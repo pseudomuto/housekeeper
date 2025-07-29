@@ -14,41 +14,73 @@ const (
 	DictionaryDiffDrop DictionaryDiffType = "DROP"
 	// DictionaryDiffReplace indicates a dictionary needs to be replaced (since dictionaries can't be altered)
 	DictionaryDiffReplace DictionaryDiffType = "REPLACE"
+	// DictionaryDiffRename indicates a dictionary needs to be renamed
+	DictionaryDiffRename DictionaryDiffType = "RENAME"
 )
 
 type (
-	// DictionaryDiff represents a difference between two dictionary states
+	// DictionaryDiff represents a difference between current and target dictionary states.
+	// It contains all information needed to generate migration SQL statements for
+	// dictionary operations including CREATE, DROP, REPLACE, and RENAME.
 	DictionaryDiff struct {
-		Type           DictionaryDiffType
-		DictionaryName string
-		Description    string
-		UpSQL          string
-		DownSQL        string
-		Current        *DictionaryInfo // Current state (nil if dictionary doesn't exist)
-		Target         *DictionaryInfo // Target state (nil if dictionary should be dropped)
+		Type               DictionaryDiffType // Type of operation (CREATE, DROP, REPLACE, RENAME)
+		DictionaryName     string            // Full name of the dictionary (database.name)
+		Description        string            // Human-readable description of the change
+		UpSQL              string            // SQL to apply the change (forward migration)
+		DownSQL            string            // SQL to rollback the change (reverse migration)
+		Current            *DictionaryInfo   // Current state (nil if dictionary doesn't exist)
+		Target             *DictionaryInfo   // Target state (nil if dictionary should be dropped)
+		NewDictionaryName  string           // For rename operations - the new full name
 	}
 
 	// DictionaryDiffType represents the type of dictionary difference
 	DictionaryDiffType string
 
-	// DictionaryInfo represents parsed dictionary information for comparison
+	// DictionaryInfo represents parsed dictionary information extracted from DDL statements.
+	// This structure contains all the properties needed for dictionary comparison and
+	// migration generation, including the full parsed statement for deep comparison.
 	DictionaryInfo struct {
-		Name      string
-		Database  string
-		OnCluster string
-		Comment   string
-		// Store the full statement for reconstruction since dictionaries have complex structure
-		Statement *parser.CreateDictionaryStmt
+		Name      string                       // Dictionary name
+		Database  string                       // Database name (empty for default database)
+		OnCluster string                       // Cluster name if specified (empty if not clustered)
+		Comment   string                       // Dictionary comment (without quotes)
+		Statement *parser.CreateDictionaryStmt // Full parsed CREATE DICTIONARY statement for deep comparison
 	}
 )
 
 // CompareDictionaryGrammars compares current and target dictionary grammars and returns migration diffs.
-// It analyzes both grammars to identify:
+// It analyzes both grammars to identify differences and generates appropriate migration operations.
+//
+// The function identifies:
 //   - Dictionaries that need to be created (exist in target but not current)
 //   - Dictionaries that need to be dropped (exist in current but not target)
 //   - Dictionaries that need to be replaced (exist in both but have differences)
+//   - Dictionaries that need to be renamed (same properties but different names)
+//
+// Rename Detection:
+// The function intelligently detects rename operations by comparing dictionary properties
+// (columns, sources, layouts, lifetimes, comments) excluding the name/database. If two
+// dictionaries have identical properties but different names, it generates a RENAME
+// operation instead of DROP+CREATE.
 //
 // Since dictionaries cannot be altered in ClickHouse, any modification requires CREATE OR REPLACE.
+//
+// Example:
+//
+//	currentSQL := `CREATE DICTIONARY analytics.old_users (id UInt64) PRIMARY KEY id 
+//	                SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
+//	targetSQL := `CREATE DICTIONARY analytics.users (id UInt64) PRIMARY KEY id 
+//	               SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
+//	
+//	current, _ := parser.ParseSQL(currentSQL)
+//	target, _ := parser.ParseSQL(targetSQL)
+//	
+//	diffs, err := CompareDictionaryGrammars(current, target)
+//	// Returns: []*DictionaryDiff with Type: DictionaryDiffRename
+//	// UpSQL: "RENAME DICTIONARY analytics.old_users TO analytics.users;"
+//	// DownSQL: "RENAME DICTIONARY analytics.users TO analytics.old_users;"
+//
+// The function returns a slice of DictionaryDiff objects describing each change needed.
 func CompareDictionaryGrammars(current, target *parser.Grammar) ([]*DictionaryDiff, error) {
 	var diffs []*DictionaryDiff
 
@@ -56,9 +88,13 @@ func CompareDictionaryGrammars(current, target *parser.Grammar) ([]*DictionaryDi
 	currentDicts := extractDictionaryInfo(current)
 	targetDicts := extractDictionaryInfo(target)
 
+	// Detect renames first to avoid treating them as drop+create
+	renameDiffs, processedCurrent, processedTarget := detectDictionaryRenames(currentDicts, targetDicts)
+	diffs = append(diffs, renameDiffs...)
+
 	// Find dictionaries to create or replace
-	for name, targetDict := range targetDicts {
-		currentDict, exists := currentDicts[name]
+	for name, targetDict := range processedTarget {
+		currentDict, exists := processedCurrent[name]
 		if !exists {
 			// Dictionary needs to be created
 			diff := &DictionaryDiff{
@@ -89,8 +125,8 @@ func CompareDictionaryGrammars(current, target *parser.Grammar) ([]*DictionaryDi
 	}
 
 	// Find dictionaries to drop
-	for name, currentDict := range currentDicts {
-		if _, exists := targetDicts[name]; !exists {
+	for name, currentDict := range processedCurrent {
+		if _, exists := processedTarget[name]; !exists {
 			// Dictionary should be dropped
 			diff := &DictionaryDiff{
 				Type:           DictionaryDiffDrop,
@@ -142,6 +178,84 @@ func extractDictionaryInfo(grammar *parser.Grammar) map[string]*DictionaryInfo {
 	}
 
 	return dictionaries
+}
+
+// detectDictionaryRenames identifies potential rename operations between current and target states.
+// It returns rename diffs and filtered maps with renamed dictionaries removed.
+func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInfo) ([]*DictionaryDiff, map[string]*DictionaryInfo, map[string]*DictionaryInfo) {
+	var renameDiffs []*DictionaryDiff
+	processedCurrent := make(map[string]*DictionaryInfo)
+	processedTarget := make(map[string]*DictionaryInfo)
+
+	// Copy all dictionaries to processed maps initially
+	for name, dict := range currentDicts {
+		processedCurrent[name] = dict
+	}
+	for name, dict := range targetDicts {
+		processedTarget[name] = dict
+	}
+
+	// Look for potential renames: dictionaries that don't exist by name but have identical properties
+	for currentName, currentDict := range currentDicts {
+		if _, exists := targetDicts[currentName]; exists {
+			continue // Dictionary exists in both, not a rename
+		}
+
+		// Look for a dictionary in target with identical properties but different name
+		for targetName, targetDict := range targetDicts {
+			if _, exists := currentDicts[targetName]; exists {
+				continue // Target dictionary exists in current, not a rename target
+			}
+
+			// Check if properties match (everything except name)
+			if dictionaryPropertiesMatch(currentDict, targetDict) {
+				// This is a rename operation
+				diff := &DictionaryDiff{
+					Type:              DictionaryDiffRename,
+					DictionaryName:    currentName,
+					NewDictionaryName: targetName,
+					Description:       fmt.Sprintf("Rename dictionary '%s' to '%s'", currentName, targetName),
+					Current:           currentDict,
+					Target:            targetDict,
+					UpSQL:             generateRenameDictionarySQL(currentName, targetName, currentDict.OnCluster),
+					DownSQL:           generateRenameDictionarySQL(targetName, currentName, currentDict.OnCluster),
+				}
+				renameDiffs = append(renameDiffs, diff)
+
+				// Remove from processed maps so they're not treated as drop+create
+				delete(processedCurrent, currentName)
+				delete(processedTarget, targetName)
+				break // Found the rename target, move to next current dictionary
+			}
+		}
+	}
+
+	return renameDiffs, processedCurrent, processedTarget
+}
+
+// dictionaryPropertiesMatch checks if two dictionaries have identical properties (excluding name)
+func dictionaryPropertiesMatch(dict1, dict2 *DictionaryInfo) bool {
+	// Compare basic metadata (excluding name)
+	if dict1.Comment != dict2.Comment ||
+		dict1.OnCluster != dict2.OnCluster ||
+		dict1.Database != dict2.Database {
+		return false
+	}
+
+	// Deep comparison of dictionary structure
+	return dictionaryStatementsEqual(dict1.Statement, dict2.Statement)
+}
+
+// generateRenameDictionarySQL generates RENAME DICTIONARY SQL
+func generateRenameDictionarySQL(oldName, newName, onCluster string) string {
+	var parts []string
+	parts = append(parts, "RENAME DICTIONARY", oldName, "TO", newName)
+
+	if onCluster != "" {
+		parts = append(parts, "ON CLUSTER", onCluster)
+	}
+
+	return strings.Join(parts, " ") + ";"
 }
 
 // needsDictionaryModification checks if a dictionary needs to be modified

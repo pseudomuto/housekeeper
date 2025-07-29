@@ -125,4 +125,19 @@ type (
 		OnCluster *string `parser:"('ON' 'CLUSTER' @Ident)?"`
 		Sync      *string `parser:"(@'SYNC')? ';'"`
 	}
+
+	// RenameDictionaryStmt represents RENAME DICTIONARY statements
+	// Syntax: RENAME DICTIONARY [db.]name1 TO [db.]new_name1 [, [db.]name2 TO [db.]new_name2, ...] [ON CLUSTER cluster];
+	RenameDictionaryStmt struct {
+		Renames   []*DictionaryRename `parser:"'RENAME' 'DICTIONARY' @@ (',' @@)*"`
+		OnCluster *string             `parser:"('ON' 'CLUSTER' @Ident)? ';'"`
+	}
+
+	// DictionaryRename represents a single dictionary rename operation
+	DictionaryRename struct {
+		FromDatabase *string `parser:"((@Ident '.')?"`
+		FromName     string  `parser:"@Ident)"`
+		ToDatabase   *string `parser:"'TO' ((@Ident '.')?"`
+		ToName       string  `parser:"@Ident)"`
+	}
 )

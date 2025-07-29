@@ -67,4 +67,18 @@ type (
 		Sync      bool    `parser:"@'SYNC'?"`
 		Semicolon bool    `parser:"';'"`
 	}
+
+	// RenameDatabaseStmt represents RENAME DATABASE statements
+	// Syntax: RENAME DATABASE name1 TO new_name1 [, name2 TO new_name2, ...] [ON CLUSTER cluster];
+	RenameDatabaseStmt struct {
+		Renames   []*DatabaseRename `parser:"'RENAME' 'DATABASE' @@ (',' @@)*"`
+		OnCluster *string           `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Semicolon bool              `parser:"';'"`
+	}
+
+	// DatabaseRename represents a single database rename operation
+	DatabaseRename struct {
+		From string `parser:"@Ident"`
+		To   string `parser:"'TO' @Ident"`
+	}
 )

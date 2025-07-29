@@ -42,6 +42,8 @@
 // ✅ ATTACH DICTIONARY - Fully implemented with all options
 // ✅ DETACH DICTIONARY - Fully implemented with all options
 // ✅ DROP DICTIONARY - Fully implemented with all options
+// ✅ RENAME DATABASE - Fully implemented with multi-database support and ON CLUSTER
+// ✅ RENAME DICTIONARY - Fully implemented with multi-dictionary support and ON CLUSTER
 // ⚠️  CREATE TABLE - Basic structure implemented (simplified)
 // ❌ CREATE VIEW - Basic structure implemented (simplified)
 
@@ -72,10 +74,10 @@ var (
 	parser = participle.MustBuild[Grammar](
 		participle.Lexer(clickhouseLexer),
 		participle.Elide("Comment", "MultilineComment", "Whitespace"),
-		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "DATABASE", "DICTIONARY", 
+		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "RENAME", "DATABASE", "DICTIONARY", 
 			"IF", "NOT", "EXISTS", "ON", "CLUSTER", "ENGINE", "COMMENT", "MODIFY", "PERMANENTLY", "SYNC",
 			"OR", "REPLACE", "PRIMARY", "KEY", "SOURCE", "LAYOUT", "LIFETIME", "SETTINGS", "MIN", "MAX",
-			"DEFAULT", "EXPRESSION", "IS_OBJECT_ID", "HIERARCHICAL", "INJECTIVE"),
+			"DEFAULT", "EXPRESSION", "IS_OBJECT_ID", "HIERARCHICAL", "INJECTIVE", "TO"),
 	)
 )
 
@@ -92,10 +94,12 @@ type (
 		AttachDatabase   *AttachDatabaseStmt   `parser:"| @@"`
 		DetachDatabase   *DetachDatabaseStmt   `parser:"| @@"`
 		DropDatabase     *DropDatabaseStmt     `parser:"| @@"`
+		RenameDatabase   *RenameDatabaseStmt   `parser:"| @@"`
 		CreateDictionary *CreateDictionaryStmt `parser:"| @@"`
 		AttachDictionary *AttachDictionaryStmt `parser:"| @@"`
 		DetachDictionary *DetachDictionaryStmt `parser:"| @@"`
 		DropDictionary   *DropDictionaryStmt   `parser:"| @@"`
+		RenameDictionary *RenameDictionaryStmt `parser:"| @@"`
 	}
 )
 
@@ -116,6 +120,8 @@ type (
 //		LAYOUT(HASHED())
 //		LIFETIME(3600);
 //		ALTER DATABASE analytics MODIFY COMMENT 'Updated analytics database';
+//		RENAME DATABASE analytics TO prod_analytics;
+//		RENAME DICTIONARY prod_analytics.users_dict TO prod_analytics.user_data;
 //	`
 //
 //	grammar, err := parser.ParseSQL(sql)
@@ -134,6 +140,24 @@ type (
 //				name = *stmt.CreateDictionary.Database + "." + name
 //			}
 //			fmt.Printf("CREATE DICTIONARY: %s\n", name)
+//		}
+//		if stmt.RenameDatabase != nil {
+//			for _, rename := range stmt.RenameDatabase.Renames {
+//				fmt.Printf("RENAME DATABASE: %s TO %s\n", rename.From, rename.To)
+//			}
+//		}
+//		if stmt.RenameDictionary != nil {
+//			for _, rename := range stmt.RenameDictionary.Renames {
+//				fromName := rename.FromName
+//				if rename.FromDatabase != nil {
+//					fromName = *rename.FromDatabase + "." + fromName
+//				}
+//				toName := rename.ToName
+//				if rename.ToDatabase != nil {
+//					toName = *rename.ToDatabase + "." + toName
+//				}
+//				fmt.Printf("RENAME DICTIONARY: %s TO %s\n", fromName, toName)
+//			}
 //		}
 //	}
 //

@@ -93,8 +93,14 @@ LAYOUT(HASHED())
 LIFETIME(3600)
 COMMENT 'User dictionary';
 
--- Drop database 'temp_db'
-DROP DATABASE IF EXISTS temp_db;
+-- Rename database 'temp_db' to 'staging_db'
+RENAME DATABASE temp_db TO staging_db;
+
+-- Rename dictionary 'old_users.users_dict' to 'users.users_dict'
+RENAME DICTIONARY old_users.users_dict TO users.users_dict;
+
+-- Drop database 'unused_db'
+DROP DATABASE IF EXISTS unused_db;
 ```
 
 **DOWN Migration:**
@@ -102,8 +108,14 @@ DROP DATABASE IF EXISTS temp_db;
 -- Schema rollback: setup_databases
 -- Generated at: 2024-01-01 12:00:00
 
--- Rollback: Drop database 'temp_db'
-CREATE DATABASE temp_db ENGINE = Atomic COMMENT 'Temporary database';
+-- Rollback: Drop database 'unused_db'
+CREATE DATABASE unused_db ENGINE = Atomic COMMENT 'Unused database';
+
+-- Rollback: Rename dictionary 'old_users.users_dict' to 'users.users_dict'
+RENAME DICTIONARY users.users_dict TO old_users.users_dict;
+
+-- Rollback: Rename database 'temp_db' to 'staging_db'
+RENAME DATABASE staging_db TO temp_db;
 
 -- Rollback: Create dictionary 'analytics.users_dict'
 DROP DICTIONARY IF EXISTS analytics.users_dict;
@@ -146,6 +158,11 @@ DETACH DATABASE [IF EXISTS] database_name [ON CLUSTER cluster_name] [PERMANENTLY
 DROP DATABASE [IF EXISTS] database_name [ON CLUSTER cluster_name] [SYNC];
 ```
 
+#### Rename Database
+```sql
+RENAME DATABASE old_name1 TO new_name1 [, old_name2 TO new_name2, ...] [ON CLUSTER cluster_name];
+```
+
 #### Create Dictionary
 ```sql
 CREATE [OR REPLACE] DICTIONARY [IF NOT EXISTS] [database.]dictionary_name [ON CLUSTER cluster_name]
@@ -177,6 +194,11 @@ DETACH DICTIONARY [IF EXISTS] [database.]dictionary_name [ON CLUSTER cluster_nam
 DROP DICTIONARY [IF EXISTS] [database.]dictionary_name [ON CLUSTER cluster_name] [SYNC];
 ```
 
+#### Rename Dictionary
+```sql
+RENAME DICTIONARY [database.]old_name1 TO [database.]new_name1 [, [database.]old_name2 TO [database.]new_name2, ...] [ON CLUSTER cluster_name];
+```
+
 ### Supported Database Engines
 
 - **Atomic** (default) - ClickHouse's default transactional database engine
@@ -193,12 +215,14 @@ The tool generates appropriate DDL for:
 - **Creating databases**: When a database exists in target schema but not in current state
 - **Dropping databases**: When a database exists in current state but not in target schema
 - **Database comment modifications**: Generates ALTER DATABASE statements for comment changes
+- **Renaming databases**: When a database has identical properties but different name
 - **Cluster-aware operations**: Preserves ON CLUSTER clauses in generated DDL
 
 ### Dictionary Operations
 - **Creating dictionaries**: When a dictionary exists in target schema but not in current state
 - **Dropping dictionaries**: When a dictionary exists in current state but not in target schema
 - **Replacing dictionaries**: Uses CREATE OR REPLACE when any dictionary properties change (dictionaries cannot be altered)
+- **Renaming dictionaries**: When a dictionary has identical properties but different name/database
 - **Complex dictionary features**: Supports all ClickHouse dictionary attributes, sources, layouts, and lifetimes
 
 ### Unsupported Operations
@@ -249,12 +273,14 @@ The participle-based parser provides robust support for:
 - `ATTACH DATABASE [IF NOT EXISTS] name [ENGINE = engine(...)] [ON CLUSTER cluster]`
 - `DETACH DATABASE [IF EXISTS] name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]`
 - `DROP DATABASE [IF EXISTS] name [ON CLUSTER cluster] [SYNC]`
+- `RENAME DATABASE old_name TO new_name [, ...] [ON CLUSTER cluster]`
 
 #### Dictionary Operations (Complete)
 - `CREATE [OR REPLACE] DICTIONARY [IF NOT EXISTS] [db.]name [ON CLUSTER cluster] (...) PRIMARY KEY ... SOURCE(...) LAYOUT(...) LIFETIME(...) [SETTINGS(...)] [COMMENT 'comment']`
 - `ATTACH DICTIONARY [IF NOT EXISTS] [db.]name [ON CLUSTER cluster]`
 - `DETACH DICTIONARY [IF EXISTS] [db.]name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]`
 - `DROP DICTIONARY [IF EXISTS] [db.]name [ON CLUSTER cluster] [SYNC]`
+- `RENAME DICTIONARY [db.]old_name TO [db.]new_name [, ...] [ON CLUSTER cluster]`
 - Complex column attributes: `IS_OBJECT_ID`, `HIERARCHICAL`, `INJECTIVE`, `DEFAULT`, `EXPRESSION`
 - All source types, layout types, lifetime configurations, and settings
 

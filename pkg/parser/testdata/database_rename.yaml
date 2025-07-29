@@ -1,0 +1,23 @@
+statements:
+  - rename_database:
+      renames:
+        - from: "old_db"
+          to: "new_db"
+  - rename_database:
+      renames:
+        - from: "db1"
+          to: "db2"
+        - from: "db3"
+          to: "db4"
+  - rename_database:
+      renames:
+        - from: "old_db"
+          to: "new_db"
+      on_cluster: "my_cluster"
+  - rename_database:
+      renames:
+        - from: "db1"
+          to: "db2"
+        - from: "db3"
+          to: "db4"
+      on_cluster: "production"

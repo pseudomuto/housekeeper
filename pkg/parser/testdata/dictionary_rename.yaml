@@ -1,0 +1,33 @@
+statements:
+  - rename_dictionary:
+      renames:
+        - from_name: "old_dict"
+          to_name: "new_dict"
+  - rename_dictionary:
+      renames:
+        - from_database: "db"
+          from_name: "old_dict"
+          to_database: "db"
+          to_name: "new_dict"
+  - rename_dictionary:
+      renames:
+        - from_name: "dict1"
+          to_name: "dict2"
+        - from_database: "db"
+          from_name: "dict3"
+          to_database: "db"
+          to_name: "dict4"
+  - rename_dictionary:
+      renames:
+        - from_name: "old_dict"
+          to_name: "new_dict"
+      on_cluster: "my_cluster"
+  - rename_dictionary:
+      renames:
+        - from_database: "db1"
+          from_name: "dict1"
+          to_database: "db2"
+          to_name: "dict2"
+        - from_name: "dict3"
+          to_name: "dict4"
+      on_cluster: "production"
