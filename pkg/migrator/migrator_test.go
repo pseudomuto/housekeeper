@@ -72,7 +72,7 @@ func TestMigrationGeneration(t *testing.T) {
 			}
 
 			// Generate migration
-			migration, err := GenerateDatabaseMigration(currentGrammar, targetGrammar, testName)
+			migration, err := GenerateMigration(currentGrammar, targetGrammar, testName)
 			if testCase.ExpectedMigration.DiffCount == 0 {
 				require.Error(t, err, "Expected error for invalid operation or no differences")
 				// Could be no differences or unsupported operation
@@ -94,7 +94,7 @@ func TestMigrationGeneration(t *testing.T) {
 
 func updateMigrationTestCase(t *testing.T, testCase MigrationTestCase, current, target *parser.Grammar, yamlPath string) {
 	// Generate migration to extract expected results
-	migration, err := GenerateDatabaseMigration(current, target, "test")
+	migration, err := GenerateMigration(current, target, "test")
 	if err != nil {
 		if strings.Contains(err.Error(), "no differences found") {
 			testCase.ExpectedMigration.DiffCount = 0

@@ -31,22 +31,29 @@ type (
 //
 // Example:
 //
-//	client, err := NewClient("localhost:9000")
+//	client, err := clickhouse.NewClient("localhost:9000")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	defer client.Close()
 //	
-//	// Get current database schema
-//	grammar, err := client.GetDatabaseGrammar(context.Background())
+//	// Get current schema (databases and dictionaries)
+//	grammar, err := client.GetSchema(context.Background())
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	
-//	// Print all databases
+//	// Print all parsed statements
 //	for _, stmt := range grammar.Statements {
 //	    if stmt.CreateDatabase != nil {
 //	        fmt.Printf("Database: %s\n", stmt.CreateDatabase.Name)
+//	    }
+//	    if stmt.CreateDictionary != nil {
+//	        name := stmt.CreateDictionary.Name
+//	        if stmt.CreateDictionary.Database != nil {
+//	            name = *stmt.CreateDictionary.Database + "." + name
+//	        }
+//	        fmt.Printf("Dictionary: %s\n", name)
 //	    }
 //	}
 func NewClient(dsn string) (*Client, error) {
@@ -96,8 +103,8 @@ func (c *Client) ExecuteMigration(ctx context.Context, sql string) error {
 }
 
 // GetSchemaRecreationStatements returns all DDL statements necessary to recreate the current database schema.
-// Currently focuses on database operations only (CREATE DATABASE statements).
-// Returns statements that can be executed to recreate the schema from scratch.
+// This focuses on database operations only (CREATE DATABASE statements).
+// Returns statements that can be executed to recreate the database portion of the schema from scratch.
 func (c *Client) GetSchemaRecreationStatements(ctx context.Context) ([]string, error) {
 	var statements []string
 
@@ -196,6 +203,37 @@ func (c *Client) validateDDLStatement(ddl string) error {
 	return err
 }
 
+// GetSchema returns complete schema information including databases and dictionaries.
+// This method retrieves both database and dictionary DDL statements from ClickHouse.
+func (c *Client) GetSchema(ctx context.Context) (*parser.Grammar, error) {
+	var statements []string
+
+	// Get database statements
+	dbStatements, err := c.GetSchemaRecreationStatements(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database statements: %w", err)
+	}
+	statements = append(statements, dbStatements...)
+
+	// Get dictionary statements
+	dictStatements, err := c.getDictionaryRecreationStatements(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dictionary statements: %w", err)
+	}
+	statements = append(statements, dictStatements...)
+
+	// Combine all statements into a single SQL string
+	combinedSQL := strings.Join(statements, "\n")
+
+	// Parse the combined SQL using our parser
+	grammar, err := parser.ParseSQL(combinedSQL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse generated DDL: %w", err)
+	}
+
+	return grammar, nil
+}
+
 // GetDatabasesOnly returns database-only schema information using the parser approach.
 // This method focuses solely on database operations and returns a Grammar with parsed database statements.
 func (c *Client) GetDatabasesOnly(ctx context.Context) (*parser.Grammar, error) {
@@ -214,4 +252,52 @@ func (c *Client) GetDatabasesOnly(ctx context.Context) (*parser.Grammar, error) 
 	}
 
 	return grammar, nil
+}
+
+// getDictionaryRecreationStatements returns CREATE DICTIONARY statements to recreate all dictionaries
+func (c *Client) getDictionaryRecreationStatements(ctx context.Context) ([]string, error) {
+	var statements []string
+
+	// Query system.dictionaries to get all dictionary information
+	query := `
+		SELECT 
+			database,
+			name,
+			create_table_query
+		FROM system.dictionaries
+		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+		ORDER BY database, name
+	`
+
+	rows, err := c.conn.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query dictionaries: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var database, name, createQuery string
+		if err := rows.Scan(&database, &name, &createQuery); err != nil {
+			return nil, fmt.Errorf("failed to scan dictionary row: %w", err)
+		}
+
+		// Clean up the CREATE statement - remove IF NOT EXISTS and ensure it ends with semicolon
+		cleanedQuery := strings.TrimSpace(createQuery)
+		if !strings.HasSuffix(cleanedQuery, ";") {
+			cleanedQuery += ";"
+		}
+
+		// Validate the generated statement using our parser
+		if err := c.validateDDLStatement(cleanedQuery); err != nil {
+			return nil, fmt.Errorf("generated invalid DDL for dictionary %s.%s: %w", database, name, err)
+		}
+
+		statements = append(statements, cleanedQuery)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating dictionary rows: %w", err)
+	}
+
+	return statements, nil
 }

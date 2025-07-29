@@ -1,0 +1,527 @@
+package migrator
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/pseudomuto/housekeeper/pkg/parser"
+)
+
+const (
+	// DictionaryDiffCreate indicates a dictionary needs to be created
+	DictionaryDiffCreate DictionaryDiffType = "CREATE"
+	// DictionaryDiffDrop indicates a dictionary needs to be dropped
+	DictionaryDiffDrop DictionaryDiffType = "DROP"
+	// DictionaryDiffReplace indicates a dictionary needs to be replaced (since dictionaries can't be altered)
+	DictionaryDiffReplace DictionaryDiffType = "REPLACE"
+)
+
+type (
+	// DictionaryDiff represents a difference between two dictionary states
+	DictionaryDiff struct {
+		Type           DictionaryDiffType
+		DictionaryName string
+		Description    string
+		UpSQL          string
+		DownSQL        string
+		Current        *DictionaryInfo // Current state (nil if dictionary doesn't exist)
+		Target         *DictionaryInfo // Target state (nil if dictionary should be dropped)
+	}
+
+	// DictionaryDiffType represents the type of dictionary difference
+	DictionaryDiffType string
+
+	// DictionaryInfo represents parsed dictionary information for comparison
+	DictionaryInfo struct {
+		Name      string
+		Database  string
+		OnCluster string
+		Comment   string
+		// Store the full statement for reconstruction since dictionaries have complex structure
+		Statement *parser.CreateDictionaryStmt
+	}
+)
+
+// CompareDictionaryGrammars compares current and target dictionary grammars and returns migration diffs.
+// It analyzes both grammars to identify:
+//   - Dictionaries that need to be created (exist in target but not current)
+//   - Dictionaries that need to be dropped (exist in current but not target)
+//   - Dictionaries that need to be replaced (exist in both but have differences)
+//
+// Since dictionaries cannot be altered in ClickHouse, any modification requires CREATE OR REPLACE.
+func CompareDictionaryGrammars(current, target *parser.Grammar) ([]*DictionaryDiff, error) {
+	var diffs []*DictionaryDiff
+
+	// Extract dictionary information from both grammars
+	currentDicts := extractDictionaryInfo(current)
+	targetDicts := extractDictionaryInfo(target)
+
+	// Find dictionaries to create or replace
+	for name, targetDict := range targetDicts {
+		currentDict, exists := currentDicts[name]
+		if !exists {
+			// Dictionary needs to be created
+			diff := &DictionaryDiff{
+				Type:           DictionaryDiffCreate,
+				DictionaryName: name,
+				Description:    fmt.Sprintf("Create dictionary '%s'", name),
+				Target:         targetDict,
+				UpSQL:          generateCreateDictionarySQL(targetDict),
+				DownSQL:        generateDropDictionarySQL(targetDict),
+			}
+			diffs = append(diffs, diff)
+		} else {
+			// Dictionary exists, check for modifications
+			if needsDictionaryModification(currentDict, targetDict) {
+				// Since dictionaries can't be altered, use CREATE OR REPLACE
+				diff := &DictionaryDiff{
+					Type:           DictionaryDiffReplace,
+					DictionaryName: name,
+					Description:    fmt.Sprintf("Replace dictionary '%s'", name),
+					Current:        currentDict,
+					Target:         targetDict,
+					UpSQL:          generateReplaceDictionarySQL(targetDict),
+					DownSQL:        generateReplaceDictionarySQL(currentDict),
+				}
+				diffs = append(diffs, diff)
+			}
+		}
+	}
+
+	// Find dictionaries to drop
+	for name, currentDict := range currentDicts {
+		if _, exists := targetDicts[name]; !exists {
+			// Dictionary should be dropped
+			diff := &DictionaryDiff{
+				Type:           DictionaryDiffDrop,
+				DictionaryName: name,
+				Description:    fmt.Sprintf("Drop dictionary '%s'", name),
+				Current:        currentDict,
+				UpSQL:          generateDropDictionarySQL(currentDict),
+				DownSQL:        generateCreateDictionarySQL(currentDict),
+			}
+			diffs = append(diffs, diff)
+		}
+	}
+
+	return diffs, nil
+}
+
+// extractDictionaryInfo extracts dictionary information from CREATE DICTIONARY statements in a grammar
+func extractDictionaryInfo(grammar *parser.Grammar) map[string]*DictionaryInfo {
+	dictionaries := make(map[string]*DictionaryInfo)
+
+	for _, stmt := range grammar.Statements {
+		if stmt.CreateDictionary != nil {
+			dict := stmt.CreateDictionary
+			info := &DictionaryInfo{
+				Name:      dict.Name,
+				Statement: dict,
+			}
+
+			if dict.Database != nil {
+				info.Database = *dict.Database
+			}
+
+			if dict.OnCluster != nil {
+				info.OnCluster = *dict.OnCluster
+			}
+
+			if dict.Comment != nil {
+				info.Comment = removeQuotes(*dict.Comment)
+			}
+
+			// Use full name (database.name) as key for uniqueness
+			fullName := info.Name
+			if info.Database != "" {
+				fullName = info.Database + "." + info.Name
+			}
+
+			dictionaries[fullName] = info
+		}
+	}
+
+	return dictionaries
+}
+
+// needsDictionaryModification checks if a dictionary needs to be modified
+// This compares the essential properties that would require a CREATE OR REPLACE
+func needsDictionaryModification(current, target *DictionaryInfo) bool {
+	// Basic metadata comparison
+	if current.Comment != target.Comment ||
+		current.OnCluster != target.OnCluster ||
+		current.Database != target.Database {
+		return true
+	}
+
+	// Deep comparison of dictionary structure
+	return !dictionaryStatementsEqual(current.Statement, target.Statement)
+}
+
+// dictionaryStatementsEqual performs deep comparison of dictionary statements
+func dictionaryStatementsEqual(current, target *parser.CreateDictionaryStmt) bool {
+	if current == nil || target == nil {
+		return current == target
+	}
+
+	// Compare basic flags
+	if !stringPtrEqual(current.OrReplace, target.OrReplace) ||
+		!stringPtrEqual(current.IfNotExists, target.IfNotExists) {
+		return false
+	}
+
+	// Compare columns
+	if !dictionaryColumnsEqual(current.Columns, target.Columns) {
+		return false
+	}
+
+	// Compare primary key
+	if !dictionaryPrimaryKeyEqual(current.PrimaryKey, target.PrimaryKey) {
+		return false
+	}
+
+	// Compare source
+	if !dictionarySourceEqual(current.Source, target.Source) {
+		return false
+	}
+
+	// Compare layout
+	if !dictionaryLayoutEqual(current.Layout, target.Layout) {
+		return false
+	}
+
+	// Compare lifetime
+	if !dictionaryLifetimeEqual(current.Lifetime, target.Lifetime) {
+		return false
+	}
+
+	// Compare settings
+	if !dictionarySettingsEqual(current.Settings, target.Settings) {
+		return false
+	}
+
+	return true
+}
+
+// Helper functions for deep comparison
+func stringPtrEqual(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func dictionaryColumnsEqual(a, b []*parser.DictionaryColumn) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, colA := range a {
+		colB := b[i]
+		if colA.Name != colB.Name || colA.Type != colB.Type {
+			return false
+		}
+		
+		// Compare defaults
+		if !dictionaryColumnDefaultEqual(colA.Default, colB.Default) {
+			return false
+		}
+		
+		// Compare attributes
+		if !dictionaryColumnAttributesEqual(colA.Attributes, colB.Attributes) {
+			return false
+		}
+	}
+	return true
+}
+
+func dictionaryColumnDefaultEqual(a, b *parser.DictionaryColumnDefault) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Type == b.Type && a.Expression == b.Expression
+}
+
+func dictionaryColumnAttributesEqual(a, b []*parser.DictionaryColumnAttr) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	// Create maps to compare attributes regardless of order
+	aMap := make(map[string]bool)
+	bMap := make(map[string]bool)
+	
+	for _, attr := range a {
+		aMap[attr.Name] = true
+	}
+	for _, attr := range b {
+		bMap[attr.Name] = true
+	}
+	
+	// Compare maps
+	for name := range aMap {
+		if !bMap[name] {
+			return false
+		}
+	}
+	for name := range bMap {
+		if !aMap[name] {
+			return false
+		}
+	}
+	
+	return true
+}
+
+func dictionaryPrimaryKeyEqual(a, b *parser.DictionaryPrimaryKey) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if len(a.Keys) != len(b.Keys) {
+		return false
+	}
+	for i, keyA := range a.Keys {
+		if keyA != b.Keys[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func dictionarySourceEqual(a, b *parser.DictionarySource) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Name == b.Name && dictionaryParametersEqual(a.Parameters, b.Parameters)
+}
+
+func dictionaryLayoutEqual(a, b *parser.DictionaryLayout) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Name == b.Name && dictionaryParametersEqual(a.Parameters, b.Parameters)
+}
+
+func dictionaryLifetimeEqual(a, b *parser.DictionaryLifetime) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	
+	// Compare single values
+	if !stringPtrEqual(a.Single, b.Single) {
+		return false
+	}
+	
+	// Compare MinMax values
+	if a.MinMax == nil && b.MinMax == nil {
+		return true
+	}
+	if a.MinMax == nil || b.MinMax == nil {
+		return false
+	}
+	
+	// Both MinMax structures should be equivalent regardless of order
+	aMin, aMax := getMinMaxValues(a.MinMax)
+	bMin, bMax := getMinMaxValues(b.MinMax)
+	
+	return aMin == bMin && aMax == bMax
+}
+
+// getMinMaxValues extracts min and max values from DictionaryLifetimeMinMax regardless of order
+func getMinMaxValues(minMax *parser.DictionaryLifetimeMinMax) (string, string) {
+	if minMax.MinFirst != nil {
+		return minMax.MinFirst.MinValue, minMax.MinFirst.MaxValue
+	}
+	if minMax.MaxFirst != nil {
+		return minMax.MaxFirst.MinValue, minMax.MaxFirst.MaxValue
+	}
+	return "", ""
+}
+
+func dictionarySettingsEqual(a, b *parser.DictionarySettings) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if len(a.Settings) != len(b.Settings) {
+		return false
+	}
+	// Simple comparison - could be enhanced with order-independent comparison
+	for i, settingA := range a.Settings {
+		settingB := b.Settings[i]
+		if settingA.Name != settingB.Name || settingA.Value != settingB.Value {
+			return false
+		}
+	}
+	return true
+}
+
+func dictionaryParametersEqual(a, b []*parser.DictionaryParameter) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, paramA := range a {
+		paramB := b[i]
+		if paramA.Name != paramB.Name || paramA.Value != paramB.Value {
+			return false
+		}
+	}
+	return true
+}
+
+// generateCreateDictionarySQL generates CREATE DICTIONARY SQL from dictionary info
+func generateCreateDictionarySQL(dict *DictionaryInfo) string {
+	return reconstructDictionarySQL(dict.Statement, false)
+}
+
+// generateReplaceDictionarySQL generates CREATE OR REPLACE DICTIONARY SQL from dictionary info
+func generateReplaceDictionarySQL(dict *DictionaryInfo) string {
+	return reconstructDictionarySQL(dict.Statement, true)
+}
+
+// generateDropDictionarySQL generates DROP DICTIONARY SQL from dictionary info
+func generateDropDictionarySQL(dict *DictionaryInfo) string {
+	var parts []string
+	parts = append(parts, "DROP DICTIONARY IF EXISTS")
+
+	if dict.Database != "" {
+		parts = append(parts, dict.Database+"."+dict.Name)
+	} else {
+		parts = append(parts, dict.Name)
+	}
+
+	if dict.OnCluster != "" {
+		parts = append(parts, "ON CLUSTER", dict.OnCluster)
+	}
+
+	return strings.Join(parts, " ") + ";"
+}
+
+// reconstructDictionarySQL reconstructs CREATE DICTIONARY SQL from parsed statement
+func reconstructDictionarySQL(stmt *parser.CreateDictionaryStmt, useOrReplace bool) string {
+	var parts []string
+
+	// CREATE [OR REPLACE] DICTIONARY
+	if useOrReplace {
+		parts = append(parts, "CREATE OR REPLACE DICTIONARY")
+	} else {
+		parts = append(parts, "CREATE DICTIONARY")
+	}
+
+	// IF NOT EXISTS (only if not using OR REPLACE)
+	if !useOrReplace && stmt.IfNotExists != nil {
+		parts = append(parts, "IF NOT EXISTS")
+	}
+
+	// [database.]name
+	if stmt.Database != nil {
+		parts = append(parts, *stmt.Database+"."+stmt.Name)
+	} else {
+		parts = append(parts, stmt.Name)
+	}
+
+	// ON CLUSTER
+	if stmt.OnCluster != nil {
+		parts = append(parts, "ON CLUSTER", *stmt.OnCluster)
+	}
+
+	// Columns
+	if len(stmt.Columns) > 0 {
+		parts = append(parts, "(")
+		var columnParts []string
+		for _, col := range stmt.Columns {
+			columnStr := col.Name + " " + col.Type
+			
+			// Add DEFAULT or EXPRESSION if present
+			if col.Default != nil {
+				columnStr += " " + col.Default.Type + " " + col.Default.Expression
+			}
+			
+			// Add attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
+			for _, attr := range col.Attributes {
+				columnStr += " " + attr.Name
+			}
+			
+			columnParts = append(columnParts, columnStr)
+		}
+		parts = append(parts, strings.Join(columnParts, ", "))
+		parts = append(parts, ")")
+	}
+
+	// PRIMARY KEY
+	if stmt.PrimaryKey != nil {
+		parts = append(parts, "PRIMARY KEY", strings.Join(stmt.PrimaryKey.Keys, ", "))
+	}
+
+	// SOURCE
+	if stmt.Source != nil {
+		sourceStr := "SOURCE(" + stmt.Source.Name
+		if len(stmt.Source.Parameters) > 0 {
+			var paramStrs []string
+			for _, param := range stmt.Source.Parameters {
+				paramStrs = append(paramStrs, param.Name+" "+param.Value)
+			}
+			sourceStr += "(" + strings.Join(paramStrs, ", ") + ")"
+		}
+		sourceStr += ")"
+		parts = append(parts, sourceStr)
+	}
+
+	// LAYOUT
+	if stmt.Layout != nil {
+		layoutStr := "LAYOUT(" + stmt.Layout.Name
+		if len(stmt.Layout.Parameters) > 0 {
+			var paramStrs []string
+			for _, param := range stmt.Layout.Parameters {
+				paramStrs = append(paramStrs, param.Name+" "+param.Value)
+			}
+			layoutStr += "(" + strings.Join(paramStrs, ", ") + ")"
+		}
+		layoutStr += ")"
+		parts = append(parts, layoutStr)
+	}
+
+	// LIFETIME
+	if stmt.Lifetime != nil {
+		if stmt.Lifetime.Single != nil {
+			parts = append(parts, "LIFETIME("+*stmt.Lifetime.Single+")")
+		} else if stmt.Lifetime.MinMax != nil {
+			min, max := getMinMaxValues(stmt.Lifetime.MinMax)
+			parts = append(parts, "LIFETIME(MIN "+min+" MAX "+max+")")
+		}
+	}
+
+	// SETTINGS
+	if stmt.Settings != nil && len(stmt.Settings.Settings) > 0 {
+		var settingStrs []string
+		for _, setting := range stmt.Settings.Settings {
+			settingStrs = append(settingStrs, setting.Name+"="+setting.Value)
+		}
+		parts = append(parts, "SETTINGS("+strings.Join(settingStrs, ", ")+")")
+	}
+
+	// COMMENT
+	if stmt.Comment != nil {
+		parts = append(parts, "COMMENT", *stmt.Comment)
+	}
+
+	return strings.Join(parts, " ") + ";"
+}

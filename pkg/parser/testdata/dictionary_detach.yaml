@@ -1,0 +1,56 @@
+dictionaries:
+    analytics.detach_full_dict:
+        name: detach_full_dict
+        database: analytics
+        cluster: production
+        or_replace: false
+        comment: ""
+        operation: DETACH
+        if_not_exists: false
+        if_exists: true
+        permanently: true
+        sync: true
+    analytics.detach_ifexists_dict:
+        name: detach_ifexists_dict
+        database: analytics
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: DETACH
+        if_not_exists: false
+        if_exists: true
+        permanently: false
+        sync: false
+    detach_basic_dict:
+        name: detach_basic_dict
+        database: ""
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: DETACH
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    detach_permanently_dict:
+        name: detach_permanently_dict
+        database: ""
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: DETACH
+        if_not_exists: false
+        if_exists: false
+        permanently: true
+        sync: false
+    detach_sync_dict:
+        name: detach_sync_dict
+        database: ""
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: DETACH
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: true

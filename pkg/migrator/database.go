@@ -223,28 +223,3 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 	return strings.Join(statements, "\n"), nil
 }
 
-// formatEngine formats a database engine with its parameters
-func formatEngine(engine *parser.DatabaseEngine) string {
-	if engine.Parameters == nil || len(engine.Parameters) == 0 {
-		return engine.Name
-	}
-
-	var params []string
-	for _, param := range engine.Parameters {
-		params = append(params, param.Value)
-	}
-	return engine.Name + "(" + strings.Join(params, ", ") + ")"
-}
-
-// removeQuotes removes surrounding single quotes from a string
-func removeQuotes(s string) string {
-	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
-		return s[1 : len(s)-1]
-	}
-	return s
-}
-
-// escapeSQL escapes single quotes in SQL strings
-func escapeSQL(s string) string {
-	return strings.ReplaceAll(s, "'", "\\'")
-}

@@ -1,0 +1,34 @@
+dictionaries:
+    analytics.user_mapping:
+        name: user_mapping
+        database: analytics
+        cluster: production
+        or_replace: false
+        comment: Complex user mapping dictionary
+        operation: CREATE
+        if_not_exists: true
+        if_exists: false
+        permanently: false
+        sync: false
+    simple_dict:
+        name: simple_dict
+        database: ""
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: CREATE
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    users_dict:
+        name: users_dict
+        database: ""
+        cluster: ""
+        or_replace: true
+        comment: User directory
+        operation: CREATE
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false

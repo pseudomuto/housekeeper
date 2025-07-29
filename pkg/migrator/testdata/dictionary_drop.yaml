@@ -1,0 +1,18 @@
+description: "Dropping a dictionary"
+current_sql: |
+  CREATE DICTIONARY users_dict (
+    id UInt64,
+    name String
+  ) PRIMARY KEY id
+  SOURCE(HTTP(url 'http://example.com/users'))
+  LAYOUT(FLAT())
+  LIFETIME(600);
+target_sql: ""
+expected_migration:
+  up_contains:
+    - "DROP DICTIONARY IF EXISTS users_dict"
+  down_contains:
+    - "CREATE DICTIONARY users_dict"
+  diff_count: 1
+  diff_types:
+    - "DROP"

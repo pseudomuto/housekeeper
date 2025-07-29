@@ -19,38 +19,42 @@ type (
 	}
 )
 
-// GenerateDatabaseMigration creates a database migration by comparing current and target database states.
-// It analyzes the differences between the current database schema and the desired target schema,
+// GenerateMigration creates a migration by comparing current and target schema states.
+// It analyzes the differences between the current schema and the desired target schema,
 // then generates appropriate DDL statements for both applying (UP) and rolling back (DOWN) the changes.
+//
+// The migration includes both database and dictionary changes, processing them in the correct order:
+// - Databases are processed first (since dictionaries may depend on them)
+// - Within each type: CREATE -> ALTER/REPLACE -> DROP
 //
 // The function returns an error if:
 //   - No differences are found between current and target schemas
-//   - An unsupported operation is detected (e.g., engine or cluster changes)
-//   - Database comparison fails
+//   - An unsupported operation is detected (e.g., database engine or cluster changes)
+//   - Schema comparison fails
 //
 // Example:
 //
 //	currentSQL := `CREATE DATABASE db1 ENGINE = Atomic COMMENT 'Old comment';`
-//	targetSQL := `CREATE DATABASE db1 ENGINE = Atomic COMMENT 'New comment';`
+//	targetSQL := `CREATE DATABASE db1 ENGINE = Atomic COMMENT 'New comment';
+//	              CREATE DICTIONARY dict1 (id UInt64) PRIMARY KEY id SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
 //	
 //	current, _ := parser.ParseSQL(currentSQL)
 //	target, _ := parser.ParseSQL(targetSQL)
 //	
-//	migration, err := GenerateDatabaseMigration(current, target, "update_comment")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	
-//	fmt.Println(migration.Up)   // ALTER DATABASE db1 MODIFY COMMENT 'New comment';
-//	fmt.Println(migration.Down) // ALTER DATABASE db1 MODIFY COMMENT 'Old comment';
-func GenerateDatabaseMigration(current, target *parser.Grammar, name string) (*Migration, error) {
-	// Compare the grammars to find differences
-	diffs, err := CompareDatabaseGrammars(current, target)
+//	migration, err := GenerateMigration(current, target, "update_schema")
+func GenerateMigration(current, target *parser.Grammar, name string) (*Migration, error) {
+	// Compare databases and dictionaries to find differences
+	dbDiffs, err := CompareDatabaseGrammars(current, target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compare database grammars: %w", err)
 	}
 
-	if len(diffs) == 0 {
+	dictDiffs, err := CompareDictionaryGrammars(current, target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare dictionary grammars: %w", err)
+	}
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 {
 		return nil, fmt.Errorf("no differences found")
 	}
 
@@ -58,56 +62,103 @@ func GenerateDatabaseMigration(current, target *parser.Grammar, name string) (*M
 	version := timestamp.Format("20060102150405")
 
 	// Generate migration header
-	up := fmt.Sprintf("-- Database migration: %s\n", name)
+	up := fmt.Sprintf("-- Schema migration: %s\n", name)
 	up += fmt.Sprintf("-- Generated at: %s\n\n", timestamp.Format("2006-01-02 15:04:05"))
 
-	down := fmt.Sprintf("-- Database rollback: %s\n", name)
+	down := fmt.Sprintf("-- Schema rollback: %s\n", name)
 	down += fmt.Sprintf("-- Generated at: %s\n\n", timestamp.Format("2006-01-02 15:04:05"))
 
-	// Process diffs in order: CREATE first, then ALTER, then DROP
+	// Process diffs in proper order: databases first, then dictionaries
+	// Within each type: CREATE first, then ALTER/REPLACE, then DROP
 	var upStatements []string
 	var downStatements []string
 
-	// Group diffs by type for proper ordering
-	var createDiffs, alterDiffs, dropDiffs []*DatabaseDiff
-	for _, diff := range diffs {
+	// Group database diffs by type for proper ordering
+	var dbCreateDiffs, dbAlterDiffs, dbDropDiffs []*DatabaseDiff
+	for _, diff := range dbDiffs {
 		switch diff.Type {
 		case DatabaseDiffCreate:
-			createDiffs = append(createDiffs, diff)
+			dbCreateDiffs = append(dbCreateDiffs, diff)
 		case DatabaseDiffAlter:
-			alterDiffs = append(alterDiffs, diff)
+			dbAlterDiffs = append(dbAlterDiffs, diff)
 		case DatabaseDiffDrop:
-			dropDiffs = append(dropDiffs, diff)
+			dbDropDiffs = append(dbDropDiffs, diff)
 		}
 	}
 
-	// UP migration: CREATE -> ALTER -> DROP
-	for _, diff := range createDiffs {
+	// Group dictionary diffs by type for proper ordering
+	var dictCreateDiffs, dictReplaceDiffs, dictDropDiffs []*DictionaryDiff
+	for _, diff := range dictDiffs {
+		switch diff.Type {
+		case DictionaryDiffCreate:
+			dictCreateDiffs = append(dictCreateDiffs, diff)
+		case DictionaryDiffReplace:
+			dictReplaceDiffs = append(dictReplaceDiffs, diff)
+		case DictionaryDiffDrop:
+			dictDropDiffs = append(dictDropDiffs, diff)
+		}
+	}
+
+	// UP migration: Databases first, then dictionaries
+	// Database order: CREATE -> ALTER -> DROP
+	for _, diff := range dbCreateDiffs {
 		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
 		upStatements = append(upStatements, diff.UpSQL)
 	}
-	for _, diff := range alterDiffs {
+	for _, diff := range dbAlterDiffs {
 		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
 		upStatements = append(upStatements, diff.UpSQL)
 	}
-	for _, diff := range dropDiffs {
+	for _, diff := range dbDropDiffs {
 		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
-	// DOWN migration: reverse order (CREATE <- ALTER <- DROP)
-	for i := len(dropDiffs) - 1; i >= 0; i-- {
-		diff := dropDiffs[i]
+	// Dictionary order: CREATE -> REPLACE -> DROP
+	for _, diff := range dictCreateDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range dictReplaceDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range dictDropDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+
+	// DOWN migration: reverse order (dictionaries first, then databases)
+	// Dictionary order: DROP <- REPLACE <- CREATE
+	for i := len(dictDropDiffs) - 1; i >= 0; i-- {
+		diff := dictDropDiffs[i]
 		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
 		downStatements = append(downStatements, diff.DownSQL)
 	}
-	for i := len(alterDiffs) - 1; i >= 0; i-- {
-		diff := alterDiffs[i]
+	for i := len(dictReplaceDiffs) - 1; i >= 0; i-- {
+		diff := dictReplaceDiffs[i]
 		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
 		downStatements = append(downStatements, diff.DownSQL)
 	}
-	for i := len(createDiffs) - 1; i >= 0; i-- {
-		diff := createDiffs[i]
+	for i := len(dictCreateDiffs) - 1; i >= 0; i-- {
+		diff := dictCreateDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+
+	// Database order: DROP <- ALTER <- CREATE
+	for i := len(dbDropDiffs) - 1; i >= 0; i-- {
+		diff := dbDropDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(dbAlterDiffs) - 1; i >= 0; i-- {
+		diff := dbAlterDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(dbCreateDiffs) - 1; i >= 0; i-- {
+		diff := dbCreateDiffs[i]
 		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
 		downStatements = append(downStatements, diff.DownSQL)
 	}
@@ -123,4 +174,5 @@ func GenerateDatabaseMigration(current, target *parser.Grammar, name string) (*M
 		Timestamp: timestamp,
 	}, nil
 }
+
 

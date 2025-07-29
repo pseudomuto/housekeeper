@@ -1,8 +1,8 @@
 // Package migrator provides database schema migration generation for ClickHouse.
 //
-// This package compares current and target database schemas to generate executable
+// This package compares current and target schemas to generate executable
 // migration files with both UP (apply) and DOWN (rollback) SQL statements.
-// It focuses exclusively on database-level operations, ensuring safe and predictable
+// It supports both database and dictionary operations, ensuring safe and predictable
 // migrations for ClickHouse deployments.
 //
 // Key features:
@@ -10,23 +10,24 @@
 //   - Generation of executable DDL statements (not just comments)
 //   - Automatic rollback SQL generation
 //   - Support for CREATE, ALTER, and DROP DATABASE operations
+//   - Support for CREATE OR REPLACE and DROP DICTIONARY operations
 //   - Error handling for unsupported operations (engine/cluster changes)
 //   - Table-driven testing with YAML fixtures
 //
 // The migration generation process:
-//   1. Parse current database state (from ClickHouse)
-//   2. Parse target database state (from SQL files)
+//   1. Parse current schema state (from ClickHouse)
+//   2. Parse target schema state (from SQL files)
 //   3. Compare the two states to identify differences
 //   4. Generate appropriate DDL for each difference
-//   5. Order operations correctly (CREATE -> ALTER -> DROP)
+//   5. Order operations correctly (databases first, then dictionaries; CREATE -> ALTER/REPLACE -> DROP)
 //   6. Generate corresponding rollback statements
 //
 // Example usage:
 //
-//	currentGrammar, _ := client.GetDatabasesOnly(ctx)
+//	currentGrammar, _ := client.GetSchema(ctx)
 //	targetGrammar, _ := parser.ParseSQLFromDirectory("schema/")
 //	
-//	migration, err := migrator.GenerateDatabaseMigration(
+//	migration, err := migrator.GenerateMigration(
 //	    currentGrammar,
 //	    targetGrammar,
 //	    "add_analytics_db"

@@ -1,0 +1,45 @@
+dictionaries:
+    analytics.attach_full_dict:
+        name: attach_full_dict
+        database: analytics
+        cluster: production
+        or_replace: false
+        comment: ""
+        operation: ATTACH
+        if_not_exists: true
+        if_exists: false
+        permanently: false
+        sync: false
+    analytics.attach_ifnotexists_dict:
+        name: attach_ifnotexists_dict
+        database: analytics
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: ATTACH
+        if_not_exists: true
+        if_exists: false
+        permanently: false
+        sync: false
+    attach_basic_dict:
+        name: attach_basic_dict
+        database: ""
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: ATTACH
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    attach_cluster_dict:
+        name: attach_cluster_dict
+        database: ""
+        cluster: production
+        or_replace: false
+        comment: ""
+        operation: ATTACH
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false

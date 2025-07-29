@@ -19,7 +19,8 @@ var testdataFS embed.FS
 
 // TestCase represents expected results for a SQL file
 type TestCase struct {
-	Databases map[string]ExpectedDatabase `yaml:"databases"`
+	Databases    map[string]ExpectedDatabase    `yaml:"databases,omitempty"`
+	Dictionaries map[string]ExpectedDictionary  `yaml:"dictionaries,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -28,6 +29,20 @@ type ExpectedDatabase struct {
 	Cluster string `yaml:"cluster"`
 	Engine  string `yaml:"engine"`
 	Comment string `yaml:"comment"`
+}
+
+// ExpectedDictionary represents expected dictionary properties
+type ExpectedDictionary struct {
+	Name        string `yaml:"name"`
+	Database    string `yaml:"database"`
+	Cluster     string `yaml:"cluster"`
+	OrReplace   bool   `yaml:"or_replace"`
+	Comment     string `yaml:"comment"`
+	Operation   string `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP
+	IfNotExists bool   `yaml:"if_not_exists"`
+	IfExists    bool   `yaml:"if_exists"`
+	Permanently bool   `yaml:"permanently"`
+	Sync        bool   `yaml:"sync"`
 }
 
 var updateFlag = flag.Bool("update", false, "update YAML test files")
@@ -187,20 +202,130 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 		}
 	}
 
-	return TestCase{Databases: expectedDatabases}
+	// Process dictionaries
+	expectedDictionaries := make(map[string]ExpectedDictionary)
+	for _, stmt := range grammar.Statements {
+		if stmt.CreateDictionary != nil {
+			dict := stmt.CreateDictionary
+			dictName := dict.Name
+			if dict.Database != nil {
+				dictName = *dict.Database + "." + dict.Name
+			}
+			
+			expectedDict := ExpectedDictionary{
+				Name:        dict.Name,
+				Operation:   "CREATE",
+				OrReplace:   dict.OrReplace != nil,
+				IfNotExists: dict.IfNotExists != nil,
+			}
+			if dict.Database != nil {
+				expectedDict.Database = *dict.Database
+			}
+			if dict.OnCluster != nil {
+				expectedDict.Cluster = *dict.OnCluster
+			}
+			if dict.Comment != nil {
+				expectedDict.Comment = removeQuotes(*dict.Comment)
+			}
+			expectedDictionaries[dictName] = expectedDict
+		} else if stmt.AttachDictionary != nil {
+			dict := stmt.AttachDictionary
+			dictName := dict.Name
+			if dict.Database != nil {
+				dictName = *dict.Database + "." + dict.Name
+			}
+			
+			expectedDict := ExpectedDictionary{
+				Name:        dict.Name,
+				Operation:   "ATTACH",
+				IfNotExists: dict.IfNotExists != nil,
+			}
+			if dict.Database != nil {
+				expectedDict.Database = *dict.Database
+			}
+			if dict.OnCluster != nil {
+				expectedDict.Cluster = *dict.OnCluster
+			}
+			expectedDictionaries[dictName] = expectedDict
+		} else if stmt.DetachDictionary != nil {
+			dict := stmt.DetachDictionary
+			dictName := dict.Name
+			if dict.Database != nil {
+				dictName = *dict.Database + "." + dict.Name
+			}
+			
+			expectedDict := ExpectedDictionary{
+				Name:        dict.Name,
+				Operation:   "DETACH",
+				IfExists:    dict.IfExists != nil,
+				Permanently: dict.Permanently != nil,
+				Sync:        dict.Sync != nil,
+			}
+			if dict.Database != nil {
+				expectedDict.Database = *dict.Database
+			}
+			if dict.OnCluster != nil {
+				expectedDict.Cluster = *dict.OnCluster
+			}
+			expectedDictionaries[dictName] = expectedDict
+		} else if stmt.DropDictionary != nil {
+			dict := stmt.DropDictionary
+			dictName := dict.Name
+			if dict.Database != nil {
+				dictName = *dict.Database + "." + dict.Name
+			}
+			
+			expectedDict := ExpectedDictionary{
+				Name:      dict.Name,
+				Operation: "DROP",
+				IfExists:  dict.IfExists != nil,
+				Sync:      dict.Sync != nil,
+			}
+			if dict.Database != nil {
+				expectedDict.Database = *dict.Database
+			}
+			if dict.OnCluster != nil {
+				expectedDict.Cluster = *dict.OnCluster
+			}
+			expectedDictionaries[dictName] = expectedDict
+		}
+	}
+	
+	testCase := TestCase{}
+	
+	// Only include databases section if there are any databases
+	if len(expectedDatabases) > 0 {
+		testCase.Databases = expectedDatabases
+	}
+	
+	// Only include dictionaries section if there are any dictionaries
+	if len(expectedDictionaries) > 0 {
+		testCase.Dictionaries = expectedDictionaries  
+	}
+	
+	return testCase
 }
 
 func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlFile string) {
 	// Use the same logic as generateTestCaseFromGrammar to extract actual results
 	actualTestCase := generateTestCaseFromGrammar(actualGrammar)
 	actualDatabases := actualTestCase.Databases
+	expectedDatabases := expected.Databases
+
+	// Handle nil vs empty map cases  
+	if actualDatabases == nil {
+		actualDatabases = make(map[string]ExpectedDatabase)
+	}
+	if expectedDatabases == nil {
+		expectedDatabases = make(map[string]ExpectedDatabase)
+	}
 
 	// Check database count
-	require.Len(t, actualDatabases, len(expected.Databases),
+	require.Len(t, actualDatabases, len(expectedDatabases),
 		"Wrong number of databases in %s", sqlFile)
 
 	// Check each expected database
-	for dbName, expectedDB := range expected.Databases {
+	for dbName, expectedDB := range expectedDatabases {
 		actualDB, exists := actualDatabases[dbName]
 		require.True(t, exists, "Database %s not found in %s", dbName, sqlFile)
 
@@ -213,6 +338,48 @@ func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlF
 			"Wrong engine in database %s from %s", dbName, sqlFile)
 		require.Equal(t, expectedDB.Comment, actualDB.Comment,
 			"Wrong comment in database %s from %s", dbName, sqlFile)
+	}
 
+	// Check dictionaries
+	actualDictionaries := actualTestCase.Dictionaries
+	expectedDictionaries := expected.Dictionaries
+	
+	// Handle nil vs empty map cases
+	if actualDictionaries == nil {
+		actualDictionaries = make(map[string]ExpectedDictionary)
+	}
+	if expectedDictionaries == nil {
+		expectedDictionaries = make(map[string]ExpectedDictionary)
+	}
+	
+	require.Len(t, actualDictionaries, len(expectedDictionaries),
+		"Wrong number of dictionaries in %s", sqlFile)
+
+	// Check each expected dictionary
+	for dictName, expectedDict := range expectedDictionaries {
+		actualDict, exists := actualDictionaries[dictName]
+		require.True(t, exists, "Dictionary %s not found in %s", dictName, sqlFile)
+
+		// Verify dictionary properties
+		require.Equal(t, expectedDict.Name, actualDict.Name,
+			"Wrong dictionary name in %s", sqlFile)
+		require.Equal(t, expectedDict.Database, actualDict.Database,
+			"Wrong database in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.Cluster, actualDict.Cluster,
+			"Wrong cluster in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.Operation, actualDict.Operation,
+			"Wrong operation in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.OrReplace, actualDict.OrReplace,
+			"Wrong OR REPLACE flag in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.IfNotExists, actualDict.IfNotExists,
+			"Wrong IF NOT EXISTS flag in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.IfExists, actualDict.IfExists,
+			"Wrong IF EXISTS flag in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.Permanently, actualDict.Permanently,
+			"Wrong PERMANENTLY flag in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.Sync, actualDict.Sync,
+			"Wrong SYNC flag in dictionary %s from %s", dictName, sqlFile)
+		require.Equal(t, expectedDict.Comment, actualDict.Comment,
+			"Wrong comment in dictionary %s from %s", dictName, sqlFile)
 	}
 }

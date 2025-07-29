@@ -1,0 +1,14 @@
+-- Basic DETACH DICTIONARY
+DETACH DICTIONARY detach_basic_dict;
+
+-- DETACH DICTIONARY with IF EXISTS
+DETACH DICTIONARY IF EXISTS analytics.detach_ifexists_dict;
+
+-- DETACH DICTIONARY with PERMANENTLY
+DETACH DICTIONARY detach_permanently_dict PERMANENTLY;
+
+-- DETACH DICTIONARY with SYNC
+DETACH DICTIONARY detach_sync_dict SYNC;
+
+-- DETACH DICTIONARY with all options
+DETACH DICTIONARY IF EXISTS analytics.detach_full_dict ON CLUSTER production PERMANENTLY SYNC;

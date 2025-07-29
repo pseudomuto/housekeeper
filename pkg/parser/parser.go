@@ -32,6 +32,16 @@
 //    - IF EXISTS
 //    - ON CLUSTER
 //    - SYNC
+// ✅ CREATE DICTIONARY - Fully implemented with all ClickHouse features:
+//    - OR REPLACE clause
+//    - IF NOT EXISTS
+//    - ON CLUSTER
+//    - Complex column attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
+//    - Column defaults and expressions
+//    - All source types, layouts, lifetimes, and settings
+// ✅ ATTACH DICTIONARY - Fully implemented with all options
+// ✅ DETACH DICTIONARY - Fully implemented with all options
+// ✅ DROP DICTIONARY - Fully implemented with all options
 // ⚠️  CREATE TABLE - Basic structure implemented (simplified)
 // ❌ CREATE VIEW - Basic structure implemented (simplified)
 
@@ -62,8 +72,10 @@ var (
 	parser = participle.MustBuild[Grammar](
 		participle.Lexer(clickhouseLexer),
 		participle.Elide("Comment", "MultilineComment", "Whitespace"),
-		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "DATABASE", "IF", "NOT", "EXISTS",
-			"ON", "CLUSTER", "ENGINE", "COMMENT", "MODIFY", "PERMANENTLY", "SYNC"),
+		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "DATABASE", "DICTIONARY", 
+			"IF", "NOT", "EXISTS", "ON", "CLUSTER", "ENGINE", "COMMENT", "MODIFY", "PERMANENTLY", "SYNC",
+			"OR", "REPLACE", "PRIMARY", "KEY", "SOURCE", "LAYOUT", "LIFETIME", "SETTINGS", "MIN", "MAX",
+			"DEFAULT", "EXPRESSION", "IS_OBJECT_ID", "HIERARCHICAL", "INJECTIVE"),
 	)
 )
 
@@ -75,11 +87,15 @@ type (
 
 	// Statement represents any DDL statement
 	Statement struct {
-		CreateDatabase *CreateDatabaseStmt `parser:"@@"`
-		AlterDatabase  *AlterDatabaseStmt  `parser:"| @@"`
-		AttachDatabase *AttachDatabaseStmt `parser:"| @@"`
-		DetachDatabase *DetachDatabaseStmt `parser:"| @@"`
-		DropDatabase   *DropDatabaseStmt   `parser:"| @@"`
+		CreateDatabase   *CreateDatabaseStmt   `parser:"@@"`
+		AlterDatabase    *AlterDatabaseStmt    `parser:"| @@"`
+		AttachDatabase   *AttachDatabaseStmt   `parser:"| @@"`
+		DetachDatabase   *DetachDatabaseStmt   `parser:"| @@"`
+		DropDatabase     *DropDatabaseStmt     `parser:"| @@"`
+		CreateDictionary *CreateDictionaryStmt `parser:"| @@"`
+		AttachDictionary *AttachDictionaryStmt `parser:"| @@"`
+		DetachDictionary *DetachDictionaryStmt `parser:"| @@"`
+		DropDictionary   *DropDictionaryStmt   `parser:"| @@"`
 	}
 )
 
@@ -92,7 +108,13 @@ type (
 //
 //	sql := `
 //		CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
-//		CREATE TABLE analytics.events (id UUID, timestamp DateTime) ENGINE = MergeTree() ORDER BY id;
+//		CREATE DICTIONARY analytics.users_dict (
+//			id UInt64 IS_OBJECT_ID,
+//			name String INJECTIVE
+//		) PRIMARY KEY id 
+//		SOURCE(HTTP(url 'http://api.example.com/users'))
+//		LAYOUT(HASHED())
+//		LIFETIME(3600);
 //		ALTER DATABASE analytics MODIFY COMMENT 'Updated analytics database';
 //	`
 //
@@ -105,6 +127,13 @@ type (
 //	for _, stmt := range grammar.Statements {
 //		if stmt.CreateDatabase != nil {
 //			fmt.Printf("CREATE DATABASE: %s\n", stmt.CreateDatabase.Name)
+//		}
+//		if stmt.CreateDictionary != nil {
+//			name := stmt.CreateDictionary.Name
+//			if stmt.CreateDictionary.Database != nil {
+//				name = *stmt.CreateDictionary.Database + "." + name
+//			}
+//			fmt.Printf("CREATE DICTIONARY: %s\n", name)
 //		}
 //	}
 //

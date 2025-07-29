@@ -52,7 +52,7 @@ state and generate migration files for any differences found.`,
 
 // runDiff executes the diff operation to compare schema with database state
 func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName string) error {
-	// Parse target schema (database operations only)
+	// Parse target schema (databases and dictionaries)
 	fmt.Println("Parsing schema files...")
 	targetGrammar, err := parser.ParseSQLFromDirectory(schemaPath)
 	if err != nil {
@@ -67,9 +67,9 @@ func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName
 	}
 	defer client.Close()
 
-	// Get current schema (database operations only)
-	fmt.Println("Reading current database schema...")
-	currentGrammar, err := client.GetDatabasesOnly(ctx)
+	// Get current schema (databases and dictionaries)
+	fmt.Println("Reading current schema...")
+	currentGrammar, err := client.GetSchema(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current schema: %w", err)
 	}
@@ -79,11 +79,11 @@ func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName
 		migrationName = "auto_migration"
 	}
 
-	fmt.Println("Generating database migration...")
-	migration, err := migrator.GenerateDatabaseMigration(currentGrammar, targetGrammar, migrationName)
+	fmt.Println("Generating schema migration...")
+	migration, err := migrator.GenerateMigration(currentGrammar, targetGrammar, migrationName)
 	if err != nil {
 		if err.Error() == "no differences found" {
-			fmt.Println("No differences found. Database schema is up to date.")
+			fmt.Println("No differences found. Schema is up to date.")
 			return nil
 		}
 		return fmt.Errorf("failed to generate migration: %w", err)
@@ -96,7 +96,10 @@ func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName
 	for _, line := range upLines {
 		if strings.HasPrefix(line, "-- Create database") ||
 			strings.HasPrefix(line, "-- Alter database") ||
-			strings.HasPrefix(line, "-- Drop database") {
+			strings.HasPrefix(line, "-- Drop database") ||
+			strings.HasPrefix(line, "-- Create dictionary") ||
+			strings.HasPrefix(line, "-- Replace dictionary") ||
+			strings.HasPrefix(line, "-- Drop dictionary") {
 			changeCount++
 			fmt.Printf("%d. %s\n", changeCount, strings.TrimPrefix(line, "-- "))
 		}
