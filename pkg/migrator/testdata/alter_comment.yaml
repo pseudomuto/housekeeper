@@ -1,0 +1,11 @@
+description: "Altering database comment"
+current_sql: "CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Old comment';"
+target_sql: "CREATE DATABASE analytics ENGINE = Atomic COMMENT 'New comment';"
+expected_migration:
+  up_contains:
+    - "ALTER DATABASE analytics MODIFY COMMENT 'New comment'"
+  down_contains:
+    - "ALTER DATABASE analytics MODIFY COMMENT 'Old comment'"
+  diff_count: 1
+  diff_types:
+    - "ALTER"

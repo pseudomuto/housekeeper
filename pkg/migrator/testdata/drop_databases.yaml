@@ -1,0 +1,16 @@
+description: "Dropping databases (empty target state)"
+current_sql: |
+  CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
+  CREATE DATABASE logs ENGINE = Atomic COMMENT 'Logs database';
+target_sql: ""  # Empty target state
+expected_migration:
+  up_contains:
+    - "DROP DATABASE IF EXISTS analytics"
+    - "DROP DATABASE IF EXISTS logs"
+  down_contains:
+    - "CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database'"
+    - "CREATE DATABASE logs ENGINE = Atomic COMMENT 'Logs database'"
+  diff_count: 2
+  diff_types:
+    - "DROP"
+    - "DROP"

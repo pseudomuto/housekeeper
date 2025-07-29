@@ -1,0 +1,21 @@
+databases:
+    basic_detach_db:
+        name: basic_detach_db
+        cluster: ""
+        engine: ""
+        comment: ""
+    cluster_detach_db:
+        name: cluster_detach_db
+        cluster: production
+        engine: ""
+        comment: ""
+    permanent_detach_db:
+        name: permanent_detach_db
+        cluster: ""
+        engine: ""
+        comment: ""
+    sync_detach_db:
+        name: sync_detach_db
+        cluster: ""
+        engine: ""
+        comment: ""

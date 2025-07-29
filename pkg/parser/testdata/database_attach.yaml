@@ -1,0 +1,26 @@
+databases:
+    basic_attach_db:
+        name: basic_attach_db
+        cluster: ""
+        engine: ""
+        comment: ""
+    cluster_attach_db:
+        name: cluster_attach_db
+        cluster: production
+        engine: ""
+        comment: ""
+    conditional_attach_db:
+        name: conditional_attach_db
+        cluster: ""
+        engine: ""
+        comment: ""
+    engine_attach_db:
+        name: engine_attach_db
+        cluster: ""
+        engine: MySQL('localhost:3306', 'database', 'user', 'password')
+        comment: ""
+    full_attach_db:
+        name: full_attach_db
+        cluster: production
+        engine: Atomic
+        comment: ""
