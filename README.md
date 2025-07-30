@@ -1,10 +1,10 @@
 # Housekeeper
 
-A command-line tool for managing ClickHouse schema migrations, supporting both database and dictionary operations.
+A command-line tool for managing ClickHouse schema migrations, supporting database, dictionary, and view operations.
 
 ## Features
 
-- Define schemas in SQL format (DDL statements) for databases and dictionaries
+- Define schemas in SQL format (DDL statements) for databases, dictionaries, and views
 - Compare schema definitions with current ClickHouse state
 - Generate migration files (up/down) for detected differences
 - Full support for ClickHouse database operations:
@@ -17,6 +17,13 @@ A command-line tool for managing ClickHouse schema migrations, supporting both d
   - CREATE OR REPLACE for dictionary modifications (since dictionaries can't be altered)
   - ATTACH/DETACH/DROP DICTIONARY operations
   - All dictionary features: sources, layouts, lifetimes, settings
+- Full support for ClickHouse view operations:
+  - CREATE VIEW and CREATE MATERIALIZED VIEW with full syntax support
+  - ENGINE specification, POPULATE option, TO table for materialized views
+  - ALTER TABLE MODIFY QUERY for materialized view modifications
+  - ATTACH/DETACH operations (VIEW for regular views, TABLE for materialized views)
+  - RENAME TABLE for both view types
+  - Intelligent migration strategies for different view types
 
 ## Installation
 
@@ -47,6 +54,29 @@ LAYOUT(COMPLEX_KEY_HASHED(size_in_cells 1000000))
 LIFETIME(MIN 300 MAX 3600)
 SETTINGS(max_threads = 4)
 COMMENT 'User dictionary with hierarchical structure';
+
+-- views.sql
+CREATE VIEW analytics.daily_summary 
+AS SELECT date, count(*) as total_events FROM events GROUP BY date;
+
+CREATE MATERIALIZED VIEW analytics.mv_daily_stats
+ENGINE = MergeTree() ORDER BY date
+POPULATE
+AS SELECT 
+    toDate(timestamp) as date, 
+    count() as event_count,
+    uniq(user_id) as unique_users
+FROM events 
+GROUP BY date;
+
+CREATE OR REPLACE MATERIALIZED VIEW analytics.mv_user_stats
+TO analytics.user_statistics
+AS SELECT 
+    user_id,
+    count() as total_events,
+    max(timestamp) as last_activity
+FROM events
+GROUP BY user_id;
 ```
 
 ### Generate Migrations
@@ -59,7 +89,7 @@ housekeeper diff --dsn localhost:9000 --schema ./schema --migrations ./migration
 
 This will:
 1. Connect to your ClickHouse instance
-2. Read the current schema (databases and dictionaries)
+2. Read the current schema (databases, dictionaries, and views)
 3. Parse your SQL schema files
 4. Compare them and detect differences
 5. Generate migration files if differences are found
@@ -199,6 +229,53 @@ DROP DICTIONARY [IF EXISTS] [database.]dictionary_name [ON CLUSTER cluster_name]
 RENAME DICTIONARY [database.]old_name1 TO [database.]new_name1 [, [database.]old_name2 TO [database.]new_name2, ...] [ON CLUSTER cluster_name];
 ```
 
+#### Create View
+```sql
+CREATE [OR REPLACE] VIEW [IF NOT EXISTS] [database.]view_name [ON CLUSTER cluster_name] AS SELECT ...;
+```
+
+#### Create Materialized View
+```sql
+CREATE [OR REPLACE] MATERIALIZED VIEW [IF NOT EXISTS] [database.]view_name [ON CLUSTER cluster_name]
+[TO [database.]table_name] [ENGINE = engine] [POPULATE]
+AS SELECT ...;
+```
+
+#### Attach View
+```sql
+ATTACH VIEW [IF NOT EXISTS] [database.]view_name [ON CLUSTER cluster_name];
+```
+
+#### Attach Table (for Materialized Views)
+```sql
+ATTACH TABLE [IF NOT EXISTS] [database.]table_name [ON CLUSTER cluster_name];
+```
+
+#### Detach View
+```sql
+DETACH VIEW [IF EXISTS] [database.]view_name [ON CLUSTER cluster_name] [PERMANENTLY] [SYNC];
+```
+
+#### Detach Table (for Materialized Views)
+```sql
+DETACH TABLE [IF EXISTS] [database.]table_name [ON CLUSTER cluster_name] [PERMANENTLY] [SYNC];
+```
+
+#### Drop View
+```sql
+DROP VIEW [IF EXISTS] [database.]view_name [ON CLUSTER cluster_name] [SYNC];
+```
+
+#### Drop Table (for Materialized Views)
+```sql
+DROP TABLE [IF EXISTS] [database.]table_name [ON CLUSTER cluster_name] [SYNC];
+```
+
+#### Rename Table (for Views and Materialized Views)
+```sql
+RENAME TABLE [database.]old_name1 TO [database.]new_name1 [, [database.]old_name2 TO [database.]new_name2, ...] [ON CLUSTER cluster_name];
+```
+
 ### Supported Database Engines
 
 - **Atomic** (default) - ClickHouse's default transactional database engine
@@ -225,6 +302,15 @@ The tool generates appropriate DDL for:
 - **Renaming dictionaries**: When a dictionary has identical properties but different name/database
 - **Complex dictionary features**: Supports all ClickHouse dictionary attributes, sources, layouts, and lifetimes
 
+### View Operations
+- **Creating views**: When a view exists in target schema but not in current state
+- **Dropping views**: When a view exists in current state but not in target schema
+- **Altering views**: 
+  - **Regular views**: Uses CREATE OR REPLACE for modifications
+  - **Materialized views**: Uses ALTER TABLE MODIFY QUERY for query changes (ClickHouse limitation)
+- **Renaming views**: Uses RENAME TABLE for both regular and materialized views when properties match but names differ
+- **Complex view features**: Supports ENGINE clauses, POPULATE option, TO table for materialized views
+
 ### Unsupported Operations
 
 The following operations will return an error:
@@ -238,9 +324,11 @@ See the `examples/` directory for sample schema files showing database definitio
 
 ## Current Limitations
 
-- **No table operations**: Table and view support will be added in future versions
+- **Limited table operations**: Only basic CREATE TABLE parsing implemented (full support coming soon)
 - **Engine/cluster changes not supported**: Database engine or cluster changes require manual intervention
 - **Dictionary structure changes**: Since dictionaries can't be altered, any change requires CREATE OR REPLACE
+- **Materialized view limitations**: Only query changes supported via ALTER TABLE MODIFY QUERY; other changes require DROP+CREATE
+- **SELECT clause formatting**: Whitespace formatting may not be preserved in parsed queries
 
 ## Development
 
@@ -258,9 +346,9 @@ go build -o housekeeper
 ## Architecture
 
 - **SQL Parser**: Modern participle-based parser for ClickHouse DDL statements
-- **Schema Comparison**: Detects differences between desired and current schema state (databases and dictionaries)
+- **Schema Comparison**: Detects differences between desired and current schema state (databases, dictionaries, and views)
 - **Migration Generator**: Creates executable up/down SQL migrations with proper operation ordering
-- **ClickHouse Client**: Connects and reads current schema (databases and dictionaries)
+- **ClickHouse Client**: Connects and reads current schema (databases, dictionaries, and views)
 - **Error Handling**: Uses wrapped errors with sentinel values for unsupported operations
 
 ### Parser Features
@@ -284,20 +372,36 @@ The participle-based parser provides robust support for:
 - Complex column attributes: `IS_OBJECT_ID`, `HIERARCHICAL`, `INJECTIVE`, `DEFAULT`, `EXPRESSION`
 - All source types, layout types, lifetime configurations, and settings
 
+#### View Operations (Complete)
+- `CREATE [OR REPLACE] VIEW [IF NOT EXISTS] [db.]name [ON CLUSTER cluster] AS SELECT ...`
+- `CREATE [OR REPLACE] MATERIALIZED VIEW [IF NOT EXISTS] [db.]name [ON CLUSTER cluster] [TO table] [ENGINE = engine] [POPULATE] AS SELECT ...`
+- `ATTACH VIEW [IF NOT EXISTS] [db.]name [ON CLUSTER cluster]` (regular views)
+- `ATTACH TABLE [IF NOT EXISTS] [db.]name [ON CLUSTER cluster]` (materialized views)
+- `DETACH VIEW [IF EXISTS] [db.]name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]` (regular views)
+- `DETACH TABLE [IF EXISTS] [db.]name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]` (materialized views)
+- `DROP VIEW [IF EXISTS] [db.]name [ON CLUSTER cluster] [SYNC]` (regular views)
+- `DROP TABLE [IF EXISTS] [db.]name [ON CLUSTER cluster] [SYNC]` (materialized views)
+- `RENAME TABLE [db.]old_name TO [db.]new_name [, ...] [ON CLUSTER cluster]` (both view types)
+- ENGINE specifications, POPULATE option, TO table clause for materialized views
+- Complex SELECT query parsing with AS SELECT clause
+
 #### Future Work
-- Table operations (CREATE, ALTER, DROP TABLE)
-- View operations (CREATE, DROP VIEW)
-- Materialized view operations
+- Full table operations (CREATE, ALTER, DROP TABLE with column definitions)
+- Index operations (CREATE INDEX, DROP INDEX)
 
 See [pkg/parser/README.md](pkg/parser/README.md) for detailed parser documentation.
 
 ## Migration Strategy
 
-This tool focuses on database and dictionary operations to provide robust, well-tested schema management. Table and view operations will be added as the parser and migration system continue to mature.
+This tool provides comprehensive schema management for ClickHouse databases, dictionaries, and views with intelligent migration strategies tailored to each object type.
 
 The current approach provides:
-- Complete database lifecycle management
-- Full dictionary lifecycle management with CREATE OR REPLACE for modifications
-- Cluster-aware operations for distributed deployments
-- Proper migration ordering (databases first, then dictionaries)
-- Foundation for future table/view operations
+- **Complete database lifecycle management** with full ClickHouse syntax support
+- **Full dictionary lifecycle management** with CREATE OR REPLACE for modifications (since dictionaries can't be altered)
+- **Complete view lifecycle management** with different strategies:
+  - **Regular views**: CREATE OR REPLACE for modifications
+  - **Materialized views**: ALTER TABLE MODIFY QUERY for query changes, proper DDL for other operations
+- **Cluster-aware operations** for distributed deployments
+- **Proper migration ordering**: databases → dictionaries → views (UP), reverse order (DOWN)
+- **Intelligent rename detection** to avoid unnecessary DROP+CREATE operations
+- **Foundation for future table operations** with extensible architecture

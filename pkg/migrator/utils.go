@@ -34,3 +34,11 @@ func formatEngine(engine *parser.DatabaseEngine) string {
 	return engine.Name + "(" + strings.Join(params, ", ") + ")"
 }
 
+// getStringValue safely gets a string value from a string pointer
+func getStringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+

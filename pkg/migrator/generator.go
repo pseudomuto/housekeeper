@@ -54,7 +54,12 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		return nil, fmt.Errorf("failed to compare dictionary grammars: %w", err)
 	}
 
-	if len(dbDiffs) == 0 && len(dictDiffs) == 0 {
+	viewDiffs, err := CompareViewGrammars(current, target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare view grammars: %w", err)
+	}
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 {
 		return nil, fmt.Errorf("no differences found")
 	}
 
@@ -68,7 +73,7 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 	down := fmt.Sprintf("-- Schema rollback: %s\n", name)
 	down += fmt.Sprintf("-- Generated at: %s\n\n", timestamp.Format("2006-01-02 15:04:05"))
 
-	// Process diffs in proper order: databases first, then dictionaries
+	// Process diffs in proper order: databases first, then dictionaries, then views
 	// Within each type: CREATE first, then ALTER/REPLACE, then DROP
 	var upStatements []string
 	var downStatements []string
@@ -103,7 +108,22 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		}
 	}
 
-	// UP migration: Databases first, then dictionaries
+	// Group view diffs by type for proper ordering
+	var viewCreateDiffs, viewAlterDiffs, viewRenameDiffs, viewDropDiffs []*ViewDiff
+	for _, diff := range viewDiffs {
+		switch diff.Type {
+		case ViewDiffCreate:
+			viewCreateDiffs = append(viewCreateDiffs, diff)
+		case ViewDiffAlter:
+			viewAlterDiffs = append(viewAlterDiffs, diff)
+		case ViewDiffRename:
+			viewRenameDiffs = append(viewRenameDiffs, diff)
+		case ViewDiffDrop:
+			viewDropDiffs = append(viewDropDiffs, diff)
+		}
+	}
+
+	// UP migration: Databases first, then dictionaries, then views
 	// Database order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range dbCreateDiffs {
 		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
@@ -140,7 +160,47 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
-	// DOWN migration: reverse order (dictionaries first, then databases)
+	// View order: CREATE -> ALTER -> RENAME -> DROP
+	for _, diff := range viewCreateDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range viewAlterDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range viewRenameDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range viewDropDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+
+	// DOWN migration: reverse order (views first, then dictionaries, then databases)
+	// View order: DROP <- RENAME <- ALTER <- CREATE
+	for i := len(viewDropDiffs) - 1; i >= 0; i-- {
+		diff := viewDropDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(viewRenameDiffs) - 1; i >= 0; i-- {
+		diff := viewRenameDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(viewAlterDiffs) - 1; i >= 0; i-- {
+		diff := viewAlterDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(viewCreateDiffs) - 1; i >= 0; i-- {
+		diff := viewCreateDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+
 	// Dictionary order: DROP <- RENAME <- REPLACE <- CREATE
 	for i := len(dictDropDiffs) - 1; i >= 0; i-- {
 		diff := dictDropDiffs[i]

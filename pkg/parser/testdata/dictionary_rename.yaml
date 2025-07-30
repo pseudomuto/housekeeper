@@ -1,33 +1,67 @@
-statements:
-  - rename_dictionary:
-      renames:
-        - from_name: "old_dict"
-          to_name: "new_dict"
-  - rename_dictionary:
-      renames:
-        - from_database: "db"
-          from_name: "old_dict"
-          to_database: "db"
-          to_name: "new_dict"
-  - rename_dictionary:
-      renames:
-        - from_name: "dict1"
-          to_name: "dict2"
-        - from_database: "db"
-          from_name: "dict3"
-          to_database: "db"
-          to_name: "dict4"
-  - rename_dictionary:
-      renames:
-        - from_name: "old_dict"
-          to_name: "new_dict"
-      on_cluster: "my_cluster"
-  - rename_dictionary:
-      renames:
-        - from_database: "db1"
-          from_name: "dict1"
-          to_database: "db2"
-          to_name: "dict2"
-        - from_name: "dict3"
-          to_name: "dict4"
-      on_cluster: "production"
+dictionaries:
+    db.dict3:
+        name: dict3
+        database: db
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: RENAME
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    db.old_dict:
+        name: old_dict
+        database: db
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: RENAME
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    db1.dict1:
+        name: dict1
+        database: db1
+        cluster: production
+        or_replace: false
+        comment: ""
+        operation: RENAME
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    dict1:
+        name: dict1
+        database: ""
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: RENAME
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    dict3:
+        name: dict3
+        database: ""
+        cluster: production
+        or_replace: false
+        comment: ""
+        operation: RENAME
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    old_dict:
+        name: old_dict
+        database: ""
+        cluster: my_cluster
+        or_replace: false
+        comment: ""
+        operation: RENAME
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false

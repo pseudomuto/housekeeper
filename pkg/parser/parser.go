@@ -45,7 +45,19 @@
 // ✅ RENAME DATABASE - Fully implemented with multi-database support and ON CLUSTER
 // ✅ RENAME DICTIONARY - Fully implemented with multi-dictionary support and ON CLUSTER
 // ⚠️  CREATE TABLE - Basic structure implemented (simplified)
-// ❌ CREATE VIEW - Basic structure implemented (simplified)
+// ✅ CREATE VIEW - Fully implemented with all options
+// ✅ CREATE MATERIALIZED VIEW - Fully implemented with all ClickHouse features:
+//    - OR REPLACE clause
+//    - IF NOT EXISTS
+//    - ON CLUSTER
+//    - TO table (for materialized views)
+//    - ENGINE specification
+//    - POPULATE option
+//    - AS SELECT clause
+// ✅ ATTACH VIEW/MATERIALIZED VIEW - Fully implemented
+// ✅ DETACH VIEW/MATERIALIZED VIEW - Fully implemented with all options
+// ✅ DROP VIEW/MATERIALIZED VIEW - Fully implemented with all options
+// ✅ RENAME VIEW/MATERIALIZED VIEW - Fully implemented with multi-view support
 
 package parser
 
@@ -77,7 +89,9 @@ var (
 		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "RENAME", "DATABASE", "DICTIONARY", 
 			"IF", "NOT", "EXISTS", "ON", "CLUSTER", "ENGINE", "COMMENT", "MODIFY", "PERMANENTLY", "SYNC",
 			"OR", "REPLACE", "PRIMARY", "KEY", "SOURCE", "LAYOUT", "LIFETIME", "SETTINGS", "MIN", "MAX",
-			"DEFAULT", "EXPRESSION", "IS_OBJECT_ID", "HIERARCHICAL", "INJECTIVE", "TO"),
+			"DEFAULT", "EXPRESSION", "IS_OBJECT_ID", "HIERARCHICAL", "INJECTIVE", "TO", "VIEW", "MATERIALIZED",
+			"POPULATE", "AS", "SELECT", "TABLE"),
+		participle.UseLookahead(4),
 	)
 )
 
@@ -96,9 +110,17 @@ type (
 		DropDatabase     *DropDatabaseStmt     `parser:"| @@"`
 		RenameDatabase   *RenameDatabaseStmt   `parser:"| @@"`
 		CreateDictionary *CreateDictionaryStmt `parser:"| @@"`
+		CreateView       *CreateViewStmt       `parser:"| @@"`
+		AttachView       *AttachViewStmt       `parser:"| @@"`
 		AttachDictionary *AttachDictionaryStmt `parser:"| @@"`
+		DetachView       *DetachViewStmt       `parser:"| @@"`
 		DetachDictionary *DetachDictionaryStmt `parser:"| @@"`
+		DropView         *DropViewStmt         `parser:"| @@"`
 		DropDictionary   *DropDictionaryStmt   `parser:"| @@"`
+		AttachTable      *AttachTableStmt      `parser:"| @@"`
+		DetachTable      *DetachTableStmt      `parser:"| @@"`
+		DropTable        *DropTableStmt        `parser:"| @@"`
+		RenameTable      *RenameTableStmt      `parser:"| @@"`
 		RenameDictionary *RenameDictionaryStmt `parser:"| @@"`
 	}
 )
@@ -119,9 +141,16 @@ type (
 //		SOURCE(HTTP(url 'http://api.example.com/users'))
 //		LAYOUT(HASHED())
 //		LIFETIME(3600);
+//		CREATE MATERIALIZED VIEW analytics.daily_stats
+//		ENGINE = MergeTree() ORDER BY date
+//		POPULATE
+//		AS SELECT toDate(timestamp) as date, count() as cnt
+//		FROM analytics.events
+//		GROUP BY date;
 //		ALTER DATABASE analytics MODIFY COMMENT 'Updated analytics database';
 //		RENAME DATABASE analytics TO prod_analytics;
 //		RENAME DICTIONARY prod_analytics.users_dict TO prod_analytics.user_data;
+//		RENAME VIEW analytics.old_view TO analytics.new_view;
 //	`
 //
 //	grammar, err := parser.ParseSQL(sql)
@@ -158,6 +187,17 @@ type (
 //				}
 //				fmt.Printf("RENAME DICTIONARY: %s TO %s\n", fromName, toName)
 //			}
+//		}
+//		if stmt.CreateView != nil {
+//			viewType := "VIEW"
+//			if stmt.CreateView.Materialized {
+//				viewType = "MATERIALIZED VIEW"
+//			}
+//			name := stmt.CreateView.Name
+//			if stmt.CreateView.Database != nil {
+//				name = *stmt.CreateView.Database + "." + name
+//			}
+//			fmt.Printf("CREATE %s: %s\n", viewType, name)
 //		}
 //	}
 //

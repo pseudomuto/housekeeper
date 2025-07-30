@@ -21,6 +21,8 @@ var testdataFS embed.FS
 type TestCase struct {
 	Databases    map[string]ExpectedDatabase    `yaml:"databases,omitempty"`
 	Dictionaries map[string]ExpectedDictionary  `yaml:"dictionaries,omitempty"`
+	Views        map[string]ExpectedView        `yaml:"views,omitempty"`
+	Tables       map[string]ExpectedTable       `yaml:"tables,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -39,6 +41,35 @@ type ExpectedDictionary struct {
 	OrReplace   bool   `yaml:"or_replace"`
 	Comment     string `yaml:"comment"`
 	Operation   string `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP
+	IfNotExists bool   `yaml:"if_not_exists"`
+	IfExists    bool   `yaml:"if_exists"`
+	Permanently bool   `yaml:"permanently"`
+	Sync        bool   `yaml:"sync"`
+}
+
+// ExpectedView represents expected view properties
+type ExpectedView struct {
+	Name         string `yaml:"name"`
+	Database     string `yaml:"database"`
+	Cluster      string `yaml:"cluster"`
+	OrReplace    bool   `yaml:"or_replace"`
+	Materialized bool   `yaml:"materialized"`
+	Operation    string `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP, RENAME
+	IfNotExists  bool   `yaml:"if_not_exists"`
+	IfExists     bool   `yaml:"if_exists"`
+	Permanently  bool   `yaml:"permanently"`
+	Sync         bool   `yaml:"sync"`
+	To           string `yaml:"to,omitempty"`
+	Engine       string `yaml:"engine,omitempty"`
+	Populate     bool   `yaml:"populate"`
+}
+
+// ExpectedTable represents expected table properties (for materialized view operations)
+type ExpectedTable struct {
+	Name        string `yaml:"name"`
+	Database    string `yaml:"database"`
+	Cluster     string `yaml:"cluster"`
+	Operation   string `yaml:"operation"`     // ATTACH, DETACH, DROP, RENAME
 	IfNotExists bool   `yaml:"if_not_exists"`
 	IfExists    bool   `yaml:"if_exists"`
 	Permanently bool   `yaml:"permanently"`
@@ -195,6 +226,18 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if db.OnCluster != nil {
 				expectedDB.Cluster = *db.OnCluster
 			}
+		} else if stmt.RenameDatabase != nil {
+			for _, rename := range stmt.RenameDatabase.Renames {
+				// Process FROM database
+				expectedDB = ExpectedDatabase{
+					Name: rename.From,
+				}
+				if stmt.RenameDatabase.OnCluster != nil {
+					expectedDB.Cluster = *stmt.RenameDatabase.OnCluster
+				}
+				expectedDatabases[rename.From] = expectedDB
+			}
+			continue
 		}
 
 		if dbName != "" {
@@ -215,7 +258,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			expectedDict := ExpectedDictionary{
 				Name:        dict.Name,
 				Operation:   "CREATE",
-				OrReplace:   dict.OrReplace != nil,
+				OrReplace:   dict.OrReplace,
 				IfNotExists: dict.IfNotExists != nil,
 			}
 			if dict.Database != nil {
@@ -288,6 +331,225 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDict.Cluster = *dict.OnCluster
 			}
 			expectedDictionaries[dictName] = expectedDict
+		} else if stmt.AttachDictionary != nil {
+			dict := stmt.AttachDictionary
+			dictName := dict.Name
+			if dict.Database != nil {
+				dictName = *dict.Database + "." + dict.Name
+			}
+			
+			expectedDict := ExpectedDictionary{
+				Name:        dict.Name,
+				Operation:   "ATTACH",
+				IfNotExists: dict.IfNotExists != nil,
+			}
+			if dict.Database != nil {
+				expectedDict.Database = *dict.Database
+			}
+			if dict.OnCluster != nil {
+				expectedDict.Cluster = *dict.OnCluster
+			}
+			expectedDictionaries[dictName] = expectedDict
+		} else if stmt.RenameDictionary != nil {
+			for _, rename := range stmt.RenameDictionary.Renames {
+				// Process FROM dictionary
+				fromName := rename.FromName
+				if rename.FromDatabase != nil {
+					fromName = *rename.FromDatabase + "." + rename.FromName
+				}
+				
+				expectedDict := ExpectedDictionary{
+					Name:      rename.FromName,
+					Operation: "RENAME",
+				}
+				if rename.FromDatabase != nil {
+					expectedDict.Database = *rename.FromDatabase
+				}
+				if stmt.RenameDictionary.OnCluster != nil {
+					expectedDict.Cluster = *stmt.RenameDictionary.OnCluster
+				}
+				expectedDictionaries[fromName] = expectedDict
+			}
+		}
+	}
+
+	// Process views
+	expectedViews := make(map[string]ExpectedView)
+	for _, stmt := range grammar.Statements {
+		if stmt.CreateView != nil {
+			view := stmt.CreateView
+			viewName := view.Name
+			if view.Database != nil {
+				viewName = *view.Database + "." + view.Name
+			}
+			
+			expectedView := ExpectedView{
+				Name:         view.Name,
+				Operation:    "CREATE",
+				OrReplace:    view.OrReplace,
+				Materialized: view.Materialized,
+				IfNotExists:  view.IfNotExists,
+				Populate:     view.Populate,
+			}
+			if view.Database != nil {
+				expectedView.Database = *view.Database
+			}
+			if view.OnCluster != nil {
+				expectedView.Cluster = *view.OnCluster
+			}
+			if view.To != nil {
+				expectedView.To = *view.To
+			}
+			if view.Engine != nil {
+				expectedView.Engine = view.Engine.Raw
+			}
+			expectedViews[viewName] = expectedView
+		} else if stmt.AttachView != nil {
+			view := stmt.AttachView
+			viewName := view.Name
+			if view.Database != nil {
+				viewName = *view.Database + "." + view.Name
+			}
+			
+			expectedView := ExpectedView{
+				Name:        view.Name,
+				Operation:   "ATTACH",
+				IfNotExists: view.IfNotExists,
+			}
+			if view.Database != nil {
+				expectedView.Database = *view.Database
+			}
+			if view.OnCluster != nil {
+				expectedView.Cluster = *view.OnCluster
+			}
+			expectedViews[viewName] = expectedView
+		} else if stmt.DetachView != nil {
+			view := stmt.DetachView
+			viewName := view.Name
+			if view.Database != nil {
+				viewName = *view.Database + "." + view.Name
+			}
+			
+			expectedView := ExpectedView{
+				Name:        view.Name,
+				Operation:   "DETACH",
+				IfExists:    view.IfExists,
+				Permanently: view.Permanently,
+				Sync:        view.Sync,
+			}
+			if view.Database != nil {
+				expectedView.Database = *view.Database
+			}
+			if view.OnCluster != nil {
+				expectedView.Cluster = *view.OnCluster
+			}
+			expectedViews[viewName] = expectedView
+		} else if stmt.DropView != nil {
+			view := stmt.DropView
+			viewName := view.Name
+			if view.Database != nil {
+				viewName = *view.Database + "." + view.Name
+			}
+			
+			expectedView := ExpectedView{
+				Name:      view.Name,
+				Operation: "DROP",
+				IfExists:  view.IfExists,
+				Sync:      view.Sync,
+			}
+			if view.Database != nil {
+				expectedView.Database = *view.Database
+			}
+			if view.OnCluster != nil {
+				expectedView.Cluster = *view.OnCluster
+			}
+			expectedViews[viewName] = expectedView
+		}
+	}
+
+	// Process tables (for materialized view operations)
+	expectedTables := make(map[string]ExpectedTable)
+	for _, stmt := range grammar.Statements {
+		if stmt.AttachTable != nil {
+			table := stmt.AttachTable
+			tableName := table.Name
+			if table.Database != nil {
+				tableName = *table.Database + "." + table.Name
+			}
+			
+			expectedTable := ExpectedTable{
+				Name:        table.Name,
+				Operation:   "ATTACH",
+				IfNotExists: table.IfNotExists,
+			}
+			if table.Database != nil {
+				expectedTable.Database = *table.Database
+			}
+			if table.OnCluster != nil {
+				expectedTable.Cluster = *table.OnCluster
+			}
+			expectedTables[tableName] = expectedTable
+		} else if stmt.DetachTable != nil {
+			table := stmt.DetachTable
+			tableName := table.Name
+			if table.Database != nil {
+				tableName = *table.Database + "." + table.Name
+			}
+			
+			expectedTable := ExpectedTable{
+				Name:        table.Name,
+				Operation:   "DETACH",
+				IfExists:    table.IfExists,
+				Permanently: table.Permanently,
+				Sync:        table.Sync,
+			}
+			if table.Database != nil {
+				expectedTable.Database = *table.Database
+			}
+			if table.OnCluster != nil {
+				expectedTable.Cluster = *table.OnCluster
+			}
+			expectedTables[tableName] = expectedTable
+		} else if stmt.DropTable != nil {
+			table := stmt.DropTable
+			tableName := table.Name
+			if table.Database != nil {
+				tableName = *table.Database + "." + table.Name
+			}
+			
+			expectedTable := ExpectedTable{
+				Name:      table.Name,
+				Operation: "DROP",
+				IfExists:  table.IfExists,
+				Sync:      table.Sync,
+			}
+			if table.Database != nil {
+				expectedTable.Database = *table.Database
+			}
+			if table.OnCluster != nil {
+				expectedTable.Cluster = *table.OnCluster
+			}
+			expectedTables[tableName] = expectedTable
+		} else if stmt.RenameTable != nil {
+			for _, rename := range stmt.RenameTable.Renames {
+				// Process FROM table
+				fromName := rename.FromName
+				if rename.FromDatabase != nil {
+					fromName = *rename.FromDatabase + "." + rename.FromName
+				}
+				
+				expectedTable := ExpectedTable{
+					Name:      rename.FromName,
+					Operation: "RENAME",
+				}
+				if rename.FromDatabase != nil {
+					expectedTable.Database = *rename.FromDatabase
+				}
+				if stmt.RenameTable.OnCluster != nil {
+					expectedTable.Cluster = *stmt.RenameTable.OnCluster
+				}
+				expectedTables[fromName] = expectedTable
+			}
 		}
 	}
 	
@@ -301,6 +563,16 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 	// Only include dictionaries section if there are any dictionaries
 	if len(expectedDictionaries) > 0 {
 		testCase.Dictionaries = expectedDictionaries  
+	}
+
+	// Only include views section if there are any views
+	if len(expectedViews) > 0 {
+		testCase.Views = expectedViews
+	}
+
+	// Only include tables section if there are any tables
+	if len(expectedTables) > 0 {
+		testCase.Tables = expectedTables
 	}
 	
 	return testCase

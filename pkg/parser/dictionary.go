@@ -5,8 +5,10 @@ package parser
 type (
 	// CreateDictionaryStmt represents CREATE [OR REPLACE] DICTIONARY statements
 	CreateDictionaryStmt struct {
-		OrReplace   *string                 `parser:"'CREATE' (@'OR' 'REPLACE')?"`
-		IfNotExists *string                 `parser:"'DICTIONARY' (@'IF' 'NOT' 'EXISTS')?"`
+		Create      string                  `parser:"'CREATE'"`
+		OrReplace   bool                    `parser:"@('OR' 'REPLACE')?"`
+		Dictionary  string                  `parser:"'DICTIONARY'"`
+		IfNotExists *string                 `parser:"(@'IF' 'NOT' 'EXISTS')?"`
 		Database    *string                 `parser:"((@Ident '.')?"`
 		Name        string                  `parser:"@Ident)"`
 		OnCluster   *string                 `parser:"('ON' 'CLUSTER' @Ident)?"`

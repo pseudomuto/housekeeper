@@ -279,7 +279,7 @@ func dictionaryStatementsEqual(current, target *parser.CreateDictionaryStmt) boo
 	}
 
 	// Compare basic flags
-	if !stringPtrEqual(current.OrReplace, target.OrReplace) ||
+	if current.OrReplace != target.OrReplace ||
 		!stringPtrEqual(current.IfNotExists, target.IfNotExists) {
 		return false
 	}
