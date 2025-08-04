@@ -80,8 +80,3 @@ type (
 		Raw string `parser:"'ENGINE' '=' @(~('POPULATE' | 'AS' | ';'))+"`
 	}
 )
-
-// String returns the string representation of ViewEngine for backward compatibility
-func (v ViewEngine) String() string {
-	return v.Raw
-}

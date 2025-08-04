@@ -12,8 +12,7 @@ type (
 	// 7. Unary (+, -, NOT)
 	// 8. Primary (literals, identifiers, functions, parentheses)
 	Expression struct {
-		Or  *OrExpression `parser:"@@"`
-		Raw string        // For backward compatibility - populated with simplified representation
+		Or *OrExpression `parser:"@@"`
 	}
 
 	// OrExpression handles OR operations (lowest precedence)
@@ -270,11 +269,8 @@ type (
 	}
 )
 
-// String returns a simplified string representation for backward compatibility
+// String returns the string representation of an Expression.
 func (e Expression) String() string {
-	if e.Raw != "" {
-		return e.Raw
-	}
 	if e.Or != nil {
 		return e.Or.String()
 	}

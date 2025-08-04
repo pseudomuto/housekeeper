@@ -8,7 +8,7 @@
 //
 // Supported DDL Operations:
 //   - Database operations: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME DATABASE
-//   - Table operations: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME TABLE  
+//   - Table operations: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME TABLE
 //   - Dictionary operations: CREATE, ATTACH, DETACH, DROP, RENAME DICTIONARY
 //   - View operations: CREATE, ATTACH, DETACH, DROP VIEW and MATERIALIZED VIEW
 //   - Expression parsing: Complex expressions with proper operator precedence
@@ -16,7 +16,7 @@
 //
 // Key features:
 //   - Complete ClickHouse DDL syntax support with all modern features
-//   - Advanced expression engine with proper operator precedence  
+//   - Advanced expression engine with proper operator precedence
 //   - Structured error messages with line and column information
 //   - Type-safe AST representation of all parsed statements
 //   - Support for all engines, data types, and their parameters
@@ -42,9 +42,9 @@
 //	    CREATE DICTIONARY users_dict (
 //	        id UInt64 IS_OBJECT_ID,
 //	        name String INJECTIVE
-//	    ) PRIMARY KEY id 
+//	    ) PRIMARY KEY id
 //	    SOURCE(HTTP(url 'http://api.example.com/users'))
-//	    LAYOUT(HASHED()) 
+//	    LAYOUT(HASHED())
 //	    LIFETIME(3600);
 //	    CREATE MATERIALIZED VIEW daily_stats
 //	    ENGINE = MergeTree() ORDER BY date

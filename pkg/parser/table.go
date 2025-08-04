@@ -160,6 +160,10 @@ type (
 	}
 
 	// AlterTableStmt represents an ALTER TABLE statement.
+	// ClickHouse syntax:
+	//   ALTER TABLE [IF EXISTS] [db.]table [ON CLUSTER cluster]
+	//   operation1 [, operation2, ...]
+	//
 	// ClickHouse supports many ALTER TABLE operations including:
 	// - ADD/DROP/MODIFY/RENAME COLUMN
 	// - ADD/DROP INDEX

@@ -3,7 +3,20 @@ package parser
 // Dictionary-related grammar types for ClickHouse CREATE DICTIONARY statements
 
 type (
-	// CreateDictionaryStmt represents CREATE [OR REPLACE] DICTIONARY statements
+	// CreateDictionaryStmt represents CREATE [OR REPLACE] DICTIONARY statements.
+	// ClickHouse syntax:
+	//   CREATE [OR REPLACE] DICTIONARY [IF NOT EXISTS] [db.]dict_name [ON CLUSTER cluster]
+	//   (
+	//     column1 Type1 [DEFAULT|EXPRESSION expr] [IS_OBJECT_ID|HIERARCHICAL|INJECTIVE],
+	//     column2 Type2 [DEFAULT|EXPRESSION expr] [IS_OBJECT_ID|HIERARCHICAL|INJECTIVE],
+	//     ...
+	//   )
+	//   PRIMARY KEY key1 [, key2, ...]
+	//   SOURCE(source_type(param1 value1 [param2 value2 ...]))
+	//   LAYOUT(layout_type[(param1 value1 [param2 value2 ...])])
+	//   LIFETIME([MIN min_val MAX max_val] | single_val)
+	//   [SETTINGS(setting1 = value1 [, setting2 = value2, ...])]
+	//   [COMMENT 'comment']
 	CreateDictionaryStmt struct {
 		Create      string                `parser:"'CREATE'"`
 		OrReplace   bool                  `parser:"@('OR' 'REPLACE')?"`
@@ -101,7 +114,9 @@ type (
 		Comma *string `parser:"@','?"`
 	}
 
-	// AttachDictionaryStmt represents ATTACH DICTIONARY statements
+	// AttachDictionaryStmt represents ATTACH DICTIONARY statements.
+	// ClickHouse syntax:
+	//   ATTACH DICTIONARY [IF NOT EXISTS] [db.]dict_name [ON CLUSTER cluster]
 	AttachDictionaryStmt struct {
 		IfNotExists *string `parser:"'ATTACH' 'DICTIONARY' (@'IF' 'NOT' 'EXISTS')?"`
 		Database    *string `parser:"((@Ident '.')?"`
@@ -109,7 +124,9 @@ type (
 		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)? ';'"`
 	}
 
-	// DetachDictionaryStmt represents DETACH DICTIONARY statements
+	// DetachDictionaryStmt represents DETACH DICTIONARY statements.
+	// ClickHouse syntax:
+	//   DETACH DICTIONARY [IF EXISTS] [db.]dict_name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]
 	DetachDictionaryStmt struct {
 		IfExists    *string `parser:"'DETACH' 'DICTIONARY' (@'IF' 'EXISTS')?"`
 		Database    *string `parser:"((@Ident '.')?"`
@@ -119,7 +136,9 @@ type (
 		Sync        *string `parser:"(@'SYNC')? ';'"`
 	}
 
-	// DropDictionaryStmt represents DROP DICTIONARY statements
+	// DropDictionaryStmt represents DROP DICTIONARY statements.
+	// ClickHouse syntax:
+	//   DROP DICTIONARY [IF EXISTS] [db.]dict_name [ON CLUSTER cluster] [SYNC]
 	DropDictionaryStmt struct {
 		IfExists  *string `parser:"'DROP' 'DICTIONARY' (@'IF' 'EXISTS')?"`
 		Database  *string `parser:"((@Ident '.')?"`
