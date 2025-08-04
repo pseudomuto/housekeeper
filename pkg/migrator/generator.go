@@ -59,7 +59,12 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		return nil, fmt.Errorf("failed to compare view grammars: %w", err)
 	}
 
-	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 {
+	tableDiffs, err := CompareTableGrammars(current, target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare table grammars: %w", err)
+	}
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 {
 		return nil, fmt.Errorf("no differences found")
 	}
 
@@ -73,7 +78,7 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 	down := fmt.Sprintf("-- Schema rollback: %s\n", name)
 	down += fmt.Sprintf("-- Generated at: %s\n\n", timestamp.Format("2006-01-02 15:04:05"))
 
-	// Process diffs in proper order: databases first, then dictionaries, then views
+	// Process diffs in proper order: databases first, then tables, then views, then dictionaries
 	// Within each type: CREATE first, then ALTER/REPLACE, then DROP
 	var upStatements []string
 	var downStatements []string
@@ -123,7 +128,22 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		}
 	}
 
-	// UP migration: Databases first, then dictionaries, then views
+	// Group table diffs by type for proper ordering
+	var tableCreateDiffs, tableAlterDiffs, tableRenameDiffs, tableDropDiffs []*TableDiff
+	for _, diff := range tableDiffs {
+		switch diff.Type {
+		case TableDiffCreate:
+			tableCreateDiffs = append(tableCreateDiffs, diff)
+		case TableDiffAlter:
+			tableAlterDiffs = append(tableAlterDiffs, diff)
+		case TableDiffRename:
+			tableRenameDiffs = append(tableRenameDiffs, diff)
+		case TableDiffDrop:
+			tableDropDiffs = append(tableDropDiffs, diff)
+		}
+	}
+
+	// UP migration: Databases first, then tables, then views, then dictionaries
 	// Database order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range dbCreateDiffs {
 		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
@@ -160,6 +180,24 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
+	// Table order: CREATE -> ALTER -> RENAME -> DROP
+	for _, diff := range tableCreateDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range tableAlterDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range tableRenameDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+	for _, diff := range tableDropDiffs {
+		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, diff.UpSQL)
+	}
+
 	// View order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range viewCreateDiffs {
 		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
@@ -178,7 +216,7 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
-	// DOWN migration: reverse order (views first, then dictionaries, then databases)
+	// DOWN migration: reverse order (views first, then tables, then dictionaries, then databases)
 	// View order: DROP <- RENAME <- ALTER <- CREATE
 	for i := len(viewDropDiffs) - 1; i >= 0; i-- {
 		diff := viewDropDiffs[i]
@@ -197,6 +235,28 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 	}
 	for i := len(viewCreateDiffs) - 1; i >= 0; i-- {
 		diff := viewCreateDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+
+	// Table order: DROP <- RENAME <- ALTER <- CREATE
+	for i := len(tableDropDiffs) - 1; i >= 0; i-- {
+		diff := tableDropDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(tableRenameDiffs) - 1; i >= 0; i-- {
+		diff := tableRenameDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(tableAlterDiffs) - 1; i >= 0; i-- {
+		diff := tableAlterDiffs[i]
+		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, diff.DownSQL)
+	}
+	for i := len(tableCreateDiffs) - 1; i >= 0; i-- {
+		diff := tableCreateDiffs[i]
 		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
 		downStatements = append(downStatements, diff.DownSQL)
 	}

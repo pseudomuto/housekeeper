@@ -1,0 +1,35 @@
+description: "Creating tables with complex formatting scenarios"
+current_sql: ""  # Empty current state
+target_sql: |
+  CREATE TABLE complex_table (
+      id UInt64,
+      data String CODEC(ZSTD),
+      nullable_field Nullable(String),
+      array_field Array(UInt32),
+      decimal_field Decimal(10, 2),
+      datetime_field DateTime64(3, 'UTC'),
+      map_field Map(String, UInt64),
+      tuple_field Tuple(String, UInt64),
+      nested_array Array(Array(String)),
+      low_cardinality LowCardinality(String)
+  ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}')
+  ORDER BY (id, data);
+expected_migration:
+  up_contains:
+    - "CREATE TABLE complex_table"
+    - "CODEC(ZSTD)"
+    - "Nullable(String)"
+    - "Array(UInt32)"
+    - "Decimal(10, 2)"
+    - "DateTime64(3, 'UTC')"
+    - "Map(String, UInt64)"
+    - "Tuple(String, UInt64)"
+    - "Array(Array(String))"
+    - "LowCardinality(String)"
+    - "ENGINE = ReplicatedMergeTree"
+    - "ORDER BY (id,data)"
+  down_contains:
+    - "DROP TABLE complex_table"
+  diff_count: 1
+  diff_types:
+    - "CREATE"

@@ -64,16 +64,36 @@ type ExpectedView struct {
 	Populate     bool   `yaml:"populate"`
 }
 
-// ExpectedTable represents expected table properties (for materialized view operations)
+// ExpectedTable represents expected table properties
 type ExpectedTable struct {
-	Name        string `yaml:"name"`
-	Database    string `yaml:"database"`
-	Cluster     string `yaml:"cluster"`
-	Operation   string `yaml:"operation"`     // ATTACH, DETACH, DROP, RENAME
-	IfNotExists bool   `yaml:"if_not_exists"`
-	IfExists    bool   `yaml:"if_exists"`
-	Permanently bool   `yaml:"permanently"`
-	Sync        bool   `yaml:"sync"`
+	Name        string             `yaml:"name"`
+	Database    string             `yaml:"database"`
+	Cluster     string             `yaml:"cluster"`
+	Operation   string             `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP, RENAME
+	OrReplace   bool               `yaml:"or_replace"`
+	IfNotExists bool               `yaml:"if_not_exists"`
+	IfExists    bool               `yaml:"if_exists"`
+	Permanently bool               `yaml:"permanently"`
+	Sync        bool               `yaml:"sync"`
+	Engine      string             `yaml:"engine,omitempty"`
+	Comment     string             `yaml:"comment,omitempty"`
+	Columns     []ExpectedColumn   `yaml:"columns,omitempty"`
+	OrderBy     string             `yaml:"order_by,omitempty"`
+	PartitionBy string             `yaml:"partition_by,omitempty"`
+	PrimaryKey  string             `yaml:"primary_key,omitempty"`
+	SampleBy    string             `yaml:"sample_by,omitempty"`
+	TTL         string             `yaml:"ttl,omitempty"`
+	Settings    map[string]string  `yaml:"settings,omitempty"`
+}
+
+// ExpectedColumn represents expected column properties
+type ExpectedColumn struct {
+	Name      string `yaml:"name"`
+	DataType  string `yaml:"data_type"`
+	Default   string `yaml:"default,omitempty"`
+	Codec     string `yaml:"codec,omitempty"`
+	TTL       string `yaml:"ttl,omitempty"`
+	Comment   string `yaml:"comment,omitempty"`
 }
 
 var updateFlag = flag.Bool("update", false, "update YAML test files")
@@ -467,10 +487,82 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 		}
 	}
 
-	// Process tables (for materialized view operations)
+	// Process tables (CREATE TABLE and materialized view operations)
 	expectedTables := make(map[string]ExpectedTable)
 	for _, stmt := range grammar.Statements {
-		if stmt.AttachTable != nil {
+		if stmt.CreateTable != nil {
+			table := stmt.CreateTable
+			tableName := table.Name
+			if table.Database != nil {
+				tableName = *table.Database + "." + table.Name
+			}
+			
+			expectedTable := ExpectedTable{
+				Name:        table.Name,
+				Operation:   "CREATE",
+				OrReplace:   table.OrReplace,
+				IfNotExists: table.IfNotExists,
+			}
+			if table.Database != nil {
+				expectedTable.Database = *table.Database
+			}
+			if table.OnCluster != nil {
+				expectedTable.Cluster = *table.OnCluster
+			}
+			if table.Engine != nil {
+				expectedTable.Engine = formatTableEngine(table.Engine)
+			}
+			if table.Comment != nil {
+				expectedTable.Comment = removeQuotes(*table.Comment)
+			}
+			if table.OrderBy != nil {
+				expectedTable.OrderBy = table.OrderBy.Expression.Raw
+			}
+			if table.PartitionBy != nil {
+				expectedTable.PartitionBy = table.PartitionBy.Expression.Raw
+			}
+			if table.PrimaryKey != nil {
+				expectedTable.PrimaryKey = table.PrimaryKey.Expression.Raw
+			}
+			if table.SampleBy != nil {
+				expectedTable.SampleBy = table.SampleBy.Expression.Raw
+			}
+			if table.TTL != nil {
+				expectedTable.TTL = table.TTL.Expression.Raw
+			}
+			if table.Settings != nil {
+				settings := make(map[string]string)
+				for _, setting := range table.Settings.Settings {
+					settings[setting.Name] = setting.Value
+				}
+				expectedTable.Settings = settings
+			}
+			
+			// Process columns
+			columns := make([]ExpectedColumn, len(table.Columns))
+			for i, col := range table.Columns {
+				expectedCol := ExpectedColumn{
+					Name:     col.Name,
+					DataType: formatDataType(col.DataType),
+				}
+				if col.Default != nil {
+					expectedCol.Default = col.Default.Type + " " + col.Default.Expression.Raw
+				}
+				if col.Codec != nil {
+					expectedCol.Codec = formatCodec(col.Codec)
+				}
+				if col.TTL != nil {
+					expectedCol.TTL = col.TTL.Expression.Raw
+				}
+				if col.Comment != nil {
+					expectedCol.Comment = removeQuotes(*col.Comment)
+				}
+				columns[i] = expectedCol
+			}
+			expectedTable.Columns = columns
+			
+			expectedTables[tableName] = expectedTable
+		} else if stmt.AttachTable != nil {
 			table := stmt.AttachTable
 			tableName := table.Name
 			if table.Database != nil {
@@ -654,4 +746,127 @@ func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlF
 		require.Equal(t, expectedDict.Comment, actualDict.Comment,
 			"Wrong comment in dictionary %s from %s", dictName, sqlFile)
 	}
+}
+
+// formatTableEngine formats a table ENGINE clause with parameters
+func formatTableEngine(engine *TableEngine) string {
+	if engine == nil {
+		return ""
+	}
+	
+	result := engine.Name
+	if len(engine.Parameters) > 0 {
+		result += "("
+		for i, param := range engine.Parameters {
+			if i > 0 {
+				result += ", "
+			}
+			if param.String != nil {
+				result += *param.String
+			} else if param.Number != nil {
+				result += *param.Number
+			} else if param.Ident != nil {
+				result += *param.Ident
+			}
+		}
+		result += ")"
+	}
+	return result
+}
+
+// formatDataType formats a data type with all its components
+func formatDataType(dataType *DataType) string {
+	if dataType == nil {
+		return ""
+	}
+	
+	if dataType.Nullable != nil {
+		return "Nullable(" + formatDataType(dataType.Nullable.Type) + ")"
+	}
+	if dataType.Array != nil {
+		return "Array(" + formatDataType(dataType.Array.Type) + ")"
+	}
+	if dataType.Tuple != nil {
+		result := "Tuple("
+		for i, element := range dataType.Tuple.Elements {
+			if i > 0 {
+				result += ", "
+			}
+			if element.Name != nil {
+				result += *element.Name + " " + formatDataType(element.Type)
+			} else {
+				result += formatDataType(element.UnnamedType)
+			}
+		}
+		return result + ")"
+	}
+	if dataType.Nested != nil {
+		result := "Nested("
+		for i, col := range dataType.Nested.Columns {
+			if i > 0 {
+				result += ", "
+			}
+			result += col.Name + " " + formatDataType(col.Type)
+		}
+		return result + ")"
+	}
+	if dataType.Map != nil {
+		return "Map(" + formatDataType(dataType.Map.KeyType) + ", " + formatDataType(dataType.Map.ValueType) + ")"
+	}
+	if dataType.LowCardinality != nil {
+		return "LowCardinality(" + formatDataType(dataType.LowCardinality.Type) + ")"
+	}
+	if dataType.Simple != nil {
+		result := dataType.Simple.Name
+		if len(dataType.Simple.Parameters) > 0 {
+			result += "("
+			for i, param := range dataType.Simple.Parameters {
+				if i > 0 {
+					result += ", "
+				}
+				if param.String != nil {
+					result += *param.String
+				} else if param.Number != nil {
+					result += *param.Number
+				} else if param.Ident != nil {
+					result += *param.Ident
+				}
+			}
+			result += ")"
+		}
+		return result
+	}
+	return ""
+}
+
+// formatCodec formats a codec clause
+func formatCodec(codec *CodecClause) string {
+	if codec == nil {
+		return ""
+	}
+	
+	result := "CODEC("
+	for i, codecSpec := range codec.Codecs {
+		if i > 0 {
+			result += ", "
+		}
+		result += codecSpec.Name
+		if len(codecSpec.Parameters) > 0 {
+			result += "("
+			for j, param := range codecSpec.Parameters {
+				if j > 0 {
+					result += ", "
+				}
+				if param.String != nil {
+					result += *param.String
+				} else if param.Number != nil {
+					result += *param.Number
+				} else if param.Ident != nil {
+					result += *param.Ident
+				}
+			}
+			result += ")"
+		}
+	}
+	return result + ")"
 }

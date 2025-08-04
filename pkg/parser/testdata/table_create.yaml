@@ -1,0 +1,128 @@
+tables:
+    analytics.events:
+        name: events
+        database: analytics
+        cluster: production
+        operation: CREATE
+        or_replace: true
+        if_not_exists: true
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: ReplicatedMergeTree('/clickhouse/tables/{shard}/events', '{replica}')
+        comment: User events table
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: user_id
+              data_type: UInt64
+            - name: event_type
+              data_type: LowCardinality(String)
+            - name: timestamp
+              data_type: DateTime
+              default: DEFAULT now(),dataMap(String,String)DEFAULTmap(),metadataNullable(String)
+              codec: CODEC(ZSTD)
+            - name: tags
+              data_type: Array(String)
+              default: DEFAULT array(),locationTuple(latFloat64,lonFloat64),settingsNested(keyString,valueString),temp_dataString
+              ttl: timestamp+INTERVAL30DAY
+              comment: Temporary data
+        order_by: (user_id,timestamp)
+        partition_by: toYYYYMM(timestamp)
+        primary_key: user_id
+        sample_by: id
+        ttl: timestamp+INTERVAL1YEAR
+        settings:
+            index_granularity: "8192"
+            merge_with_ttl_timeout: "3600"
+    logs:
+        name: logs
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: Log
+        columns:
+            - name: timestamp
+              data_type: DateTime
+            - name: level
+              data_type: String
+            - name: message
+              data_type: String
+    measurements:
+        name: measurements
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: device_id
+              data_type: FixedString(16)
+            - name: value
+              data_type: Decimal(10, 4)
+            - name: precision_value
+              data_type: Decimal128(6)
+            - name: created_at
+              data_type: DateTime64(3, 'UTC')
+            - name: config_data
+              data_type: String
+              codec: CODEC(LZ4HC(9))
+        order_by: (device_id,created_at)
+    user_profiles:
+        name: user_profiles
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: user_id
+              data_type: UInt64
+            - name: profile_data
+              data_type: Map(String, Nullable(String))
+            - name: tags
+              data_type: Array(LowCardinality(String))
+            - name: coordinates
+              data_type: Nullable(Tuple(lat Float64, lon Float64))
+            - name: computed_field
+              data_type: String
+            - name: age_alias
+              data_type: UInt8
+            - name: default_data
+              data_type: String
+        order_by: user_id
+        partition_by: user_id%100
+    users:
+        name: users
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: name
+              data_type: String
+            - name: email
+              data_type: String
+        order_by: id

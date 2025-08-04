@@ -1,0 +1,20 @@
+description: "Dropping tables"
+current_sql: |
+  CREATE TABLE old_table (
+      id UInt64,
+      data String
+  ) ENGINE = MergeTree()
+  ORDER BY id;
+target_sql: ""  # Empty target state
+expected_migration:
+  up_contains:
+    - "DROP TABLE old_table"
+  down_contains:
+    - "CREATE TABLE old_table"
+    - "id UInt64"
+    - "data String"
+    - "ENGINE = MergeTree"
+    - "ORDER BY id"
+  diff_count: 1
+  diff_types:
+    - "DROP"

@@ -1,0 +1,171 @@
+tables:
+    analytics.events:
+        name: events
+        database: analytics
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    analytics.old_events:
+        name: old_events
+        database: analytics
+        cluster: main_cluster
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    data_v1:
+        name: data_v1
+        database: ""
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    db1.t1:
+        name: t1
+        database: db1
+        cluster: main_cluster
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    db1.users:
+        name: users
+        database: db1
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    measurements:
+        name: measurements
+        database: ""
+        cluster: production
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    old_table:
+        name: old_table
+        database: ""
+        cluster: analytics_cluster
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    staging.logs:
+        name: logs
+        database: staging
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    staging.metrics:
+        name: metrics
+        database: staging
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    staging.user_profiles:
+        name: user_profiles
+        database: staging
+        cluster: production
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    t2:
+        name: t2
+        database: ""
+        cluster: main_cluster
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    table_2023_01:
+        name: table_2023_01
+        database: ""
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    table1:
+        name: table1
+        database: ""
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    table2:
+        name: table2
+        database: ""
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    temp.data:
+        name: data
+        database: temp
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    temp_data:
+        name: temp_data
+        database: ""
+        cluster: analytics_cluster
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    users:
+        name: users
+        database: ""
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false

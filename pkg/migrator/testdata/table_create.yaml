@@ -1,0 +1,22 @@
+description: "Creating new tables"
+current_sql: ""  # Empty current state
+target_sql: |
+  CREATE TABLE users (
+      id UInt64,
+      name String,
+      email String
+  ) ENGINE = MergeTree()
+  ORDER BY id;
+expected_migration:
+  up_contains:
+    - "CREATE TABLE users"
+    - "id UInt64"
+    - "name String"
+    - "email String"
+    - "ENGINE = MergeTree"
+    - "ORDER BY id"
+  down_contains:
+    - "DROP TABLE users"
+  diff_count: 1
+  diff_types:
+    - "CREATE"
