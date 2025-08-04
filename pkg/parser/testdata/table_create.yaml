@@ -91,6 +91,50 @@ tables:
         settings:
             index_granularity: "8192"
             merge_with_ttl_timeout: "3600"
+    analytics_data:
+        name: analytics_data
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: user_id
+              data_type: UInt64
+            - name: event_type
+              data_type: String
+            - name: timestamp
+              data_type: DateTime
+            - name: revenue
+              data_type: Decimal(10, 2)
+        order_by: expression
+    complex_table:
+        name: complex_table
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: name
+              data_type: String
+            - name: category
+              data_type: String
+            - name: value
+              data_type: Float64
+            - name: created_at
+              data_type: DateTime
+        order_by: expression
     logs:
         name: logs
         database: ""
@@ -161,6 +205,25 @@ tables:
               data_type: Float32
         order_by: expression
         partition_by: expression
+    test_projections:
+        name: test_projections
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: name
+              data_type: String
+            - name: timestamp
+              data_type: DateTime
+        order_by: expression
     user_profiles:
         name: user_profiles
         database: ""

@@ -84,6 +84,7 @@ type ExpectedTable struct {
 	SampleBy    string            `yaml:"sample_by,omitempty"`
 	TTL         string            `yaml:"ttl,omitempty"`
 	Settings    map[string]string `yaml:"settings,omitempty"`
+	AlterOperations map[string]int `yaml:"alter_operations,omitempty"`
 }
 
 // ExpectedColumn represents expected column properties
@@ -646,6 +647,98 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedTables[fromName] = expectedTable
 			}
+		} else if stmt.AlterTable != nil {
+			table := stmt.AlterTable
+			tableName := table.Name
+			if table.Database != nil {
+				tableName = *table.Database + "." + table.Name
+			}
+
+			// Check if table already exists in expectedTables, accumulate operations
+			var expectedTable ExpectedTable
+			if existingTable, exists := expectedTables[tableName]; exists {
+				expectedTable = existingTable
+			} else {
+				expectedTable = ExpectedTable{
+					Name:      table.Name,
+					Operation: "ALTER",
+					IfExists:  table.IfExists,
+				}
+				if table.Database != nil {
+					expectedTable.Database = *table.Database
+				}
+				if table.OnCluster != nil {
+					expectedTable.Cluster = *table.OnCluster
+				}
+			}
+			
+			// Initialize operation counts if not exists
+			if expectedTable.AlterOperations == nil {
+				expectedTable.AlterOperations = make(map[string]int)
+			}
+			
+			// Count and accumulate operations by type for testing
+			for _, op := range table.Operations {
+				if op.AddColumn != nil {
+					expectedTable.AlterOperations["ADD_COLUMN"]++
+				} else if op.DropColumn != nil {
+					expectedTable.AlterOperations["DROP_COLUMN"]++
+				} else if op.ModifyColumn != nil {
+					expectedTable.AlterOperations["MODIFY_COLUMN"]++
+				} else if op.RenameColumn != nil {
+					expectedTable.AlterOperations["RENAME_COLUMN"]++
+				} else if op.CommentColumn != nil {
+					expectedTable.AlterOperations["COMMENT_COLUMN"]++
+				} else if op.ClearColumn != nil {
+					expectedTable.AlterOperations["CLEAR_COLUMN"]++
+				} else if op.AddIndex != nil {
+					expectedTable.AlterOperations["ADD_INDEX"]++
+				} else if op.DropIndex != nil {
+					expectedTable.AlterOperations["DROP_INDEX"]++
+				} else if op.AddConstraint != nil {
+					expectedTable.AlterOperations["ADD_CONSTRAINT"]++
+				} else if op.DropConstraint != nil {
+					expectedTable.AlterOperations["DROP_CONSTRAINT"]++
+				} else if op.AddProjection != nil {
+					expectedTable.AlterOperations["ADD_PROJECTION"]++
+				} else if op.DropProjection != nil {
+					expectedTable.AlterOperations["DROP_PROJECTION"]++
+				} else if op.ModifyTTL != nil {
+					expectedTable.AlterOperations["MODIFY_TTL"]++
+				} else if op.DeleteTTL != nil {
+					expectedTable.AlterOperations["DELETE_TTL"]++
+				} else if op.Update != nil {
+					expectedTable.AlterOperations["UPDATE"]++
+				} else if op.Delete != nil {
+					expectedTable.AlterOperations["DELETE"]++
+				} else if op.Freeze != nil {
+					expectedTable.AlterOperations["FREEZE"]++
+				} else if op.AttachPartition != nil {
+					expectedTable.AlterOperations["ATTACH_PARTITION"]++
+				} else if op.DetachPartition != nil {
+					expectedTable.AlterOperations["DETACH_PARTITION"]++
+				} else if op.DropPartition != nil {
+					expectedTable.AlterOperations["DROP_PARTITION"]++
+				} else if op.MovePartition != nil {
+					expectedTable.AlterOperations["MOVE_PARTITION"]++
+				} else if op.ReplacePartition != nil {
+					expectedTable.AlterOperations["REPLACE_PARTITION"]++
+				} else if op.FetchPartition != nil {
+					expectedTable.AlterOperations["FETCH_PARTITION"]++
+				} else if op.ModifyOrderBy != nil {
+					expectedTable.AlterOperations["MODIFY_ORDER_BY"]++
+				} else if op.ModifySampleBy != nil {
+					expectedTable.AlterOperations["MODIFY_SAMPLE_BY"]++
+				} else if op.RemoveSampleBy != nil {
+					expectedTable.AlterOperations["REMOVE_SAMPLE_BY"]++
+				} else if op.ModifySetting != nil {
+					expectedTable.AlterOperations["MODIFY_SETTING"]++
+				} else if op.ResetSetting != nil {
+					expectedTable.AlterOperations["RESET_SETTING"]++
+				}
+			}
+			
+			expectedTables[tableName] = expectedTable
 		}
 	}
 

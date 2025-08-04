@@ -40,11 +40,12 @@ type (
 		Semicolon   bool                  `parser:"';'"`
 	}
 
-	// TableElement represents an element within table definition (column, index, or constraint)
+	// TableElement represents an element within table definition (column, index, constraint, or projection)
 	TableElement struct {
-		Index      *IndexDefinition   `parser:"@@"`
+		Index      *IndexDefinition      `parser:"@@"`
 		Constraint *ConstraintDefinition `parser:"| @@"`
-		Column     *Column            `parser:"| @@"`
+		Projection *ProjectionDefinition `parser:"| @@"`
+		Column     *Column               `parser:"| @@"`
 	}
 
 	// IndexDefinition represents an INDEX definition within CREATE TABLE
@@ -114,6 +115,50 @@ type (
 		Name       string     `parser:"@(Ident | BacktickIdent)"`
 		Check      string     `parser:"'CHECK'"`
 		Expression Expression `parser:"@@"`
+	}
+
+	// ProjectionDefinition represents a PROJECTION definition within CREATE TABLE
+	// ClickHouse syntax:
+	//   PROJECTION projection_name (SELECT ... [GROUP BY ...] [ORDER BY ...])
+	ProjectionDefinition struct {
+		Projection  string            `parser:"'PROJECTION'"`
+		Name        string            `parser:"@(Ident | BacktickIdent)"`
+		SelectClause ProjectionSelect `parser:"@@"`
+	}
+
+	// ProjectionSelect represents the SELECT clause within projection parentheses
+	ProjectionSelect struct {
+		OpenParen   string                     `parser:"'('"`
+		Select      string                     `parser:"'SELECT'"`
+		Columns     []ProjectionSelectColumn   `parser:"@@ (',' @@)*"`
+		GroupBy     *ProjectionGroupBy         `parser:"@@?"`
+		OrderBy     *ProjectionOrderBy         `parser:"@@?"`
+		CloseParen  string                     `parser:"')'"`
+	}
+
+	// ProjectionSelectColumn represents columns in projection SELECT
+	ProjectionSelectColumn struct {
+		Star  *string    `parser:"@'*'"`
+		Expr  *Expression `parser:"| @@"`
+		Alias *string    `parser:"('AS' @(Ident | BacktickIdent))?"`
+	}
+
+	// ProjectionGroupBy represents GROUP BY clause in projections
+	ProjectionGroupBy struct {
+		GroupBy    string       `parser:"'GROUP' 'BY'"`
+		Columns    []Expression `parser:"@@ (',' @@)*"`
+	}
+
+	// ProjectionOrderBy represents ORDER BY clause in projections  
+	ProjectionOrderBy struct {
+		OrderBy    string                   `parser:"'ORDER' 'BY'"`
+		Columns    []ProjectionOrderColumn  `parser:"@@ (',' @@)*"`
+	}
+
+	// ProjectionOrderColumn represents a column in ORDER BY with optional ASC/DESC
+	ProjectionOrderColumn struct {
+		Expr      Expression `parser:"@@"`
+		Direction *string    `parser:"@('ASC' | 'DESC')?"`
 	}
 
 	// TableEngine represents the ENGINE clause for tables
@@ -244,6 +289,7 @@ type (
 	// - ADD/DROP/MODIFY/RENAME COLUMN
 	// - ADD/DROP INDEX
 	// - ADD/DROP CONSTRAINT
+	// - ADD/DROP PROJECTION
 	// - MODIFY TTL
 	// - UPDATE/DELETE data
 	// - FREEZE/ATTACH/DETACH/DROP/MOVE/REPLACE PARTITION
@@ -287,6 +333,8 @@ type (
 		RemoveSampleBy   *RemoveSampleByOperation   `parser:"| @@"`
 		ModifySetting    *ModifySettingOperation    `parser:"| @@"`
 		ResetSetting     *ResetSettingOperation     `parser:"| @@"`
+		AddProjection    *AddProjectionOperation    `parser:"| @@"`
+		DropProjection   *DropProjectionOperation   `parser:"| @@"`
 	}
 
 	// AddColumnOperation represents ADD COLUMN operation
@@ -509,5 +557,24 @@ type (
 	ResetSettingOperation struct {
 		Reset string `parser:"'RESET' 'SETTING'"`
 		Name  string `parser:"@(Ident | BacktickIdent)"`
+	}
+
+	// AddProjectionOperation represents ADD PROJECTION operation
+	// ClickHouse syntax:
+	//   ADD PROJECTION [IF NOT EXISTS] projection_name (SELECT ...)
+	AddProjectionOperation struct {
+		Add           string            `parser:"'ADD' 'PROJECTION'"`
+		IfNotExists   bool              `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Name          string            `parser:"@(Ident | BacktickIdent)"`
+		SelectClause  ProjectionSelect  `parser:"@@"`
+	}
+
+	// DropProjectionOperation represents DROP PROJECTION operation
+	// ClickHouse syntax:
+	//   DROP PROJECTION [IF EXISTS] projection_name
+	DropProjectionOperation struct {
+		Drop       string `parser:"'DROP' 'PROJECTION'"`
+		IfExists   bool   `parser:"@('IF' 'EXISTS')?"`
+		Name       string `parser:"@(Ident | BacktickIdent)"`
 	}
 )

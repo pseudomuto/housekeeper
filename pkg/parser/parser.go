@@ -112,7 +112,7 @@ var (
 			"CODEC", "TTL", "EPHEMERAL", "ALIAS", "ORDER", "PARTITION", "SAMPLE", "BY", "INTERVAL",
 			"ADD", "COLUMN", "AFTER", "FIRST", "REMOVE", "CLEAR", "IN", "DELETE", "WHERE", "UPDATE",
 			"FREEZE", "WITH", "NAME", "FROM", "MOVE", "DISK", "VOLUME", "FETCH", "RESET", "SETTING",
-			"INDEX", "TYPE", "GRANULARITY", "CONSTRAINT", "CHECK", "AND", "LIKE", "BETWEEN", "IS", "NULL",
+			"INDEX", "TYPE", "GRANULARITY", "CONSTRAINT", "CHECK", "PROJECTION", "GROUP", "AND", "LIKE", "BETWEEN", "IS", "NULL",
 			"TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "EXTRACT", "OVER",
 			"ROWS", "RANGE", "UNBOUNDED", "PRECEDING", "CURRENT", "ROW", "FOLLOWING", "NULLS", "LAST",
 			"SECOND", "MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "QUARTER", "YEAR", "NOW", "TODAY",
@@ -326,4 +326,44 @@ func ParseSQLFromDirectory(dir string) (*Grammar, error) {
 	}
 
 	return &Grammar{Statements: allStatements}, nil
+}
+
+// parseBalancedParentheses parses content within balanced parentheses
+// starting from the given position in the input string
+func parseBalancedParentheses(input string, start int) (content string, end int, err error) {
+	if start >= len(input) || input[start] != '(' {
+		return "", start, fmt.Errorf("expected '(' at position %d", start)
+	}
+
+	depth := 0
+	i := start
+	contentStart := start + 1
+
+	for i < len(input) {
+		char := input[i]
+		switch char {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				// Found the matching closing parenthesis
+				content = input[contentStart:i]
+				return content, i + 1, nil
+			}
+		case '\'':
+			// Skip string literals to avoid counting parentheses inside strings
+			i++
+			for i < len(input) && input[i] != '\'' {
+				if input[i] == '\\' && i+1 < len(input) {
+					i += 2 // Skip escaped character
+				} else {
+					i++
+				}
+			}
+		}
+		i++
+	}
+
+	return "", i, fmt.Errorf("unmatched parentheses starting at position %d", start)
 }

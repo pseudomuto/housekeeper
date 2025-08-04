@@ -154,3 +154,50 @@ ALTER TABLE analytics.events
 DETACH PARTITION '202301',
 DETACH PARTITION '202302',
 DETACH PARTITION '202303';
+
+-- ALTER TABLE ADD PROJECTION basic
+ALTER TABLE analytics.events ADD PROJECTION user_stats (
+    SELECT 
+        user_id,
+        count() AS event_count
+    GROUP BY user_id
+);
+
+-- ALTER TABLE ADD PROJECTION with IF NOT EXISTS
+ALTER TABLE analytics.events ADD PROJECTION IF NOT EXISTS daily_stats (
+    SELECT 
+        toDate(timestamp) AS date,
+        count() AS total_events,
+        uniq(user_id) AS unique_users
+    GROUP BY date
+    ORDER BY date DESC
+);
+
+-- ALTER TABLE ADD PROJECTION with complex SELECT
+ALTER TABLE analytics.events ADD PROJECTION revenue_summary (
+    SELECT 
+        user_id,
+        toYYYYMM(timestamp) AS month,
+        sum(revenue) AS total_revenue,
+        avg(revenue) AS avg_revenue,
+        count() AS transaction_count
+    GROUP BY user_id, month
+    ORDER BY user_id, month
+);
+
+-- ALTER TABLE DROP PROJECTION
+ALTER TABLE analytics.events DROP PROJECTION user_stats;
+
+-- ALTER TABLE DROP PROJECTION with IF EXISTS
+ALTER TABLE analytics.events DROP PROJECTION IF EXISTS old_projection;
+
+-- ALTER TABLE with mixed operations including projections
+ALTER TABLE analytics.events
+ADD COLUMN revenue Decimal(10, 2) DEFAULT 0,
+ADD PROJECTION revenue_stats (
+    SELECT 
+        toYYYYMM(timestamp) AS month,
+        sum(revenue) AS monthly_revenue
+    GROUP BY month
+),
+DROP PROJECTION IF EXISTS old_stats;

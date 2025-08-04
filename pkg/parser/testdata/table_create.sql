@@ -115,3 +115,65 @@ CREATE TABLE user_profiles (
     
 ) ENGINE = MergeTree()
 ORDER BY user_id;
+
+-- Table with simple projection
+CREATE TABLE test_projections (
+    id UInt64,
+    name String,
+    timestamp DateTime,
+    
+    PROJECTION by_time (
+        SELECT *
+        ORDER BY timestamp
+    )
+    
+) ENGINE = MergeTree()
+ORDER BY id;
+
+-- Table with aggregating projection
+CREATE TABLE analytics_data (
+    user_id UInt64,
+    event_type String,
+    timestamp DateTime,
+    revenue Decimal(10, 2),
+    
+    PROJECTION user_stats (
+        SELECT 
+            user_id,
+            count() AS event_count,
+            sum(revenue) AS total_revenue
+        GROUP BY user_id
+        ORDER BY user_id
+    )
+    
+) ENGINE = MergeTree()
+ORDER BY (user_id, timestamp);
+
+-- Table with mixed elements (columns, indexes, projections, constraints)
+CREATE TABLE complex_table (
+    id UInt64,
+    name String,
+    category String,
+    value Float64,
+    created_at DateTime,
+    
+    INDEX name_bloom name TYPE bloom_filter GRANULARITY 1,
+    
+    PROJECTION by_category (
+        SELECT 
+            category,
+            count() AS item_count,
+            avg(value) AS avg_value
+        GROUP BY category
+        ORDER BY category
+    ),
+    
+    PROJECTION timeline (
+        SELECT *
+        ORDER BY created_at DESC
+    ),
+    
+    CONSTRAINT positive_value CHECK value >= 0
+    
+) ENGINE = MergeTree()
+ORDER BY id;
