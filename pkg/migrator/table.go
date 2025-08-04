@@ -239,9 +239,13 @@ func extractTablesFromGrammar(grammar *parser.Grammar) map[string]*TableInfo {
 				tableInfo.Settings = settings
 			}
 
-			// Process columns
-			columns := make([]ColumnInfo, len(table.Columns))
-			for i, col := range table.Columns {
+			// Process columns from table elements
+			var columns []ColumnInfo
+			for _, element := range table.Elements {
+				if element.Column == nil {
+					continue // Skip indexes and constraints for now
+				}
+				col := element.Column
 				columnInfo := ColumnInfo{
 					Name:     col.Name,
 					DataType: formatColumnDataType(col.DataType),
@@ -258,7 +262,7 @@ func extractTablesFromGrammar(grammar *parser.Grammar) map[string]*TableInfo {
 				if col.Comment != nil {
 					columnInfo.Comment = removeQuotes(*col.Comment)
 				}
-				columns[i] = columnInfo
+				columns = append(columns, columnInfo)
 			}
 			tableInfo.Columns = columns
 

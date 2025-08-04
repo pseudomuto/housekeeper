@@ -21,23 +21,99 @@ type (
 	//   [SETTINGS name=value, ...]
 	//   [COMMENT 'comment']
 	CreateTableStmt struct {
-		Create      string               `parser:"'CREATE'"`
-		OrReplace   bool                 `parser:"@('OR' 'REPLACE')?"`
-		Table       string               `parser:"'TABLE'"`
-		IfNotExists bool                 `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database    *string              `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name        string               `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string              `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Columns     []Column             `parser:"'(' @@ (',' @@)* ')'"`
-		Engine      *TableEngine         `parser:"@@"`
-		OrderBy     *OrderByClause       `parser:"@@?"`
-		PartitionBy *PartitionByClause   `parser:"@@?"`
-		PrimaryKey  *PrimaryKeyClause    `parser:"@@?"`
-		SampleBy    *SampleByClause      `parser:"@@?"`
-		TTL         *TableTTLClause      `parser:"@@?"`
-		Settings    *TableSettingsClause `parser:"@@?"`
-		Comment     *string              `parser:"('COMMENT' @String)?"`
-		Semicolon   bool                 `parser:"';'"`
+		Create      string                `parser:"'CREATE'"`
+		OrReplace   bool                  `parser:"@('OR' 'REPLACE')?"`
+		Table       string                `parser:"'TABLE'"`
+		IfNotExists bool                  `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Database    *string               `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string                `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Elements    []TableElement        `parser:"'(' @@ (',' @@)* ')'"`
+		Engine      *TableEngine          `parser:"@@"`
+		OrderBy     *OrderByClause        `parser:"@@?"`
+		PartitionBy *PartitionByClause    `parser:"@@?"`
+		PrimaryKey  *PrimaryKeyClause     `parser:"@@?"`
+		SampleBy    *SampleByClause       `parser:"@@?"`
+		TTL         *TableTTLClause       `parser:"@@?"`
+		Settings    *TableSettingsClause  `parser:"@@?"`
+		Comment     *string               `parser:"('COMMENT' @String)?"`
+		Semicolon   bool                  `parser:"';'"`
+	}
+
+	// TableElement represents an element within table definition (column, index, or constraint)
+	TableElement struct {
+		Index      *IndexDefinition   `parser:"@@"`
+		Constraint *ConstraintDefinition `parser:"| @@"`
+		Column     *Column            `parser:"| @@"`
+	}
+
+	// IndexDefinition represents an INDEX definition within CREATE TABLE
+	// ClickHouse syntax:
+	//   INDEX index_name expression TYPE index_type [GRANULARITY value]
+	IndexDefinition struct {
+		Index       string     `parser:"'INDEX'"`
+		Name        string     `parser:"@(Ident | BacktickIdent)"`
+		Expression  Expression `parser:"@@"`
+		Type        string     `parser:"'TYPE'"`
+		IndexType   IndexType  `parser:"@@"`
+		Granularity *string    `parser:"('GRANULARITY' @Number)?"`
+	}
+
+	// IndexType represents different ClickHouse index types
+	IndexType struct {
+		// Simple index types
+		BloomFilter  bool `parser:"@'bloom_filter'"`
+		MinMax       bool `parser:"| @'minmax'"`  
+		Hypothesis   bool `parser:"| @'hypothesis'"`
+		
+		// Parametric index types
+		Set          *IndexSetType          `parser:"| @@"`
+		TokenBF      *IndexTokenBFType      `parser:"| @@"`
+		NGramBF      *IndexNGramBFType      `parser:"| @@"`
+		
+		// Custom/future index types - fallback to string
+		Custom       *string                `parser:"| @(Ident | BacktickIdent)"`
+	}
+
+	// IndexSetType represents set(max_rows) index type
+	IndexSetType struct {
+		Set     string `parser:"'set' '('"`
+		MaxRows string `parser:"@Number"`
+		Close   string `parser:"')'"`
+	}
+
+	// IndexTokenBFType represents tokenbf_v1(size, hashes, seed) index type
+	IndexTokenBFType struct {
+		TokenBF string `parser:"'tokenbf_v1' '('"`
+		Size    string `parser:"@Number"`
+		Comma1  string `parser:"','"`
+		Hashes  string `parser:"@Number"`
+		Comma2  string `parser:"','"`
+		Seed    string `parser:"@Number"`
+		Close   string `parser:"')'"`
+	}
+
+	// IndexNGramBFType represents ngrambf_v1(n, size, hashes, seed) index type
+	IndexNGramBFType struct {
+		NGramBF string `parser:"'ngrambf_v1' '('"`
+		N       string `parser:"@Number"`
+		Comma1  string `parser:"','"`
+		Size    string `parser:"@Number"`
+		Comma2  string `parser:"','"`
+		Hashes  string `parser:"@Number"`
+		Comma3  string `parser:"','"`
+		Seed    string `parser:"@Number"`
+		Close   string `parser:"')'"`
+	}
+
+	// ConstraintDefinition represents a CONSTRAINT definition within CREATE TABLE
+	// ClickHouse syntax:
+	//   CONSTRAINT constraint_name CHECK expression
+	ConstraintDefinition struct {
+		Constraint string     `parser:"'CONSTRAINT'"`
+		Name       string     `parser:"@(Ident | BacktickIdent)"`
+		Check      string     `parser:"'CHECK'"`
+		Expression Expression `parser:"@@"`
 	}
 
 	// TableEngine represents the ENGINE clause for tables

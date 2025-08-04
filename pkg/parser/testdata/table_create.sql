@@ -79,3 +79,39 @@ CREATE TABLE IF NOT EXISTS `analytics-db`.`user-events` ON CLUSTER `prod-cluster
     `created-at` DateTime DEFAULT now()
 ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/user-events', '{replica}')
 ORDER BY id;
+
+-- Table with INDEX definitions
+CREATE TABLE search_logs (
+    id UInt64,
+    query String,
+    user_id UInt64,
+    timestamp DateTime,
+    category LowCardinality(String),
+    response_time Float32,
+    
+    INDEX query_bloom query TYPE bloom_filter GRANULARITY 1,
+    INDEX user_minmax user_id TYPE minmax GRANULARITY 2,
+    INDEX category_set category TYPE set(1000) GRANULARITY 1,
+    INDEX response_time_minmax response_time TYPE minmax GRANULARITY 1
+    
+) ENGINE = MergeTree()
+ORDER BY (timestamp, user_id)
+PARTITION BY toYYYYMM(timestamp);
+
+-- Table with mixed elements (columns, indexes, constraints)
+CREATE TABLE user_profiles (
+    user_id UInt64,
+    email String,
+    age UInt8,
+    profile_data Map(String, String),
+    created_at DateTime DEFAULT now(),
+    updated_at DateTime DEFAULT now(),
+    
+    INDEX email_bloom email TYPE bloom_filter GRANULARITY 1,
+    INDEX age_minmax age TYPE minmax GRANULARITY 1,
+    
+    CONSTRAINT valid_age CHECK age BETWEEN 13 AND 120,
+    CONSTRAINT valid_email CHECK email LIKE '%@%'
+    
+) ENGINE = MergeTree()
+ORDER BY user_id;

@@ -135,6 +135,32 @@ tables:
               data_type: String
               codec: CODEC(LZ4HC(9))
         order_by: expression
+    search_logs:
+        name: search_logs
+        database: ""
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: query
+              data_type: String
+            - name: user_id
+              data_type: UInt64
+            - name: timestamp
+              data_type: DateTime
+            - name: category
+              data_type: LowCardinality(String)
+            - name: response_time
+              data_type: Float32
+        order_by: expression
+        partition_by: expression
     user_profiles:
         name: user_profiles
         database: ""
@@ -149,20 +175,19 @@ tables:
         columns:
             - name: user_id
               data_type: UInt64
-            - name: profile_data
-              data_type: Map(String, Nullable(String))
-            - name: tags
-              data_type: Array(LowCardinality(String))
-            - name: coordinates
-              data_type: Nullable(Tuple(lat Float64, lon Float64))
-            - name: computed_field
+            - name: email
               data_type: String
-            - name: age_alias
+            - name: age
               data_type: UInt8
-            - name: default_data
-              data_type: String
+            - name: profile_data
+              data_type: Map(String, String)
+            - name: created_at
+              data_type: DateTime
+              default: DEFAULT expression
+            - name: updated_at
+              data_type: DateTime
+              default: DEFAULT expression
         order_by: expression
-        partition_by: expression
     users:
         name: users
         database: ""

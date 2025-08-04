@@ -44,11 +44,17 @@
 // ✅ DROP DICTIONARY - Fully implemented with all options
 // ✅ RENAME DATABASE - Fully implemented with multi-database support and ON CLUSTER
 // ✅ RENAME DICTIONARY - Fully implemented with multi-dictionary support and ON CLUSTER
-// ✅ CREATE TABLE - Fully implemented with comprehensive column support:
+// ✅ CREATE TABLE - Fully implemented with comprehensive support:
 //    - OR REPLACE clause
 //    - IF NOT EXISTS
 //    - ON CLUSTER
 //    - Complete column definitions using column.go types
+//    - INDEX definitions with all ClickHouse index types:
+//      • bloom_filter, minmax, hypothesis (simple types)
+//      • set(max_rows), tokenbf_v1(size, hashes, seed), ngrambf_v1(n, size, hashes, seed) (parametric types)
+//      • Support for backtick identifiers in index names and expressions
+//      • GRANULARITY specification
+//    - CONSTRAINT definitions with CHECK expressions
 //    - ENGINE clause with parameters
 //    - ORDER BY, PARTITION BY, PRIMARY KEY, SAMPLE BY
 //    - Table-level TTL and SETTINGS
@@ -110,7 +116,7 @@ var (
 			"TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "EXTRACT", "OVER",
 			"ROWS", "RANGE", "UNBOUNDED", "PRECEDING", "CURRENT", "ROW", "FOLLOWING", "NULLS", "LAST",
 			"SECOND", "MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "QUARTER", "YEAR", "NOW", "TODAY",
-			"YESTERDAY", "DESC", "ASC"),
+			"YESTERDAY", "DESC", "ASC", "BLOOM_FILTER", "MINMAX", "HYPOTHESIS", "SET", "TOKENBF_V1", "NGRAMBF_V1"),
 		participle.UseLookahead(4),
 	)
 )

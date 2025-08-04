@@ -538,9 +538,13 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedTable.Settings = settings
 			}
 
-			// Process columns
-			columns := make([]ExpectedColumn, len(table.Columns))
-			for i, col := range table.Columns {
+			// Process columns from table elements
+			var columns []ExpectedColumn
+			for _, element := range table.Elements {
+				if element.Column == nil {
+					continue // Skip indexes and constraints for now
+				}
+				col := element.Column
 				expectedCol := ExpectedColumn{
 					Name:     col.Name,
 					DataType: formatDataType(col.DataType),
@@ -557,7 +561,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				if col.Comment != nil {
 					expectedCol.Comment = removeQuotes(*col.Comment)
 				}
-				columns[i] = expectedCol
+				columns = append(columns, expectedCol)
 			}
 			expectedTable.Columns = columns
 
