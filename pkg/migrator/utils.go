@@ -41,4 +41,3 @@ func getStringValue(s *string) string {
 	}
 	return *s
 }
-

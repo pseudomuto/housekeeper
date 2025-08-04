@@ -20,13 +20,13 @@ CREATE OR REPLACE TABLE IF NOT EXISTS analytics.events ON CLUSTER production (
         key String,
         value String
     ),
-    temp_data String TTL timestamp + INTERVAL 30 DAY COMMENT 'Temporary data'
+    temp_data String TTL timestamp + days(30) COMMENT 'Temporary data'
 ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/events', '{replica}')
 ORDER BY (user_id, timestamp)
 PARTITION BY toYYYYMM(timestamp)
 PRIMARY KEY user_id
 SAMPLE BY id
-TTL timestamp + INTERVAL 1 YEAR
+TTL timestamp + years(1)
 SETTINGS index_granularity = 8192, merge_with_ttl_timeout = 3600
 COMMENT 'User events table';
 

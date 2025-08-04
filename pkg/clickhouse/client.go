@@ -36,13 +36,13 @@ type (
 //	    log.Fatal(err)
 //	}
 //	defer client.Close()
-//	
+//
 //	// Get current schema (databases and dictionaries)
 //	grammar, err := client.GetSchema(context.Background())
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	
+//
 //	// Print all parsed statements
 //	for _, stmt := range grammar.Statements {
 //	    if stmt.CreateDatabase != nil {
@@ -88,7 +88,6 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-
 func (c *Client) listDatabases(ctx context.Context) ([]string, error) {
 	rows, err := c.conn.Query(ctx, "SHOW DATABASES")
 	if err != nil {
@@ -120,11 +119,11 @@ func (c *Client) listDatabases(ctx context.Context) ([]string, error) {
 //
 //	migrationSQL := `
 //		CREATE DATABASE analytics ENGINE = Atomic;
-//		CREATE DICTIONARY analytics.users (id UInt64) PRIMARY KEY id 
+//		CREATE DICTIONARY analytics.users (id UInt64) PRIMARY KEY id
 //		SOURCE(HTTP(url 'http://api.example.com/users')) LAYOUT(HASHED()) LIFETIME(3600);
 //		RENAME DATABASE old_analytics TO analytics_backup;
 //	`
-//	
+//
 //	err := client.ExecuteMigration(ctx, migrationSQL)
 //	if err != nil {
 //		log.Fatalf("Migration failed: %v", err)
@@ -152,7 +151,7 @@ func (c *Client) ExecuteMigration(ctx context.Context, sql string) error {
 //	if err != nil {
 //		log.Fatalf("Failed to get database statements: %v", err)
 //	}
-//	
+//
 //	for _, stmt := range statements {
 //		fmt.Println(stmt)
 //		// Output: CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';
@@ -263,10 +262,10 @@ func (c *Client) validateDDLStatement(ddl string) error {
 // including all databases and dictionaries, parsed into a structured Grammar object.
 //
 // The method performs the following operations:
-//   1. Retrieves all non-system databases using GetSchemaRecreationStatements
-//   2. Retrieves all dictionary definitions from system.dictionaries
-//   3. Combines and parses all DDL statements into a unified Grammar
-//   4. Returns the parsed Grammar for use in migration generation
+//  1. Retrieves all non-system databases using GetSchemaRecreationStatements
+//  2. Retrieves all dictionary definitions from system.dictionaries
+//  3. Combines and parses all DDL statements into a unified Grammar
+//  4. Returns the parsed Grammar for use in migration generation
 //
 // System databases and dictionaries are automatically excluded from results.
 // All returned DDL statements are validated by the parser before being included.
@@ -277,7 +276,7 @@ func (c *Client) validateDDLStatement(ddl string) error {
 //	if err != nil {
 //		log.Fatalf("Failed to get schema: %v", err)
 //	}
-//	
+//
 //	// Process databases
 //	for _, stmt := range grammar.Statements {
 //		if stmt.CreateDatabase != nil {
@@ -337,12 +336,12 @@ func (c *Client) GetSchema(ctx context.Context) (*parser.Grammar, error) {
 //	if err != nil {
 //		log.Fatalf("Failed to get databases: %v", err)
 //	}
-//	
+//
 //	// Process only database statements
 //	for _, stmt := range grammar.Statements {
 //		if stmt.CreateDatabase != nil {
-//			fmt.Printf("Database: %s (Engine: %s)\n", 
-//				stmt.CreateDatabase.Name, 
+//			fmt.Printf("Database: %s (Engine: %s)\n",
+//				stmt.CreateDatabase.Name,
 //				stmt.CreateDatabase.Engine.Name)
 //		}
 //	}

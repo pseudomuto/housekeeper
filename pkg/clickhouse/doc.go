@@ -23,13 +23,13 @@
 //	    log.Fatal(err)
 //	}
 //	defer client.Close()
-//	
+//
 //	// Get current database schema
 //	currentSchema, err := client.GetDatabasesOnly(ctx)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	
+//
 //	// Execute a migration
 //	err = client.ExecuteMigration(ctx, migrationSQL)
 //	if err != nil {

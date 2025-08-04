@@ -13,9 +13,9 @@ const (
 	// TableDiffCreate indicates a table needs to be created
 	TableDiffCreate TableDiffType = "CREATE"
 	// TableDiffDrop indicates a table needs to be dropped
-	TableDiffDrop   TableDiffType = "DROP"
+	TableDiffDrop TableDiffType = "DROP"
 	// TableDiffAlter indicates a table needs to be altered
-	TableDiffAlter  TableDiffType = "ALTER"
+	TableDiffAlter TableDiffType = "ALTER"
 	// TableDiffRename indicates a table needs to be renamed
 	TableDiffRename TableDiffType = "RENAME"
 )
@@ -25,15 +25,15 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// table operations including CREATE, ALTER, DROP, and RENAME.
 	TableDiff struct {
-		Type           TableDiffType // Type of operation (CREATE, ALTER, DROP, RENAME)
-		TableName      string        // Name of the table being modified (with database prefix if needed)
-		Description    string        // Human-readable description of the change
-		UpSQL          string        // SQL to apply the change (forward migration)
-		DownSQL        string        // SQL to rollback the change (reverse migration)
-		Current        *TableInfo    // Current state (nil if table doesn't exist)
-		Target         *TableInfo    // Target state (nil if table should be dropped)
-		NewTableName   string        // For rename operations - the new name
-		ColumnChanges  []ColumnDiff  // For ALTER operations - specific column changes
+		Type          TableDiffType // Type of operation (CREATE, ALTER, DROP, RENAME)
+		TableName     string        // Name of the table being modified (with database prefix if needed)
+		Description   string        // Human-readable description of the change
+		UpSQL         string        // SQL to apply the change (forward migration)
+		DownSQL       string        // SQL to rollback the change (reverse migration)
+		Current       *TableInfo    // Current state (nil if table doesn't exist)
+		Target        *TableInfo    // Target state (nil if table should be dropped)
+		NewTableName  string        // For rename operations - the new name
+		ColumnChanges []ColumnDiff  // For ALTER operations - specific column changes
 	}
 
 	// TableDiffType represents the type of table difference
@@ -145,7 +145,7 @@ func CompareTableGrammars(current, target *parser.Grammar) ([]*TableDiff, error)
 			if !tablesEqual(currentTable, targetTable) {
 				// Check if engine change is involved (not supported)
 				if currentTable.Engine != targetTable.Engine {
-					return nil, errors.Wrapf(ErrUnsupported, 
+					return nil, errors.Wrapf(ErrUnsupported,
 						"table engine change from %s to %s for table %s is not supported",
 						currentTable.Engine, targetTable.Engine, tableName)
 				}
@@ -217,19 +217,19 @@ func extractTablesFromGrammar(grammar *parser.Grammar) map[string]*TableInfo {
 				tableInfo.Comment = removeQuotes(*table.Comment)
 			}
 			if table.OrderBy != nil {
-				tableInfo.OrderBy = table.OrderBy.Expression.Raw
+				tableInfo.OrderBy = table.OrderBy.Expression.String()
 			}
 			if table.PartitionBy != nil {
-				tableInfo.PartitionBy = table.PartitionBy.Expression.Raw
+				tableInfo.PartitionBy = table.PartitionBy.Expression.String()
 			}
 			if table.PrimaryKey != nil {
-				tableInfo.PrimaryKey = table.PrimaryKey.Expression.Raw
+				tableInfo.PrimaryKey = table.PrimaryKey.Expression.String()
 			}
 			if table.SampleBy != nil {
-				tableInfo.SampleBy = table.SampleBy.Expression.Raw
+				tableInfo.SampleBy = table.SampleBy.Expression.String()
 			}
 			if table.TTL != nil {
-				tableInfo.TTL = table.TTL.Expression.Raw
+				tableInfo.TTL = table.TTL.Expression.String()
 			}
 			if table.Settings != nil {
 				settings := make(map[string]string)
@@ -247,13 +247,13 @@ func extractTablesFromGrammar(grammar *parser.Grammar) map[string]*TableInfo {
 					DataType: formatColumnDataType(col.DataType),
 				}
 				if col.Default != nil {
-					columnInfo.Default = col.Default.Type + " " + col.Default.Expression.Raw
+					columnInfo.Default = col.Default.Type + " " + col.Default.Expression.String()
 				}
 				if col.Codec != nil {
 					columnInfo.Codec = formatColumnCodec(col.Codec)
 				}
 				if col.TTL != nil {
-					columnInfo.TTL = col.TTL.Expression.Raw
+					columnInfo.TTL = col.TTL.Expression.String()
 				}
 				if col.Comment != nil {
 					columnInfo.Comment = removeQuotes(*col.Comment)

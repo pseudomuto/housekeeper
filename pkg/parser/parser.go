@@ -86,7 +86,10 @@ var (
 		{Name: "String", Pattern: `'([^'\\]|\\.)*'`},
 		{Name: "Number", Pattern: `\d+(\.\d+)?`},
 		{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-		{Name: "Punct", Pattern: `[(),.;=+\-*/%<>]`},
+		{Name: "NotEq", Pattern: `!=|<>`},
+		{Name: "LtEq", Pattern: `<=`},
+		{Name: "GtEq", Pattern: `>=`},
+		{Name: "Punct", Pattern: `[(),.;=+\-*/%<>\[\]!]`},
 		{Name: "Whitespace", Pattern: `\s+`},
 	})
 
@@ -94,7 +97,7 @@ var (
 	parser = participle.MustBuild[Grammar](
 		participle.Lexer(clickhouseLexer),
 		participle.Elide("Comment", "MultilineComment", "Whitespace"),
-		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "RENAME", "DATABASE", "DICTIONARY", 
+		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "RENAME", "DATABASE", "DICTIONARY",
 			"IF", "NOT", "EXISTS", "ON", "CLUSTER", "ENGINE", "COMMENT", "MODIFY", "PERMANENTLY", "SYNC",
 			"OR", "REPLACE", "PRIMARY", "KEY", "SOURCE", "LAYOUT", "LIFETIME", "SETTINGS", "MIN", "MAX",
 			"DEFAULT", "EXPRESSION", "IS_OBJECT_ID", "HIERARCHICAL", "INJECTIVE", "TO", "VIEW", "MATERIALIZED",
@@ -102,10 +105,19 @@ var (
 			"CODEC", "TTL", "EPHEMERAL", "ALIAS", "ORDER", "PARTITION", "SAMPLE", "BY", "INTERVAL",
 			"ADD", "COLUMN", "AFTER", "FIRST", "REMOVE", "CLEAR", "IN", "DELETE", "WHERE", "UPDATE",
 			"FREEZE", "WITH", "NAME", "FROM", "MOVE", "DISK", "VOLUME", "FETCH", "RESET", "SETTING",
-			"INDEX", "TYPE", "GRANULARITY", "CONSTRAINT", "CHECK"),
+			"INDEX", "TYPE", "GRANULARITY", "CONSTRAINT", "CHECK", "AND", "LIKE", "BETWEEN", "IS", "NULL",
+			"TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "EXTRACT", "OVER",
+			"ROWS", "RANGE", "UNBOUNDED", "PRECEDING", "CURRENT", "ROW", "FOLLOWING", "NULLS", "LAST",
+			"SECOND", "MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "QUARTER", "YEAR", "NOW", "TODAY",
+			"YESTERDAY", "DESC", "ASC"),
 		participle.UseLookahead(4),
 	)
 )
+
+// GetLexer returns the ClickHouse lexer for testing purposes
+func GetLexer() lexer.Definition {
+	return clickhouseLexer
+}
 
 type (
 	// Grammar defines the complete ClickHouse DDL grammar
@@ -162,7 +174,7 @@ type (
 //		CREATE DICTIONARY analytics.users_dict (
 //			id UInt64 IS_OBJECT_ID,
 //			name String INJECTIVE
-//		) PRIMARY KEY id 
+//		) PRIMARY KEY id
 //		SOURCE(HTTP(url 'http://api.example.com/users'))
 //		LAYOUT(HASHED())
 //		LIFETIME(3600);

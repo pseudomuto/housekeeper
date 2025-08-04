@@ -12,9 +12,9 @@ const (
 	// DatabaseDiffCreate indicates a database needs to be created
 	DatabaseDiffCreate DatabaseDiffType = "CREATE"
 	// DatabaseDiffDrop indicates a database needs to be dropped
-	DatabaseDiffDrop   DatabaseDiffType = "DROP"
+	DatabaseDiffDrop DatabaseDiffType = "DROP"
 	// DatabaseDiffAlter indicates a database needs to be altered
-	DatabaseDiffAlter  DatabaseDiffType = "ALTER"
+	DatabaseDiffAlter DatabaseDiffType = "ALTER"
 	// DatabaseDiffRename indicates a database needs to be renamed
 	DatabaseDiffRename DatabaseDiffType = "RENAME"
 )
@@ -29,14 +29,14 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// database operations including CREATE, ALTER, DROP, and RENAME.
 	DatabaseDiff struct {
-		Type           DatabaseDiffType // Type of operation (CREATE, ALTER, DROP, RENAME)
-		DatabaseName   string          // Name of the database being modified
-		Description    string          // Human-readable description of the change
-		UpSQL          string          // SQL to apply the change (forward migration)
-		DownSQL        string          // SQL to rollback the change (reverse migration)
-		Current        *DatabaseInfo   // Current state (nil if database doesn't exist)
-		Target         *DatabaseInfo   // Target state (nil if database should be dropped)
-		NewDatabaseName string         // For rename operations - the new name
+		Type            DatabaseDiffType // Type of operation (CREATE, ALTER, DROP, RENAME)
+		DatabaseName    string           // Name of the database being modified
+		Description     string           // Human-readable description of the change
+		UpSQL           string           // SQL to apply the change (forward migration)
+		DownSQL         string           // SQL to rollback the change (reverse migration)
+		Current         *DatabaseInfo    // Current state (nil if database doesn't exist)
+		Target          *DatabaseInfo    // Target state (nil if database should be dropped)
+		NewDatabaseName string           // For rename operations - the new name
 	}
 
 	// DatabaseDiffType represents the type of database difference
@@ -58,7 +58,7 @@ type (
 //
 // The function identifies:
 //   - Databases that need to be created (exist in target but not current)
-//   - Databases that need to be dropped (exist in current but not target)  
+//   - Databases that need to be dropped (exist in current but not target)
 //   - Databases that need to be altered (exist in both but have differences)
 //   - Databases that need to be renamed (same properties but different names)
 //
@@ -71,10 +71,10 @@ type (
 //
 //	currentSQL := `CREATE DATABASE old_analytics ENGINE = Atomic COMMENT 'Analytics DB';`
 //	targetSQL := `CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';`
-//	
+//
 //	current, _ := parser.ParseSQL(currentSQL)
 //	target, _ := parser.ParseSQL(targetSQL)
-//	
+//
 //	diffs, err := CompareDatabaseGrammars(current, target)
 //	// Returns: []*DatabaseDiff with Type: DatabaseDiffRename
 //	// UpSQL: "RENAME DATABASE old_analytics TO analytics;"
@@ -114,12 +114,12 @@ func CompareDatabaseGrammars(current, target *parser.Grammar) ([]*DatabaseDiff, 
 				if err != nil {
 					return nil, fmt.Errorf("failed to generate UP migration for database '%s': %w", name, err)
 				}
-				
+
 				downSQL, err := generateAlterDatabaseSQL(targetDB, currentDB)
 				if err != nil {
 					return nil, fmt.Errorf("failed to generate DOWN migration for database '%s': %w", name, err)
 				}
-				
+
 				diff := &DatabaseDiff{
 					Type:         DatabaseDiffAlter,
 					DatabaseName: name,
@@ -326,4 +326,3 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 
 	return strings.Join(statements, "\n"), nil
 }
-

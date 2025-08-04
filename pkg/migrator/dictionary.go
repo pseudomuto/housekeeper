@@ -23,14 +23,14 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// dictionary operations including CREATE, DROP, REPLACE, and RENAME.
 	DictionaryDiff struct {
-		Type               DictionaryDiffType // Type of operation (CREATE, DROP, REPLACE, RENAME)
-		DictionaryName     string            // Full name of the dictionary (database.name)
-		Description        string            // Human-readable description of the change
-		UpSQL              string            // SQL to apply the change (forward migration)
-		DownSQL            string            // SQL to rollback the change (reverse migration)
-		Current            *DictionaryInfo   // Current state (nil if dictionary doesn't exist)
-		Target             *DictionaryInfo   // Target state (nil if dictionary should be dropped)
-		NewDictionaryName  string           // For rename operations - the new full name
+		Type              DictionaryDiffType // Type of operation (CREATE, DROP, REPLACE, RENAME)
+		DictionaryName    string             // Full name of the dictionary (database.name)
+		Description       string             // Human-readable description of the change
+		UpSQL             string             // SQL to apply the change (forward migration)
+		DownSQL           string             // SQL to rollback the change (reverse migration)
+		Current           *DictionaryInfo    // Current state (nil if dictionary doesn't exist)
+		Target            *DictionaryInfo    // Target state (nil if dictionary should be dropped)
+		NewDictionaryName string             // For rename operations - the new full name
 	}
 
 	// DictionaryDiffType represents the type of dictionary difference
@@ -67,14 +67,14 @@ type (
 //
 // Example:
 //
-//	currentSQL := `CREATE DICTIONARY analytics.old_users (id UInt64) PRIMARY KEY id 
+//	currentSQL := `CREATE DICTIONARY analytics.old_users (id UInt64) PRIMARY KEY id
 //	                SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
-//	targetSQL := `CREATE DICTIONARY analytics.users (id UInt64) PRIMARY KEY id 
+//	targetSQL := `CREATE DICTIONARY analytics.users (id UInt64) PRIMARY KEY id
 //	               SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
-//	
+//
 //	current, _ := parser.ParseSQL(currentSQL)
 //	target, _ := parser.ParseSQL(targetSQL)
-//	
+//
 //	diffs, err := CompareDictionaryGrammars(current, target)
 //	// Returns: []*DictionaryDiff with Type: DictionaryDiffRename
 //	// UpSQL: "RENAME DICTIONARY analytics.old_users TO analytics.users;"
@@ -337,12 +337,12 @@ func dictionaryColumnsEqual(a, b []*parser.DictionaryColumn) bool {
 		if colA.Name != colB.Name || colA.Type != colB.Type {
 			return false
 		}
-		
+
 		// Compare defaults
 		if !dictionaryColumnDefaultEqual(colA.Default, colB.Default) {
 			return false
 		}
-		
+
 		// Compare attributes
 		if !dictionaryColumnAttributesEqual(colA.Attributes, colB.Attributes) {
 			return false
@@ -368,14 +368,14 @@ func dictionaryColumnAttributesEqual(a, b []*parser.DictionaryColumnAttr) bool {
 	// Create maps to compare attributes regardless of order
 	aMap := make(map[string]bool)
 	bMap := make(map[string]bool)
-	
+
 	for _, attr := range a {
 		aMap[attr.Name] = true
 	}
 	for _, attr := range b {
 		bMap[attr.Name] = true
 	}
-	
+
 	// Compare maps
 	for name := range aMap {
 		if !bMap[name] {
@@ -387,7 +387,7 @@ func dictionaryColumnAttributesEqual(a, b []*parser.DictionaryColumnAttr) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -436,12 +436,12 @@ func dictionaryLifetimeEqual(a, b *parser.DictionaryLifetime) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	
+
 	// Compare single values
 	if !stringPtrEqual(a.Single, b.Single) {
 		return false
 	}
-	
+
 	// Compare MinMax values
 	if a.MinMax == nil && b.MinMax == nil {
 		return true
@@ -449,11 +449,11 @@ func dictionaryLifetimeEqual(a, b *parser.DictionaryLifetime) bool {
 	if a.MinMax == nil || b.MinMax == nil {
 		return false
 	}
-	
+
 	// Both MinMax structures should be equivalent regardless of order
 	aMin, aMax := getMinMaxValues(a.MinMax)
 	bMin, bMax := getMinMaxValues(b.MinMax)
-	
+
 	return aMin == bMin && aMax == bMax
 }
 
@@ -563,17 +563,17 @@ func reconstructDictionarySQL(stmt *parser.CreateDictionaryStmt, useOrReplace bo
 		var columnParts []string
 		for _, col := range stmt.Columns {
 			columnStr := col.Name + " " + col.Type
-			
+
 			// Add DEFAULT or EXPRESSION if present
 			if col.Default != nil {
 				columnStr += " " + col.Default.Type + " " + col.Default.Expression
 			}
-			
+
 			// Add attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
 			for _, attr := range col.Attributes {
 				columnStr += " " + attr.Name
 			}
-			
+
 			columnParts = append(columnParts, columnStr)
 		}
 		parts = append(parts, strings.Join(columnParts, ", "))

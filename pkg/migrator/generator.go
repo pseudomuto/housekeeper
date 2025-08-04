@@ -19,29 +19,43 @@ type (
 	}
 )
 
-// GenerateMigration creates a migration by comparing current and target schema states.
+// GenerateMigration creates a comprehensive migration by comparing current and target schema states.
 // It analyzes the differences between the current schema and the desired target schema,
 // then generates appropriate DDL statements for both applying (UP) and rolling back (DOWN) the changes.
 //
-// The migration includes both database and dictionary changes, processing them in the correct order:
-// - Databases are processed first (since dictionaries may depend on them)
-// - Within each type: CREATE -> ALTER/REPLACE -> DROP
+// The migration includes all schema objects (databases, tables, dictionaries, views), processing them in the correct order:
+// - UP migration: Databases → Tables → Dictionaries → Views (CREATE → ALTER → RENAME → DROP)
+// - DOWN migration: Views → Dictionaries → Tables → Databases (reverse order, reverse operations)
+//
+// Migration strategies for different object types:
+//   - Databases: Standard DDL operations (CREATE, ALTER, DROP, RENAME)
+//   - Tables: Full DDL support including column modifications (CREATE, ALTER, DROP, RENAME)
+//   - Dictionaries: CREATE OR REPLACE for modifications (since they can't be altered)
+//   - Regular Views: CREATE OR REPLACE for modifications
+//   - Materialized Views: ALTER TABLE MODIFY QUERY for query changes
 //
 // The function returns an error if:
 //   - No differences are found between current and target schemas
-//   - An unsupported operation is detected (e.g., database engine or cluster changes)
-//   - Schema comparison fails
+//   - An unsupported operation is detected (e.g., engine or cluster changes)
+//   - Schema comparison fails for any object type
 //
 // Example:
 //
-//	currentSQL := `CREATE DATABASE db1 ENGINE = Atomic COMMENT 'Old comment';`
-//	targetSQL := `CREATE DATABASE db1 ENGINE = Atomic COMMENT 'New comment';
-//	              CREATE DICTIONARY dict1 (id UInt64) PRIMARY KEY id SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
-//	
+//	currentSQL := `
+//		CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Old comment';
+//		CREATE TABLE analytics.events (id UInt64, name String) ENGINE = MergeTree() ORDER BY id;
+//	`
+//	targetSQL := `
+//		CREATE DATABASE analytics ENGINE = Atomic COMMENT 'New comment';
+//		CREATE TABLE analytics.events (id UInt64, name String, timestamp DateTime) ENGINE = MergeTree() ORDER BY id;
+//		CREATE DICTIONARY analytics.users_dict (id UInt64) PRIMARY KEY id SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);
+//		CREATE VIEW analytics.daily_stats AS SELECT date, count() FROM events GROUP BY date;
+//	`
+//
 //	current, _ := parser.ParseSQL(currentSQL)
 //	target, _ := parser.ParseSQL(targetSQL)
-//	
-//	migration, err := GenerateMigration(current, target, "update_schema")
+//
+//	migration, err := GenerateMigration(current, target, "update_analytics_schema")
 func GenerateMigration(current, target *parser.Grammar, name string) (*Migration, error) {
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := CompareDatabaseGrammars(current, target)
@@ -316,5 +330,3 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 		Timestamp: timestamp,
 	}, nil
 }
-
-

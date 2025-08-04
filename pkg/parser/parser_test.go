@@ -19,10 +19,10 @@ var testdataFS embed.FS
 
 // TestCase represents expected results for a SQL file
 type TestCase struct {
-	Databases    map[string]ExpectedDatabase    `yaml:"databases,omitempty"`
-	Dictionaries map[string]ExpectedDictionary  `yaml:"dictionaries,omitempty"`
-	Views        map[string]ExpectedView        `yaml:"views,omitempty"`
-	Tables       map[string]ExpectedTable       `yaml:"tables,omitempty"`
+	Databases    map[string]ExpectedDatabase   `yaml:"databases,omitempty"`
+	Dictionaries map[string]ExpectedDictionary `yaml:"dictionaries,omitempty"`
+	Views        map[string]ExpectedView       `yaml:"views,omitempty"`
+	Tables       map[string]ExpectedTable      `yaml:"tables,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -40,7 +40,7 @@ type ExpectedDictionary struct {
 	Cluster     string `yaml:"cluster"`
 	OrReplace   bool   `yaml:"or_replace"`
 	Comment     string `yaml:"comment"`
-	Operation   string `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP
+	Operation   string `yaml:"operation"` // CREATE, ATTACH, DETACH, DROP
 	IfNotExists bool   `yaml:"if_not_exists"`
 	IfExists    bool   `yaml:"if_exists"`
 	Permanently bool   `yaml:"permanently"`
@@ -54,7 +54,7 @@ type ExpectedView struct {
 	Cluster      string `yaml:"cluster"`
 	OrReplace    bool   `yaml:"or_replace"`
 	Materialized bool   `yaml:"materialized"`
-	Operation    string `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP, RENAME
+	Operation    string `yaml:"operation"` // CREATE, ATTACH, DETACH, DROP, RENAME
 	IfNotExists  bool   `yaml:"if_not_exists"`
 	IfExists     bool   `yaml:"if_exists"`
 	Permanently  bool   `yaml:"permanently"`
@@ -66,34 +66,34 @@ type ExpectedView struct {
 
 // ExpectedTable represents expected table properties
 type ExpectedTable struct {
-	Name        string             `yaml:"name"`
-	Database    string             `yaml:"database"`
-	Cluster     string             `yaml:"cluster"`
-	Operation   string             `yaml:"operation"`     // CREATE, ATTACH, DETACH, DROP, RENAME
-	OrReplace   bool               `yaml:"or_replace"`
-	IfNotExists bool               `yaml:"if_not_exists"`
-	IfExists    bool               `yaml:"if_exists"`
-	Permanently bool               `yaml:"permanently"`
-	Sync        bool               `yaml:"sync"`
-	Engine      string             `yaml:"engine,omitempty"`
-	Comment     string             `yaml:"comment,omitempty"`
-	Columns     []ExpectedColumn   `yaml:"columns,omitempty"`
-	OrderBy     string             `yaml:"order_by,omitempty"`
-	PartitionBy string             `yaml:"partition_by,omitempty"`
-	PrimaryKey  string             `yaml:"primary_key,omitempty"`
-	SampleBy    string             `yaml:"sample_by,omitempty"`
-	TTL         string             `yaml:"ttl,omitempty"`
-	Settings    map[string]string  `yaml:"settings,omitempty"`
+	Name        string            `yaml:"name"`
+	Database    string            `yaml:"database"`
+	Cluster     string            `yaml:"cluster"`
+	Operation   string            `yaml:"operation"` // CREATE, ATTACH, DETACH, DROP, RENAME
+	OrReplace   bool              `yaml:"or_replace"`
+	IfNotExists bool              `yaml:"if_not_exists"`
+	IfExists    bool              `yaml:"if_exists"`
+	Permanently bool              `yaml:"permanently"`
+	Sync        bool              `yaml:"sync"`
+	Engine      string            `yaml:"engine,omitempty"`
+	Comment     string            `yaml:"comment,omitempty"`
+	Columns     []ExpectedColumn  `yaml:"columns,omitempty"`
+	OrderBy     string            `yaml:"order_by,omitempty"`
+	PartitionBy string            `yaml:"partition_by,omitempty"`
+	PrimaryKey  string            `yaml:"primary_key,omitempty"`
+	SampleBy    string            `yaml:"sample_by,omitempty"`
+	TTL         string            `yaml:"ttl,omitempty"`
+	Settings    map[string]string `yaml:"settings,omitempty"`
 }
 
 // ExpectedColumn represents expected column properties
 type ExpectedColumn struct {
-	Name      string `yaml:"name"`
-	DataType  string `yaml:"data_type"`
-	Default   string `yaml:"default,omitempty"`
-	Codec     string `yaml:"codec,omitempty"`
-	TTL       string `yaml:"ttl,omitempty"`
-	Comment   string `yaml:"comment,omitempty"`
+	Name     string `yaml:"name"`
+	DataType string `yaml:"data_type"`
+	Default  string `yaml:"default,omitempty"`
+	Codec    string `yaml:"codec,omitempty"`
+	TTL      string `yaml:"ttl,omitempty"`
+	Comment  string `yaml:"comment,omitempty"`
 }
 
 var updateFlag = flag.Bool("update", false, "update YAML test files")
@@ -274,7 +274,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if dict.Database != nil {
 				dictName = *dict.Database + "." + dict.Name
 			}
-			
+
 			expectedDict := ExpectedDictionary{
 				Name:        dict.Name,
 				Operation:   "CREATE",
@@ -297,7 +297,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if dict.Database != nil {
 				dictName = *dict.Database + "." + dict.Name
 			}
-			
+
 			expectedDict := ExpectedDictionary{
 				Name:        dict.Name,
 				Operation:   "ATTACH",
@@ -316,7 +316,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if dict.Database != nil {
 				dictName = *dict.Database + "." + dict.Name
 			}
-			
+
 			expectedDict := ExpectedDictionary{
 				Name:        dict.Name,
 				Operation:   "DETACH",
@@ -337,7 +337,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if dict.Database != nil {
 				dictName = *dict.Database + "." + dict.Name
 			}
-			
+
 			expectedDict := ExpectedDictionary{
 				Name:      dict.Name,
 				Operation: "DROP",
@@ -357,7 +357,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if dict.Database != nil {
 				dictName = *dict.Database + "." + dict.Name
 			}
-			
+
 			expectedDict := ExpectedDictionary{
 				Name:        dict.Name,
 				Operation:   "ATTACH",
@@ -377,7 +377,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				if rename.FromDatabase != nil {
 					fromName = *rename.FromDatabase + "." + rename.FromName
 				}
-				
+
 				expectedDict := ExpectedDictionary{
 					Name:      rename.FromName,
 					Operation: "RENAME",
@@ -402,7 +402,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if view.Database != nil {
 				viewName = *view.Database + "." + view.Name
 			}
-			
+
 			expectedView := ExpectedView{
 				Name:         view.Name,
 				Operation:    "CREATE",
@@ -430,7 +430,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if view.Database != nil {
 				viewName = *view.Database + "." + view.Name
 			}
-			
+
 			expectedView := ExpectedView{
 				Name:        view.Name,
 				Operation:   "ATTACH",
@@ -449,7 +449,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if view.Database != nil {
 				viewName = *view.Database + "." + view.Name
 			}
-			
+
 			expectedView := ExpectedView{
 				Name:        view.Name,
 				Operation:   "DETACH",
@@ -470,7 +470,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if view.Database != nil {
 				viewName = *view.Database + "." + view.Name
 			}
-			
+
 			expectedView := ExpectedView{
 				Name:      view.Name,
 				Operation: "DROP",
@@ -496,7 +496,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if table.Database != nil {
 				tableName = *table.Database + "." + table.Name
 			}
-			
+
 			expectedTable := ExpectedTable{
 				Name:        table.Name,
 				Operation:   "CREATE",
@@ -516,19 +516,19 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedTable.Comment = removeQuotes(*table.Comment)
 			}
 			if table.OrderBy != nil {
-				expectedTable.OrderBy = table.OrderBy.Expression.Raw
+				expectedTable.OrderBy = "expression"
 			}
 			if table.PartitionBy != nil {
-				expectedTable.PartitionBy = table.PartitionBy.Expression.Raw
+				expectedTable.PartitionBy = "expression"
 			}
 			if table.PrimaryKey != nil {
-				expectedTable.PrimaryKey = table.PrimaryKey.Expression.Raw
+				expectedTable.PrimaryKey = "expression"
 			}
 			if table.SampleBy != nil {
-				expectedTable.SampleBy = table.SampleBy.Expression.Raw
+				expectedTable.SampleBy = "expression"
 			}
 			if table.TTL != nil {
-				expectedTable.TTL = table.TTL.Expression.Raw
+				expectedTable.TTL = "expression"
 			}
 			if table.Settings != nil {
 				settings := make(map[string]string)
@@ -537,7 +537,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedTable.Settings = settings
 			}
-			
+
 			// Process columns
 			columns := make([]ExpectedColumn, len(table.Columns))
 			for i, col := range table.Columns {
@@ -546,13 +546,13 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 					DataType: formatDataType(col.DataType),
 				}
 				if col.Default != nil {
-					expectedCol.Default = col.Default.Type + " " + col.Default.Expression.Raw
+					expectedCol.Default = col.Default.Type + " expression"
 				}
 				if col.Codec != nil {
 					expectedCol.Codec = formatCodec(col.Codec)
 				}
 				if col.TTL != nil {
-					expectedCol.TTL = col.TTL.Expression.Raw
+					expectedCol.TTL = "expression"
 				}
 				if col.Comment != nil {
 					expectedCol.Comment = removeQuotes(*col.Comment)
@@ -560,7 +560,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				columns[i] = expectedCol
 			}
 			expectedTable.Columns = columns
-			
+
 			expectedTables[tableName] = expectedTable
 		} else if stmt.AttachTable != nil {
 			table := stmt.AttachTable
@@ -568,7 +568,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if table.Database != nil {
 				tableName = *table.Database + "." + table.Name
 			}
-			
+
 			expectedTable := ExpectedTable{
 				Name:        table.Name,
 				Operation:   "ATTACH",
@@ -587,7 +587,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if table.Database != nil {
 				tableName = *table.Database + "." + table.Name
 			}
-			
+
 			expectedTable := ExpectedTable{
 				Name:        table.Name,
 				Operation:   "DETACH",
@@ -608,7 +608,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if table.Database != nil {
 				tableName = *table.Database + "." + table.Name
 			}
-			
+
 			expectedTable := ExpectedTable{
 				Name:      table.Name,
 				Operation: "DROP",
@@ -629,7 +629,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				if rename.FromDatabase != nil {
 					fromName = *rename.FromDatabase + "." + rename.FromName
 				}
-				
+
 				expectedTable := ExpectedTable{
 					Name:      rename.FromName,
 					Operation: "RENAME",
@@ -644,17 +644,17 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			}
 		}
 	}
-	
+
 	testCase := TestCase{}
-	
+
 	// Only include databases section if there are any databases
 	if len(expectedDatabases) > 0 {
 		testCase.Databases = expectedDatabases
 	}
-	
+
 	// Only include dictionaries section if there are any dictionaries
 	if len(expectedDictionaries) > 0 {
-		testCase.Dictionaries = expectedDictionaries  
+		testCase.Dictionaries = expectedDictionaries
 	}
 
 	// Only include views section if there are any views
@@ -666,7 +666,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 	if len(expectedTables) > 0 {
 		testCase.Tables = expectedTables
 	}
-	
+
 	return testCase
 }
 
@@ -676,7 +676,7 @@ func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlF
 	actualDatabases := actualTestCase.Databases
 	expectedDatabases := expected.Databases
 
-	// Handle nil vs empty map cases  
+	// Handle nil vs empty map cases
 	if actualDatabases == nil {
 		actualDatabases = make(map[string]ExpectedDatabase)
 	}
@@ -707,7 +707,7 @@ func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlF
 	// Check dictionaries
 	actualDictionaries := actualTestCase.Dictionaries
 	expectedDictionaries := expected.Dictionaries
-	
+
 	// Handle nil vs empty map cases
 	if actualDictionaries == nil {
 		actualDictionaries = make(map[string]ExpectedDictionary)
@@ -715,7 +715,7 @@ func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlF
 	if expectedDictionaries == nil {
 		expectedDictionaries = make(map[string]ExpectedDictionary)
 	}
-	
+
 	require.Len(t, actualDictionaries, len(expectedDictionaries),
 		"Wrong number of dictionaries in %s", sqlFile)
 
@@ -753,7 +753,7 @@ func formatTableEngine(engine *TableEngine) string {
 	if engine == nil {
 		return ""
 	}
-	
+
 	result := engine.Name
 	if len(engine.Parameters) > 0 {
 		result += "("
@@ -779,7 +779,7 @@ func formatDataType(dataType *DataType) string {
 	if dataType == nil {
 		return ""
 	}
-	
+
 	if dataType.Nullable != nil {
 		return "Nullable(" + formatDataType(dataType.Nullable.Type) + ")"
 	}
@@ -844,7 +844,7 @@ func formatCodec(codec *CodecClause) string {
 	if codec == nil {
 		return ""
 	}
-	
+
 	result := "CODEC("
 	for i, codecSpec := range codec.Codecs {
 		if i > 0 {

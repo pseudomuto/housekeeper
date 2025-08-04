@@ -21,30 +21,30 @@ type (
 	//   [SETTINGS name=value, ...]
 	//   [COMMENT 'comment']
 	CreateTableStmt struct {
-		Create      string              `parser:"'CREATE'"`
-		OrReplace   bool                `parser:"@('OR' 'REPLACE')?"`
-		Table       string              `parser:"'TABLE'"`
-		IfNotExists bool                `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database    *string             `parser:"(@Ident '.')?"`
-		Name        string              `parser:"@Ident"`
-		OnCluster   *string             `parser:"('ON' 'CLUSTER' @Ident)?"`
-		Columns     []Column            `parser:"'(' @@ (',' @@)* ')'"`
-		Engine      *TableEngine        `parser:"@@"`
-		OrderBy     *OrderByClause      `parser:"@@?"`
-		PartitionBy *PartitionByClause  `parser:"@@?"`
-		PrimaryKey  *PrimaryKeyClause   `parser:"@@?"`
-		SampleBy    *SampleByClause     `parser:"@@?"`
-		TTL         *TableTTLClause     `parser:"@@?"`
+		Create      string               `parser:"'CREATE'"`
+		OrReplace   bool                 `parser:"@('OR' 'REPLACE')?"`
+		Table       string               `parser:"'TABLE'"`
+		IfNotExists bool                 `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Database    *string              `parser:"(@Ident '.')?"`
+		Name        string               `parser:"@Ident"`
+		OnCluster   *string              `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Columns     []Column             `parser:"'(' @@ (',' @@)* ')'"`
+		Engine      *TableEngine         `parser:"@@"`
+		OrderBy     *OrderByClause       `parser:"@@?"`
+		PartitionBy *PartitionByClause   `parser:"@@?"`
+		PrimaryKey  *PrimaryKeyClause    `parser:"@@?"`
+		SampleBy    *SampleByClause      `parser:"@@?"`
+		TTL         *TableTTLClause      `parser:"@@?"`
 		Settings    *TableSettingsClause `parser:"@@?"`
-		Comment     *string             `parser:"('COMMENT' @String)?"`
-		Semicolon   bool                `parser:"';'"`
+		Comment     *string              `parser:"('COMMENT' @String)?"`
+		Semicolon   bool                 `parser:"';'"`
 	}
 
 	// TableEngine represents the ENGINE clause for tables
 	// Examples: ENGINE = MergeTree(), ENGINE = ReplicatedMergeTree('/path', 'replica')
 	TableEngine struct {
-		Engine     string           `parser:"'ENGINE' '='"`
-		Name       string           `parser:"@Ident"`
+		Engine     string            `parser:"'ENGINE' '='"`
+		Name       string            `parser:"@Ident"`
 		Parameters []EngineParameter `parser:"'(' (@@ (',' @@)*)? ')'"`
 	}
 
@@ -144,10 +144,10 @@ type (
 	// ClickHouse syntax:
 	//   RENAME TABLE [db.]table1 TO [db.]table2, [db.]table3 TO [db.]table4, ... [ON CLUSTER cluster]
 	RenameTableStmt struct {
-		Rename    string         `parser:"'RENAME' 'TABLE'"`
-		Renames   []TableRename  `parser:"@@ (',' @@)*"`
-		OnCluster *string        `parser:"('ON' 'CLUSTER' @Ident)?"`
-		Semicolon bool           `parser:"';'"`
+		Rename    string        `parser:"'RENAME' 'TABLE'"`
+		Renames   []TableRename `parser:"@@ (',' @@)*"`
+		OnCluster *string       `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Semicolon bool          `parser:"';'"`
 	}
 
 	// TableRename represents a single table rename operation
@@ -170,52 +170,52 @@ type (
 	// - MODIFY ORDER BY/SAMPLE BY
 	// - MODIFY SETTING
 	AlterTableStmt struct {
-		Alter       string               `parser:"'ALTER' 'TABLE'"`
-		IfExists    bool                 `parser:"@('IF' 'EXISTS')?"`
-		Database    *string              `parser:"(@Ident '.')?"`
-		Name        string               `parser:"@Ident"`
-		OnCluster   *string              `parser:"('ON' 'CLUSTER' @Ident)?"`
-		Operations  []AlterTableOperation `parser:"@@ (',' @@)*"`
-		Semicolon   bool                 `parser:"';'"`
+		Alter      string                `parser:"'ALTER' 'TABLE'"`
+		IfExists   bool                  `parser:"@('IF' 'EXISTS')?"`
+		Database   *string               `parser:"(@Ident '.')?"`
+		Name       string                `parser:"@Ident"`
+		OnCluster  *string               `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Operations []AlterTableOperation `parser:"@@ (',' @@)*"`
+		Semicolon  bool                  `parser:"';'"`
 	}
 
 	// AlterTableOperation represents a single ALTER TABLE operation
 	AlterTableOperation struct {
-		AddColumn      *AddColumnOperation      `parser:"@@"`
-		DropColumn     *DropColumnOperation     `parser:"| @@"`
-		ModifyColumn   *ModifyColumnOperation   `parser:"| @@"`
-		RenameColumn   *RenameColumnOperation   `parser:"| @@"`
-		CommentColumn  *CommentColumnOperation  `parser:"| @@"`
-		ClearColumn    *ClearColumnOperation    `parser:"| @@"`
-		ModifyTTL      *ModifyTTLOperation      `parser:"| @@"`
-		DeleteTTL      *DeleteTTLOperation      `parser:"| @@"`
-		AddIndex       *AddIndexOperation       `parser:"| @@"`
-		DropIndex      *DropIndexOperation      `parser:"| @@"`
-		AddConstraint  *AddConstraintOperation  `parser:"| @@"`
-		DropConstraint *DropConstraintOperation `parser:"| @@"`
-		Update         *UpdateOperation         `parser:"| @@"`
-		Delete         *DeleteOperation         `parser:"| @@"`
-		Freeze         *FreezeOperation         `parser:"| @@"`
-		AttachPartition *AttachPartitionOperation `parser:"| @@"`
-		DetachPartition *DetachPartitionOperation `parser:"| @@"`
-		DropPartition   *DropPartitionOperation   `parser:"| @@"`
-		MovePartition   *MovePartitionOperation   `parser:"| @@"`
+		AddColumn        *AddColumnOperation        `parser:"@@"`
+		DropColumn       *DropColumnOperation       `parser:"| @@"`
+		ModifyColumn     *ModifyColumnOperation     `parser:"| @@"`
+		RenameColumn     *RenameColumnOperation     `parser:"| @@"`
+		CommentColumn    *CommentColumnOperation    `parser:"| @@"`
+		ClearColumn      *ClearColumnOperation      `parser:"| @@"`
+		ModifyTTL        *ModifyTTLOperation        `parser:"| @@"`
+		DeleteTTL        *DeleteTTLOperation        `parser:"| @@"`
+		AddIndex         *AddIndexOperation         `parser:"| @@"`
+		DropIndex        *DropIndexOperation        `parser:"| @@"`
+		AddConstraint    *AddConstraintOperation    `parser:"| @@"`
+		DropConstraint   *DropConstraintOperation   `parser:"| @@"`
+		Update           *UpdateOperation           `parser:"| @@"`
+		Delete           *DeleteOperation           `parser:"| @@"`
+		Freeze           *FreezeOperation           `parser:"| @@"`
+		AttachPartition  *AttachPartitionOperation  `parser:"| @@"`
+		DetachPartition  *DetachPartitionOperation  `parser:"| @@"`
+		DropPartition    *DropPartitionOperation    `parser:"| @@"`
+		MovePartition    *MovePartitionOperation    `parser:"| @@"`
 		ReplacePartition *ReplacePartitionOperation `parser:"| @@"`
-		FetchPartition  *FetchPartitionOperation  `parser:"| @@"`
-		ModifyOrderBy   *ModifyOrderByOperation   `parser:"| @@"`
-		ModifySampleBy  *ModifySampleByOperation  `parser:"| @@"`
-		RemoveSampleBy  *RemoveSampleByOperation  `parser:"| @@"`
-		ModifySetting   *ModifySettingOperation   `parser:"| @@"`
-		ResetSetting    *ResetSettingOperation    `parser:"| @@"`
+		FetchPartition   *FetchPartitionOperation   `parser:"| @@"`
+		ModifyOrderBy    *ModifyOrderByOperation    `parser:"| @@"`
+		ModifySampleBy   *ModifySampleByOperation   `parser:"| @@"`
+		RemoveSampleBy   *RemoveSampleByOperation   `parser:"| @@"`
+		ModifySetting    *ModifySettingOperation    `parser:"| @@"`
+		ResetSetting     *ResetSettingOperation     `parser:"| @@"`
 	}
 
 	// AddColumnOperation represents ADD COLUMN operation
 	AddColumnOperation struct {
-		Add        string  `parser:"'ADD' 'COLUMN'"`
+		Add         string  `parser:"'ADD' 'COLUMN'"`
 		IfNotExists bool    `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Column     Column  `parser:"@@"`
-		After      *string `parser:"('AFTER' @Ident)?"`
-		First      bool    `parser:"@'FIRST'?"`
+		Column      Column  `parser:"@@"`
+		After       *string `parser:"('AFTER' @Ident)?"`
+		First       bool    `parser:"@'FIRST'?"`
 	}
 
 	// DropColumnOperation represents DROP COLUMN operation
@@ -227,15 +227,15 @@ type (
 
 	// ModifyColumnOperation represents MODIFY COLUMN operation
 	ModifyColumnOperation struct {
-		Modify      string  `parser:"'MODIFY' 'COLUMN'"`
-		IfExists    bool    `parser:"@('IF' 'EXISTS')?"`
-		Name        string  `parser:"@Ident"`
-		Type        *DataType `parser:"@@?"`
-		Default     *DefaultClause `parser:"@@?"`
-		Codec       *string  `parser:"('CODEC' '(' @String ')')?"`
-		TTL         *Expression `parser:"('TTL' @@)?"`
-		Comment     *string  `parser:"('COMMENT' @String)?"`
-		Remove      *ModifyColumnRemove `parser:"@@?"`
+		Modify   string              `parser:"'MODIFY' 'COLUMN'"`
+		IfExists bool                `parser:"@('IF' 'EXISTS')?"`
+		Name     string              `parser:"@Ident"`
+		Type     *DataType           `parser:"@@?"`
+		Default  *DefaultClause      `parser:"@@?"`
+		Codec    *string             `parser:"('CODEC' '(' @String ')')?"`
+		TTL      *Expression         `parser:"('TTL' @@)?"`
+		Comment  *string             `parser:"('COMMENT' @String)?"`
+		Remove   *ModifyColumnRemove `parser:"@@?"`
 	}
 
 	// ModifyColumnRemove represents REMOVE clause in MODIFY COLUMN
@@ -262,11 +262,11 @@ type (
 
 	// ClearColumnOperation represents CLEAR COLUMN operation
 	ClearColumnOperation struct {
-		Clear     string  `parser:"'CLEAR' 'COLUMN'"`
-		IfExists  bool    `parser:"@('IF' 'EXISTS')?"`
-		Name      string  `parser:"@Ident"`
-		In        string  `parser:"'IN'"`
-		Partition string  `parser:"'PARTITION' @(String | Ident)"`
+		Clear     string `parser:"'CLEAR' 'COLUMN'"`
+		IfExists  bool   `parser:"@('IF' 'EXISTS')?"`
+		Name      string `parser:"@Ident"`
+		In        string `parser:"'IN'"`
+		Partition string `parser:"'PARTITION' @(String | Ident)"`
 	}
 
 	// ModifyTTLOperation represents MODIFY TTL operation
@@ -278,7 +278,7 @@ type (
 
 	// TTLDelete represents DELETE clause in TTL
 	TTLDelete struct {
-		Delete string     `parser:"'DELETE'"`
+		Delete string      `parser:"'DELETE'"`
 		Where  *Expression `parser:"('WHERE' @@)?"`
 	}
 
@@ -324,17 +324,17 @@ type (
 
 	// UpdateOperation represents UPDATE operation
 	UpdateOperation struct {
-		Update     string       `parser:"'UPDATE'"`
-		Column     string       `parser:"@Ident"`
-		Eq         string       `parser:"'='"`
-		Expression Expression   `parser:"@@"`
-		Where      *Expression  `parser:"('WHERE' @@)?"`
+		Update     string      `parser:"'UPDATE'"`
+		Column     string      `parser:"@Ident"`
+		Eq         string      `parser:"'='"`
+		Expression Expression  `parser:"@@"`
+		Where      *Expression `parser:"('WHERE' @@)?"`
 	}
 
 	// DeleteOperation represents DELETE operation
 	DeleteOperation struct {
-		Delete string      `parser:"'DELETE'"`
-		Where  Expression  `parser:"'WHERE' @@"`
+		Delete string     `parser:"'DELETE'"`
+		Where  Expression `parser:"'WHERE' @@"`
 	}
 
 	// FreezeOperation represents FREEZE operation
@@ -346,8 +346,8 @@ type (
 
 	// AttachPartitionOperation represents ATTACH PARTITION operation
 	AttachPartitionOperation struct {
-		Attach    string `parser:"'ATTACH' 'PARTITION'"`
-		Partition string `parser:"@(String | Ident)"`
+		Attach    string               `parser:"'ATTACH' 'PARTITION'"`
+		Partition string               `parser:"@(String | Ident)"`
 		From      *AttachPartitionFrom `parser:"@@?"`
 	}
 
@@ -372,11 +372,11 @@ type (
 
 	// MovePartitionOperation represents MOVE PARTITION operation
 	MovePartitionOperation struct {
-		Move      string  `parser:"'MOVE' 'PARTITION'"`
-		Partition string  `parser:"@(String | Ident)"`
-		To        string  `parser:"'TO'"`
-		Disk      *string `parser:"(('DISK' @String)"`
-		Volume    *string `parser:"| ('VOLUME' @String)"`
+		Move      string       `parser:"'MOVE' 'PARTITION'"`
+		Partition string       `parser:"@(String | Ident)"`
+		To        string       `parser:"'TO'"`
+		Disk      *string      `parser:"(('DISK' @String)"`
+		Volume    *string      `parser:"| ('VOLUME' @String)"`
 		Table     *MoveToTable `parser:"| ('TABLE' @@))?"`
 	}
 
@@ -421,8 +421,8 @@ type (
 
 	// ModifySettingOperation represents MODIFY SETTING operation
 	ModifySettingOperation struct {
-		Modify  string        `parser:"'MODIFY' 'SETTING'"`
-		Setting TableSetting  `parser:"@@"`
+		Modify  string       `parser:"'MODIFY' 'SETTING'"`
+		Setting TableSetting `parser:"@@"`
 	}
 
 	// ResetSettingOperation represents RESET SETTING operation

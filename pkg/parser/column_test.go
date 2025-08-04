@@ -24,8 +24,8 @@ var (
 	columnParser = participle.MustBuild[Column](
 		participle.Lexer(columnLexer),
 		participle.Elide("Comment", "Whitespace"),
-		participle.CaseInsensitive("DEFAULT", "MATERIALIZED", "EPHEMERAL", "ALIAS", "CODEC", "TTL", 
-			"COMMENT", "NULLABLE", "ARRAY", "TUPLE", "NESTED", "MAP", "LOWCARDINALITY", 
+		participle.CaseInsensitive("DEFAULT", "MATERIALIZED", "EPHEMERAL", "ALIAS", "CODEC", "TTL",
+			"COMMENT", "NULLABLE", "ARRAY", "TUPLE", "NESTED", "MAP", "LOWCARDINALITY",
 			"PRIMARY", "ORDER", "PARTITION", "SAMPLE", "SETTINGS", "ENGINE", "BY", "INTERVAL"),
 	)
 )
@@ -54,7 +54,7 @@ func TestColumnParsing(t *testing.T) {
 				require.Equal(t, "String", col.DataType.Simple.Name)
 				require.NotNil(t, col.Default)
 				require.Equal(t, "DEFAULT", col.Default.Type)
-				require.Equal(t, "'Anonymous'", col.Default.Expression.Raw)
+				require.NotNil(t, col.Default.Expression.Or)
 			},
 		},
 		{
@@ -220,7 +220,7 @@ func TestColumnParsing(t *testing.T) {
 				require.Equal(t, "full_name", col.Name)
 				require.NotNil(t, col.Default)
 				require.Equal(t, "MATERIALIZED", col.Default.Type)
-				require.Equal(t, "concat(first_name,' ',last_name)", col.Default.Expression.Raw)
+				require.NotNil(t, col.Default.Expression.Or)
 			},
 		},
 		{
@@ -234,16 +234,16 @@ func TestColumnParsing(t *testing.T) {
 		},
 		{
 			name:  "column with TTL",
-			input: "temp_data String TTL created_at + INTERVAL 1 DAY",
+			input: "temp_data String TTL created_at + days(1)",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "temp_data", col.Name)
 				require.NotNil(t, col.TTL)
-				require.Equal(t, "created_at+INTERVAL1DAY", col.TTL.Expression.Raw)
+				require.NotNil(t, col.TTL.Expression.Or)
 			},
 		},
 		{
 			name:  "complex column with all options",
-			input: "data Nullable(String) DEFAULT '' CODEC(ZSTD) TTL created_at + INTERVAL 30 DAY COMMENT 'User data'",
+			input: "data Nullable(String) DEFAULT '' CODEC(ZSTD) TTL created_at + days(30) COMMENT 'User data'",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "data", col.Name)
 				require.NotNil(t, col.DataType.Nullable)

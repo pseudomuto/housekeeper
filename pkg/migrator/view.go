@@ -23,15 +23,15 @@ type (
 	// It handles both regular views and materialized views, with special handling
 	// for materialized views which can only be altered using ALTER TABLE MODIFY QUERY.
 	ViewDiff struct {
-		Type         ViewDiffType // Type of operation (CREATE, DROP, ALTER, RENAME)
-		ViewName     string       // Full name of the view (database.name)
-		Description  string       // Human-readable description of the change
-		UpSQL        string       // SQL to apply the change (forward migration)
-		DownSQL      string       // SQL to rollback the change (reverse migration)
-		Current      *ViewInfo    // Current state (nil if view doesn't exist)
-		Target       *ViewInfo    // Target state (nil if view should be dropped)
-		NewViewName  string       // For rename operations - the new full name
-		IsMaterialized bool       // True if this is a materialized view
+		Type           ViewDiffType // Type of operation (CREATE, DROP, ALTER, RENAME)
+		ViewName       string       // Full name of the view (database.name)
+		Description    string       // Human-readable description of the change
+		UpSQL          string       // SQL to apply the change (forward migration)
+		DownSQL        string       // SQL to rollback the change (reverse migration)
+		Current        *ViewInfo    // Current state (nil if view doesn't exist)
+		Target         *ViewInfo    // Target state (nil if view should be dropped)
+		NewViewName    string       // For rename operations - the new full name
+		IsMaterialized bool         // True if this is a materialized view
 	}
 
 	// ViewDiffType represents the type of view difference
@@ -41,11 +41,11 @@ type (
 	// This structure contains all the properties needed for view comparison and
 	// migration generation, including whether it's a materialized view.
 	ViewInfo struct {
-		Name         string                // View name
-		Database     string                // Database name (empty for default database)
-		OnCluster    string                // Cluster name if specified (empty if not clustered)
-		Materialized bool                  // True if this is a materialized view
-		OrReplace    bool                  // True if created with OR REPLACE
+		Name         string                 // View name
+		Database     string                 // Database name (empty for default database)
+		OnCluster    string                 // Cluster name if specified (empty if not clustered)
+		Materialized bool                   // True if this is a materialized view
+		OrReplace    bool                   // True if created with OR REPLACE
 		Statement    *parser.CreateViewStmt // Full parsed CREATE VIEW statement for deep comparison
 	}
 )
@@ -137,7 +137,7 @@ func CompareViewGrammars(current, target *parser.Grammar) ([]*ViewDiff, error) {
 					Target:         targetView,
 					IsMaterialized: currentView.Materialized,
 				}
-				
+
 				// For materialized views, use ALTER TABLE MODIFY QUERY
 				// For regular views, use CREATE OR REPLACE
 				if currentView.Materialized {
@@ -218,7 +218,7 @@ func isViewRename(currentView *ViewInfo, targetViews map[string]*ViewInfo) bool 
 		if getFullViewName(currentView) == targetName {
 			continue
 		}
-		
+
 		// Check if properties match (indicating a rename)
 		if viewsHaveSameProperties(currentView, targetView) {
 			return true
@@ -295,43 +295,43 @@ func getFullViewName(view *ViewInfo) string {
 // generateCreateViewSQL generates CREATE VIEW SQL from ViewInfo
 func generateCreateViewSQL(view *ViewInfo) string {
 	sql := "CREATE"
-	
+
 	if view.OrReplace {
 		sql += " OR REPLACE"
 	}
-	
+
 	if view.Materialized {
 		sql += " MATERIALIZED"
 	}
-	
+
 	sql += " VIEW"
-	
+
 	if view.Statement.IfNotExists {
 		sql += " IF NOT EXISTS"
 	}
-	
+
 	sql += " " + getFullViewName(view)
-	
+
 	if view.OnCluster != "" {
 		sql += " ON CLUSTER " + view.OnCluster
 	}
-	
+
 	if view.Statement.To != nil && *view.Statement.To != "" {
 		sql += " TO " + *view.Statement.To
 	}
-	
+
 	if view.Statement.Engine != nil {
 		sql += " ENGINE = " + strings.TrimSpace(view.Statement.Engine.Raw)
 	}
-	
+
 	if view.Statement.Populate {
 		sql += " POPULATE"
 	}
-	
+
 	if view.Statement.AsSelect != nil {
 		sql += " AS " + strings.TrimSpace(view.Statement.AsSelect.Raw)
 	}
-	
+
 	return sql + ";"
 }
 
@@ -357,43 +357,43 @@ func generateDropViewSQL(view *ViewInfo) string {
 // generateCreateOrReplaceViewSQL generates CREATE OR REPLACE VIEW SQL for regular views
 func generateCreateOrReplaceViewSQL(view *ViewInfo) string {
 	sql := "CREATE OR REPLACE VIEW " + getFullViewName(view)
-	
+
 	if view.OnCluster != "" {
 		sql += " ON CLUSTER " + view.OnCluster
 	}
-	
+
 	if view.Statement.AsSelect != nil {
 		sql += " AS " + strings.TrimSpace(view.Statement.AsSelect.Raw)
 	}
-	
+
 	return sql + ";"
 }
 
 // generateAlterMaterializedViewSQL generates ALTER TABLE MODIFY QUERY SQL for materialized views
 func generateAlterMaterializedViewSQL(view *ViewInfo) string {
 	sql := "ALTER TABLE " + getFullViewName(view)
-	
+
 	if view.OnCluster != "" {
 		sql += " ON CLUSTER " + view.OnCluster
 	}
-	
+
 	sql += " MODIFY QUERY"
-	
+
 	if view.Statement.AsSelect != nil {
 		sql += " " + strings.TrimSpace(view.Statement.AsSelect.Raw)
 	}
-	
+
 	return sql + ";"
 }
 
 // generateRenameViewSQL generates RENAME TABLE SQL for both regular and materialized views
 func generateRenameViewSQL(from, to *ViewInfo) string {
 	sql := "RENAME TABLE " + getFullViewName(from) + " TO " + getFullViewName(to)
-	
+
 	// Use cluster info from the target view
 	if to.OnCluster != "" {
 		sql += " ON CLUSTER " + to.OnCluster
 	}
-	
+
 	return sql + ";"
 }

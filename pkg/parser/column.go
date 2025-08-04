@@ -6,12 +6,12 @@ type (
 	// such as DEFAULT values, MATERIALIZED expressions, ALIAS definitions,
 	// compression CODECs, TTL settings, and comments.
 	Column struct {
-		Name       string            `parser:"@Ident"`
-		DataType   *DataType         `parser:"@@"`
-		Default    *DefaultClause    `parser:"@@?"`
-		Codec      *CodecClause      `parser:"@@?"`
-		TTL        *TTLClause        `parser:"@@?"`
-		Comment    *string           `parser:"('COMMENT' @String)?"`
+		Name     string         `parser:"@Ident"`
+		DataType *DataType      `parser:"@@"`
+		Default  *DefaultClause `parser:"@@?"`
+		Codec    *CodecClause   `parser:"@@?"`
+		TTL      *TTLClause     `parser:"@@?"`
+		Comment  *string        `parser:"('COMMENT' @String)?"`
 	}
 
 	// DataType represents any ClickHouse data type including primitives,
@@ -78,11 +78,11 @@ type (
 
 	// MapType represents Map(K, V) where K and V are data types
 	MapType struct {
-		Map      string    `parser:"'Map' '('"`
-		KeyType  *DataType `parser:"@@"`
-		Comma    string    `parser:"','"`
+		Map       string    `parser:"'Map' '('"`
+		KeyType   *DataType `parser:"@@"`
+		Comma     string    `parser:"','"`
 		ValueType *DataType `parser:"@@"`
-		Close    string    `parser:"')'"`
+		Close     string    `parser:"')'"`
 	}
 
 	// LowCardinalityType represents LowCardinality(T) where T is a data type
@@ -94,8 +94,8 @@ type (
 
 	// SimpleType represents basic data types and parametric types
 	SimpleType struct {
-		Name       string            `parser:"@Ident"`
-		Parameters []TypeParameter   `parser:"('(' @@ (',' @@)* ')')?"`
+		Name       string          `parser:"@Ident"`
+		Parameters []TypeParameter `parser:"('(' @@ (',' @@)* ')')?"`
 	}
 
 	// TypeParameter represents a parameter in a parametric type (can be number or identifier)
@@ -111,25 +111,17 @@ type (
 		Expression Expression `parser:"@@"`
 	}
 
-	// Expression represents any ClickHouse expression (simplified for now)
-	// In a full implementation, this would parse complex expressions
-	Expression struct {
-		// For now, we capture everything until we hit specific keywords
-		// Note: This will collapse whitespace due to lexer configuration
-		Raw string `parser:"@(~('CODEC' | 'TTL' | 'COMMENT' | 'PRIMARY' | 'ORDER' | 'PARTITION' | 'SAMPLE' | 'SETTINGS' | 'ENGINE' | ';'))+"`
-	}
-
 	// CodecClause represents compression codec specification
 	CodecClause struct {
-		Codec      string       `parser:"'CODEC' '('"`
-		Codecs     []CodecSpec  `parser:"@@ (',' @@)*"`
-		Close      string       `parser:"')'"`
+		Codec  string      `parser:"'CODEC' '('"`
+		Codecs []CodecSpec `parser:"@@ (',' @@)*"`
+		Close  string      `parser:"')'"`
 	}
 
 	// CodecSpec represents a single codec specification (e.g., ZSTD, LZ4HC(9))
 	CodecSpec struct {
-		Name       string           `parser:"@Ident"`
-		Parameters []TypeParameter  `parser:"('(' @@ (',' @@)* ')')?"`
+		Name       string          `parser:"@Ident"`
+		Parameters []TypeParameter `parser:"('(' @@ (',' @@)* ')')?"`
 	}
 
 	// TTLClause represents column-level TTL specification

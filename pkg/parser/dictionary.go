@@ -5,35 +5,35 @@ package parser
 type (
 	// CreateDictionaryStmt represents CREATE [OR REPLACE] DICTIONARY statements
 	CreateDictionaryStmt struct {
-		Create      string                  `parser:"'CREATE'"`
-		OrReplace   bool                    `parser:"@('OR' 'REPLACE')?"`
-		Dictionary  string                  `parser:"'DICTIONARY'"`
-		IfNotExists *string                 `parser:"(@'IF' 'NOT' 'EXISTS')?"`
-		Database    *string                 `parser:"((@Ident '.')?"`
-		Name        string                  `parser:"@Ident)"`
-		OnCluster   *string                 `parser:"('ON' 'CLUSTER' @Ident)?"`
-		Columns     []*DictionaryColumn     `parser:"'(' @@* ')'"`
-		PrimaryKey  *DictionaryPrimaryKey   `parser:"@@?"`
-		Source      *DictionarySource       `parser:"@@"`
-		Layout      *DictionaryLayout       `parser:"@@"`
-		Lifetime    *DictionaryLifetime     `parser:"@@?"`
-		Settings    *DictionarySettings     `parser:"@@?"`
-		Comment     *string                 `parser:"('COMMENT' @String)? ';'"`
+		Create      string                `parser:"'CREATE'"`
+		OrReplace   bool                  `parser:"@('OR' 'REPLACE')?"`
+		Dictionary  string                `parser:"'DICTIONARY'"`
+		IfNotExists *string               `parser:"(@'IF' 'NOT' 'EXISTS')?"`
+		Database    *string               `parser:"((@Ident '.')?"`
+		Name        string                `parser:"@Ident)"`
+		OnCluster   *string               `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Columns     []*DictionaryColumn   `parser:"'(' @@* ')'"`
+		PrimaryKey  *DictionaryPrimaryKey `parser:"@@?"`
+		Source      *DictionarySource     `parser:"@@"`
+		Layout      *DictionaryLayout     `parser:"@@"`
+		Lifetime    *DictionaryLifetime   `parser:"@@?"`
+		Settings    *DictionarySettings   `parser:"@@?"`
+		Comment     *string               `parser:"('COMMENT' @String)? ';'"`
 	}
 
 	// DictionaryColumn represents a column definition in dictionary
 	DictionaryColumn struct {
-		Name       string                     `parser:"@Ident"`
-		Type       string                     `parser:"@Ident"`
-		Default    *DictionaryColumnDefault   `parser:"@@?"`
-		Attributes []*DictionaryColumnAttr    `parser:"@@*"`
-		Comma      *string                    `parser:"@','?"`
+		Name       string                   `parser:"@Ident"`
+		Type       string                   `parser:"@Ident"`
+		Default    *DictionaryColumnDefault `parser:"@@?"`
+		Attributes []*DictionaryColumnAttr  `parser:"@@*"`
+		Comma      *string                  `parser:"@','?"`
 	}
 
 	// DictionaryColumnDefault represents DEFAULT or EXPRESSION clause
 	DictionaryColumnDefault struct {
-		Type       string  `parser:"(@'DEFAULT' | @'EXPRESSION')"`
-		Expression string  `parser:"@(String | Number | Ident)"`
+		Type       string `parser:"(@'DEFAULT' | @'EXPRESSION')"`
+		Expression string `parser:"@(String | Number | Ident)"`
 	}
 
 	// DictionaryColumnAttr represents column attributes like IS_OBJECT_ID, HIERARCHICAL, INJECTIVE
@@ -48,14 +48,14 @@ type (
 
 	// DictionarySource represents SOURCE clause
 	DictionarySource struct {
-		Name       string                   `parser:"'SOURCE' '(' @Ident"`
-		Parameters []*DictionaryParameter   `parser:"('(' @@* ')')? ')'"`
+		Name       string                 `parser:"'SOURCE' '(' @Ident"`
+		Parameters []*DictionaryParameter `parser:"('(' @@* ')')? ')'"`
 	}
 
 	// DictionaryLayout represents LAYOUT clause
 	DictionaryLayout struct {
-		Name       string                   `parser:"'LAYOUT' '(' @Ident"`
-		Parameters []*DictionaryParameter   `parser:"('(' @@* ')')? ')'"`
+		Name       string                 `parser:"'LAYOUT' '(' @Ident"`
+		Parameters []*DictionaryParameter `parser:"('(' @@* ')')? ')'"`
 	}
 
 	// DictionaryLifetime represents LIFETIME clause
@@ -109,7 +109,7 @@ type (
 		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)? ';'"`
 	}
 
-	// DetachDictionaryStmt represents DETACH DICTIONARY statements  
+	// DetachDictionaryStmt represents DETACH DICTIONARY statements
 	DetachDictionaryStmt struct {
 		IfExists    *string `parser:"'DETACH' 'DICTIONARY' (@'IF' 'EXISTS')?"`
 		Database    *string `parser:"((@Ident '.')?"`
