@@ -35,4 +35,11 @@ RENAME TABLE staging.logs TO production.logs, staging.metrics TO analytics.metri
 -- Rename with underscores and numbers
 RENAME TABLE table_2023_01 TO table_2024_01, data_v1 TO data_v2;
 
--- Note: Parser currently doesn't support backtick-quoted identifiers or unicode in table names
+-- RENAME TABLE with backtick identifiers for reserved keywords and special chars
+RENAME TABLE `old-table` TO `new-table` ON CLUSTER `prod-cluster`;
+
+-- Multiple renames with backtick identifiers
+RENAME TABLE `user-db`.`old-users` TO `user-db`.`users-archive`, `order-db`.`select` TO `order-db`.`orders-data`;
+
+-- Cross-database rename with backtick identifiers
+RENAME TABLE `staging-db`.`user-profiles` TO `production-db`.`user-profiles`;

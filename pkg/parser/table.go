@@ -25,9 +25,9 @@ type (
 		OrReplace   bool                 `parser:"@('OR' 'REPLACE')?"`
 		Table       string               `parser:"'TABLE'"`
 		IfNotExists bool                 `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database    *string              `parser:"(@Ident '.')?"`
-		Name        string               `parser:"@Ident"`
-		OnCluster   *string              `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string              `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string               `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string              `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Columns     []Column             `parser:"'(' @@ (',' @@)* ')'"`
 		Engine      *TableEngine         `parser:"@@"`
 		OrderBy     *OrderByClause       `parser:"@@?"`
@@ -44,7 +44,7 @@ type (
 	// Examples: ENGINE = MergeTree(), ENGINE = ReplicatedMergeTree('/path', 'replica')
 	TableEngine struct {
 		Engine     string            `parser:"'ENGINE' '='"`
-		Name       string            `parser:"@Ident"`
+		Name       string            `parser:"@(Ident | BacktickIdent)"`
 		Parameters []EngineParameter `parser:"'(' (@@ (',' @@)*)? ')'"`
 	}
 
@@ -52,7 +52,7 @@ type (
 	EngineParameter struct {
 		String *string `parser:"@String"`
 		Number *string `parser:"| @Number"`
-		Ident  *string `parser:"| @Ident"`
+		Ident  *string `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// OrderByClause represents ORDER BY expression
@@ -92,9 +92,9 @@ type (
 
 	// TableSetting represents a single setting in SETTINGS clause
 	TableSetting struct {
-		Name  string `parser:"@Ident"`
+		Name  string `parser:"@(Ident | BacktickIdent)"`
 		Eq    string `parser:"'='"`
-		Value string `parser:"@(String | Number | Ident)"`
+		Value string `parser:"@(String | Number | Ident | BacktickIdent)"`
 	}
 
 	// AttachTableStmt represents an ATTACH TABLE statement.
@@ -104,9 +104,9 @@ type (
 	AttachTableStmt struct {
 		Attach      string  `parser:"'ATTACH' 'TABLE'"`
 		IfNotExists bool    `parser:"('IF' 'NOT' 'EXISTS')?"`
-		Database    *string `parser:"(@Ident '.')?"`
-		Name        string  `parser:"@Ident"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string  `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Semicolon   bool    `parser:"';'"`
 	}
 
@@ -117,9 +117,9 @@ type (
 	DetachTableStmt struct {
 		Detach      string  `parser:"'DETACH' 'TABLE'"`
 		IfExists    bool    `parser:"('IF' 'EXISTS')?"`
-		Database    *string `parser:"(@Ident '.')?"`
-		Name        string  `parser:"@Ident"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string  `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Permanently bool    `parser:"@'PERMANENTLY'?"`
 		Sync        bool    `parser:"@'SYNC'?"`
 		Semicolon   bool    `parser:"';'"`
@@ -132,9 +132,9 @@ type (
 	DropTableStmt struct {
 		Drop      string  `parser:"'DROP' 'TABLE'"`
 		IfExists  bool    `parser:"('IF' 'EXISTS')?"`
-		Database  *string `parser:"(@Ident '.')?"`
-		Name      string  `parser:"@Ident"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database  *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name      string  `parser:"@(Ident | BacktickIdent)"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Sync      bool    `parser:"@'SYNC'?"`
 		Semicolon bool    `parser:"';'"`
 	}
@@ -146,17 +146,17 @@ type (
 	RenameTableStmt struct {
 		Rename    string        `parser:"'RENAME' 'TABLE'"`
 		Renames   []TableRename `parser:"@@ (',' @@)*"`
-		OnCluster *string       `parser:"('ON' 'CLUSTER' @Ident)?"`
+		OnCluster *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Semicolon bool          `parser:"';'"`
 	}
 
 	// TableRename represents a single table rename operation
 	TableRename struct {
-		FromDatabase *string `parser:"(@Ident '.')?"`
-		FromName     string  `parser:"@Ident"`
+		FromDatabase *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		FromName     string  `parser:"@(Ident | BacktickIdent)"`
 		To           string  `parser:"'TO'"`
-		ToDatabase   *string `parser:"(@Ident '.')?"`
-		ToName       string  `parser:"@Ident"`
+		ToDatabase   *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		ToName       string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// AlterTableStmt represents an ALTER TABLE statement.
@@ -176,9 +176,9 @@ type (
 	AlterTableStmt struct {
 		Alter      string                `parser:"'ALTER' 'TABLE'"`
 		IfExists   bool                  `parser:"@('IF' 'EXISTS')?"`
-		Database   *string               `parser:"(@Ident '.')?"`
-		Name       string                `parser:"@Ident"`
-		OnCluster  *string               `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database   *string               `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name       string                `parser:"@(Ident | BacktickIdent)"`
+		OnCluster  *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Operations []AlterTableOperation `parser:"@@ (',' @@)*"`
 		Semicolon  bool                  `parser:"';'"`
 	}
@@ -218,7 +218,7 @@ type (
 		Add         string  `parser:"'ADD' 'COLUMN'"`
 		IfNotExists bool    `parser:"@('IF' 'NOT' 'EXISTS')?"`
 		Column      Column  `parser:"@@"`
-		After       *string `parser:"('AFTER' @Ident)?"`
+		After       *string `parser:"('AFTER' @(Ident | BacktickIdent))?"`
 		First       bool    `parser:"@'FIRST'?"`
 	}
 
@@ -226,14 +226,14 @@ type (
 	DropColumnOperation struct {
 		Drop     string `parser:"'DROP' 'COLUMN'"`
 		IfExists bool   `parser:"@('IF' 'EXISTS')?"`
-		Name     string `parser:"@Ident"`
+		Name     string `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// ModifyColumnOperation represents MODIFY COLUMN operation
 	ModifyColumnOperation struct {
 		Modify   string              `parser:"'MODIFY' 'COLUMN'"`
 		IfExists bool                `parser:"@('IF' 'EXISTS')?"`
-		Name     string              `parser:"@Ident"`
+		Name     string              `parser:"@(Ident | BacktickIdent)"`
 		Type     *DataType           `parser:"@@?"`
 		Default  *DefaultClause      `parser:"@@?"`
 		Codec    *string             `parser:"('CODEC' '(' @String ')')?"`
@@ -252,15 +252,15 @@ type (
 	RenameColumnOperation struct {
 		Rename   string `parser:"'RENAME' 'COLUMN'"`
 		IfExists bool   `parser:"@('IF' 'EXISTS')?"`
-		From     string `parser:"@Ident"`
-		To       string `parser:"'TO' @Ident"`
+		From     string `parser:"@(Ident | BacktickIdent)"`
+		To       string `parser:"'TO' @(Ident | BacktickIdent)"`
 	}
 
 	// CommentColumnOperation represents COMMENT COLUMN operation
 	CommentColumnOperation struct {
 		Comment  string `parser:"'COMMENT' 'COLUMN'"`
 		IfExists bool   `parser:"@('IF' 'EXISTS')?"`
-		Name     string `parser:"@Ident"`
+		Name     string `parser:"@(Ident | BacktickIdent)"`
 		Value    string `parser:"@String"`
 	}
 
@@ -268,9 +268,9 @@ type (
 	ClearColumnOperation struct {
 		Clear     string `parser:"'CLEAR' 'COLUMN'"`
 		IfExists  bool   `parser:"@('IF' 'EXISTS')?"`
-		Name      string `parser:"@Ident"`
+		Name      string `parser:"@(Ident | BacktickIdent)"`
 		In        string `parser:"'IN'"`
-		Partition string `parser:"'PARTITION' @(String | Ident)"`
+		Partition string `parser:"'PARTITION' @(String | Ident | BacktickIdent)"`
 	}
 
 	// ModifyTTLOperation represents MODIFY TTL operation
@@ -295,11 +295,11 @@ type (
 	AddIndexOperation struct {
 		Add         string     `parser:"'ADD' 'INDEX'"`
 		IfNotExists bool       `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Name        string     `parser:"@Ident"`
+		Name        string     `parser:"@(Ident | BacktickIdent)"`
 		Expression  Expression `parser:"@@"`
-		Type        string     `parser:"'TYPE' @Ident"`
+		Type        string     `parser:"'TYPE' @(Ident | BacktickIdent)"`
 		Granularity string     `parser:"'GRANULARITY' @Number"`
-		After       *string    `parser:"('AFTER' @Ident)?"`
+		After       *string    `parser:"('AFTER' @(Ident | BacktickIdent))?"`
 		First       bool       `parser:"@'FIRST'?"`
 	}
 
@@ -307,14 +307,14 @@ type (
 	DropIndexOperation struct {
 		Drop     string `parser:"'DROP' 'INDEX'"`
 		IfExists bool   `parser:"@('IF' 'EXISTS')?"`
-		Name     string `parser:"@Ident"`
+		Name     string `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// AddConstraintOperation represents ADD CONSTRAINT operation
 	AddConstraintOperation struct {
 		Add         string     `parser:"'ADD' 'CONSTRAINT'"`
 		IfNotExists bool       `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Name        string     `parser:"@Ident"`
+		Name        string     `parser:"@(Ident | BacktickIdent)"`
 		Check       string     `parser:"'CHECK'"`
 		Expression  Expression `parser:"@@"`
 	}
@@ -323,13 +323,13 @@ type (
 	DropConstraintOperation struct {
 		Drop     string `parser:"'DROP' 'CONSTRAINT'"`
 		IfExists bool   `parser:"@('IF' 'EXISTS')?"`
-		Name     string `parser:"@Ident"`
+		Name     string `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// UpdateOperation represents UPDATE operation
 	UpdateOperation struct {
 		Update     string      `parser:"'UPDATE'"`
-		Column     string      `parser:"@Ident"`
+		Column     string      `parser:"@(Ident | BacktickIdent)"`
 		Eq         string      `parser:"'='"`
 		Expression Expression  `parser:"@@"`
 		Where      *Expression `parser:"('WHERE' @@)?"`
@@ -344,40 +344,40 @@ type (
 	// FreezeOperation represents FREEZE operation
 	FreezeOperation struct {
 		Freeze    string  `parser:"'FREEZE'"`
-		Partition *string `parser:"('PARTITION' @(String | Ident))?"`
+		Partition *string `parser:"('PARTITION' @(String | Ident | BacktickIdent))?"`
 		With      *string `parser:"('WITH' 'NAME' @String)?"`
 	}
 
 	// AttachPartitionOperation represents ATTACH PARTITION operation
 	AttachPartitionOperation struct {
 		Attach    string               `parser:"'ATTACH' 'PARTITION'"`
-		Partition string               `parser:"@(String | Ident)"`
+		Partition string               `parser:"@(String | Ident | BacktickIdent)"`
 		From      *AttachPartitionFrom `parser:"@@?"`
 	}
 
 	// AttachPartitionFrom represents FROM clause in ATTACH PARTITION
 	AttachPartitionFrom struct {
 		From     string  `parser:"'FROM'"`
-		Database *string `parser:"(@Ident '.')?"`
-		Table    string  `parser:"@Ident"`
+		Database *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Table    string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// DetachPartitionOperation represents DETACH PARTITION operation
 	DetachPartitionOperation struct {
 		Detach    string `parser:"'DETACH' 'PARTITION'"`
-		Partition string `parser:"@(String | Ident)"`
+		Partition string `parser:"@(String | Ident | BacktickIdent)"`
 	}
 
 	// DropPartitionOperation represents DROP PARTITION operation
 	DropPartitionOperation struct {
 		Drop      string `parser:"'DROP' 'PARTITION'"`
-		Partition string `parser:"@(String | Ident)"`
+		Partition string `parser:"@(String | Ident | BacktickIdent)"`
 	}
 
 	// MovePartitionOperation represents MOVE PARTITION operation
 	MovePartitionOperation struct {
 		Move      string       `parser:"'MOVE' 'PARTITION'"`
-		Partition string       `parser:"@(String | Ident)"`
+		Partition string       `parser:"@(String | Ident | BacktickIdent)"`
 		To        string       `parser:"'TO'"`
 		Disk      *string      `parser:"(('DISK' @String)"`
 		Volume    *string      `parser:"| ('VOLUME' @String)"`
@@ -386,23 +386,23 @@ type (
 
 	// MoveToTable represents destination table in MOVE PARTITION
 	MoveToTable struct {
-		Database *string `parser:"(@Ident '.')?"`
-		Name     string  `parser:"@Ident"`
+		Database *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name     string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// ReplacePartitionOperation represents REPLACE PARTITION operation
 	ReplacePartitionOperation struct {
 		Replace   string  `parser:"'REPLACE' 'PARTITION'"`
-		Partition string  `parser:"@(String | Ident)"`
+		Partition string  `parser:"@(String | Ident | BacktickIdent)"`
 		From      string  `parser:"'FROM'"`
-		Database  *string `parser:"(@Ident '.')?"`
-		Table     string  `parser:"@Ident"`
+		Database  *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Table     string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// FetchPartitionOperation represents FETCH PARTITION operation
 	FetchPartitionOperation struct {
 		Fetch     string `parser:"'FETCH' 'PARTITION'"`
-		Partition string `parser:"@(String | Ident)"`
+		Partition string `parser:"@(String | Ident | BacktickIdent)"`
 		From      string `parser:"'FROM' @String"`
 	}
 
@@ -432,6 +432,6 @@ type (
 	// ResetSettingOperation represents RESET SETTING operation
 	ResetSettingOperation struct {
 		Reset string `parser:"'RESET' 'SETTING'"`
-		Name  string `parser:"@Ident"`
+		Name  string `parser:"@(Ident | BacktickIdent)"`
 	}
 )

@@ -1,4 +1,44 @@
 tables:
+    '`old-table`':
+        name: '`old-table`'
+        database: ""
+        cluster: '`prod-cluster`'
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    '`order-db`.`select`':
+        name: '`select`'
+        database: '`order-db`'
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    '`staging-db`.`user-profiles`':
+        name: '`user-profiles`'
+        database: '`staging-db`'
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    '`user-db`.`old-users`':
+        name: '`old-users`'
+        database: '`user-db`'
+        cluster: ""
+        operation: RENAME
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
     analytics.events:
         name: events
         database: analytics

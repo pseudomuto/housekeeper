@@ -1,4 +1,29 @@
 views:
+    '`analytics-db`.`daily-summary`':
+        name: '`daily-summary`'
+        database: '`analytics-db`'
+        cluster: ""
+        or_replace: false
+        materialized: false
+        operation: CREATE
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        populate: false
+    '`metrics`.`hourly-stats`':
+        name: '`hourly-stats`'
+        database: '`metrics`'
+        cluster: ""
+        or_replace: false
+        materialized: true
+        operation: CREATE
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree()ORDERBY`timestamp`
+        populate: false
     analytics.daily_summary:
         name: daily_summary
         database: analytics

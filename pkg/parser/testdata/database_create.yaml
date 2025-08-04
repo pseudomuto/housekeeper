@@ -1,4 +1,14 @@
 databases:
+    '`order-db`':
+        name: '`order-db`'
+        cluster: '`prod-cluster`'
+        engine: ""
+        comment: Database with special chars
+    '`user-database`':
+        name: '`user-database`'
+        cluster: ""
+        engine: Atomic
+        comment: ""
     basic_db:
         name: basic_db
         cluster: ""

@@ -1,4 +1,15 @@
 dictionaries:
+    '`user-dict`.`order-lookup`':
+        name: '`order-lookup`'
+        database: '`user-dict`'
+        cluster: ""
+        or_replace: false
+        comment: ""
+        operation: CREATE
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
     analytics.user_mapping:
         name: user_mapping
         database: analytics

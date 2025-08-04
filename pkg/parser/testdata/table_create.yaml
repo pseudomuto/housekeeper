@@ -1,4 +1,49 @@
 tables:
+    '`analytics-db`.`user-events`':
+        name: '`user-events`'
+        database: '`analytics-db`'
+        cluster: '`prod-cluster`'
+        operation: CREATE
+        or_replace: false
+        if_not_exists: true
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: ReplicatedMergeTree('/clickhouse/tables/{shard}/user-events', '{replica}')
+        columns:
+            - name: id
+              data_type: UInt64
+            - name: '`user-name`'
+              data_type: String
+            - name: event_type
+              data_type: String
+            - name: '`created-at`'
+              data_type: DateTime
+              default: DEFAULT expression
+        order_by: expression
+    '`user-db`.`order-table`':
+        name: '`order-table`'
+        database: '`user-db`'
+        cluster: ""
+        operation: CREATE
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+        engine: MergeTree
+        columns:
+            - name: '`user-id`'
+              data_type: UInt64
+            - name: '`order-id`'
+              data_type: String
+            - name: '`order-date`'
+              data_type: Date
+            - name: '`select`'
+              data_type: String
+            - name: '`group`'
+              data_type: LowCardinality(String)
+        order_by: expression
     analytics.events:
         name: events
         database: analytics
@@ -20,18 +65,29 @@ tables:
               data_type: LowCardinality(String)
             - name: timestamp
               data_type: DateTime
-              default: DEFAULT now(),dataMap(String,String)DEFAULTmap(),metadataNullable(String)
+              default: DEFAULT expression
+            - name: data
+              data_type: Map(String, String)
+              default: DEFAULT expression
+            - name: metadata
+              data_type: Nullable(String)
               codec: CODEC(ZSTD)
             - name: tags
               data_type: Array(String)
-              default: DEFAULT array(),locationTuple(latFloat64,lonFloat64),settingsNested(keyString,valueString),temp_dataString
-              ttl: timestamp+INTERVAL30DAY
+              default: DEFAULT expression
+            - name: location
+              data_type: Tuple(lat Float64, lon Float64)
+            - name: settings
+              data_type: Nested(key String, value String)
+            - name: temp_data
+              data_type: String
+              ttl: expression
               comment: Temporary data
-        order_by: (user_id,timestamp)
-        partition_by: toYYYYMM(timestamp)
-        primary_key: user_id
-        sample_by: id
-        ttl: timestamp+INTERVAL1YEAR
+        order_by: expression
+        partition_by: expression
+        primary_key: expression
+        sample_by: expression
+        ttl: expression
         settings:
             index_granularity: "8192"
             merge_with_ttl_timeout: "3600"
@@ -78,7 +134,7 @@ tables:
             - name: config_data
               data_type: String
               codec: CODEC(LZ4HC(9))
-        order_by: (device_id,created_at)
+        order_by: expression
     user_profiles:
         name: user_profiles
         database: ""
@@ -105,8 +161,8 @@ tables:
               data_type: UInt8
             - name: default_data
               data_type: String
-        order_by: user_id
-        partition_by: user_id%100
+        order_by: expression
+        partition_by: expression
     users:
         name: users
         database: ""
@@ -125,4 +181,4 @@ tables:
               data_type: String
             - name: email
               data_type: String
-        order_by: id
+        order_by: expression

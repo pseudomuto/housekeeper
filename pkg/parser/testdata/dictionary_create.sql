@@ -52,3 +52,15 @@ PRIMARY KEY key1, key2
 SOURCE(File(path '/data/dict.csv' format 'CSV'))
 LAYOUT(COMPLEX_KEY_CACHE(size_in_cells 1000000))
 LIFETIME(MAX 1200 MIN 300);
+
+-- Dictionary with backtick identifiers for reserved keywords
+CREATE DICTIONARY `user-dict`.`order-lookup`
+(
+    `user-id` UInt64 IS_OBJECT_ID,
+    `order` String INJECTIVE,
+    `select` String DEFAULT 'default_value'
+)
+PRIMARY KEY `user-id`
+SOURCE(HTTP(url 'http://api.example.com/orders'))
+LAYOUT(HASHED())
+LIFETIME(3600);

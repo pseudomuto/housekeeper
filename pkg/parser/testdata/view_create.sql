@@ -50,3 +50,21 @@ LEFT JOIN users u ON e.user_id = u.id
 WHERE e.status = 'completed'
 GROUP BY date, e.user_id, u.name, e.category;
 
+-- CREATE VIEW with backtick identifiers
+CREATE VIEW `analytics-db`.`daily-summary` AS 
+SELECT 
+    `order-date` as `date`,
+    count(*) as `total-orders`
+FROM `orders-table` 
+GROUP BY `order-date`;
+
+-- CREATE MATERIALIZED VIEW with backtick identifiers
+CREATE MATERIALIZED VIEW `metrics`.`hourly-stats` 
+ENGINE = MergeTree() 
+ORDER BY `timestamp`
+AS SELECT 
+    toStartOfHour(`created-at`) as `timestamp`,
+    count(*) as `count`
+FROM `events-table` 
+GROUP BY `timestamp`;
+

@@ -13,10 +13,10 @@ type (
 		Materialized bool          `parser:"@'MATERIALIZED'?"`
 		View         string        `parser:"'VIEW'"`
 		IfNotExists  bool          `parser:"('IF' 'NOT' 'EXISTS')?"`
-		Database     *string       `parser:"(@Ident '.')?"`
-		Name         string        `parser:"@Ident"`
-		OnCluster    *string       `parser:"('ON' 'CLUSTER' @Ident)?"`
-		To           *string       `parser:"('TO' @(Ident ('.' Ident)?))?"`
+		Database     *string       `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name         string        `parser:"@(Ident | BacktickIdent)"`
+		OnCluster    *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		To           *string       `parser:"('TO' @((Ident | BacktickIdent) ('.' (Ident | BacktickIdent))?))?"`
 		Engine       *ViewEngine   `parser:"@@?"`
 		Populate     bool          `parser:"@'POPULATE'?"`
 		AsSelect     *SelectClause `parser:"'AS' @@"`
@@ -30,9 +30,9 @@ type (
 		Attach      string  `parser:"'ATTACH'"`
 		View        string  `parser:"'VIEW'"`
 		IfNotExists bool    `parser:"('IF' 'NOT' 'EXISTS')?"`
-		Database    *string `parser:"(@Ident '.')?"`
-		Name        string  `parser:"@Ident"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string  `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Semicolon   bool    `parser:"';'"`
 	}
 
@@ -43,9 +43,9 @@ type (
 		Detach      string  `parser:"'DETACH'"`
 		View        string  `parser:"'VIEW'"`
 		IfExists    bool    `parser:"('IF' 'EXISTS')?"`
-		Database    *string `parser:"(@Ident '.')?"`
-		Name        string  `parser:"@Ident"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string  `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Permanently bool    `parser:"'PERMANENTLY'?"`
 		Sync        bool    `parser:"'SYNC'?"`
 		Semicolon   bool    `parser:"';'"`
@@ -58,9 +58,9 @@ type (
 		Drop      string  `parser:"'DROP'"`
 		View      string  `parser:"'VIEW'"`
 		IfExists  bool    `parser:"('IF' 'EXISTS')?"`
-		Database  *string `parser:"(@Ident '.')?"`
-		Name      string  `parser:"@Ident"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database  *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name      string  `parser:"@(Ident | BacktickIdent)"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Sync      bool    `parser:"'SYNC'?"`
 		Semicolon bool    `parser:"';'"`
 	}

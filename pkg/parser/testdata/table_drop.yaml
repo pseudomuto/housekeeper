@@ -1,4 +1,34 @@
 tables:
+    '`analytics-db`.`user-events`':
+        name: '`user-events`'
+        database: '`analytics-db`'
+        cluster: '`prod-cluster`'
+        operation: DROP
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    '`order-db`.`select`':
+        name: '`select`'
+        database: '`order-db`'
+        cluster: ""
+        operation: DROP
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
+    '`user-data`':
+        name: '`user-data`'
+        database: ""
+        cluster: ""
+        operation: DROP
+        or_replace: false
+        if_not_exists: false
+        if_exists: false
+        permanently: false
+        sync: false
     analytics.events:
         name: events
         database: analytics

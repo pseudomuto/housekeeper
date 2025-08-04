@@ -1,4 +1,9 @@
 databases:
+    '`old-name`':
+        name: '`old-name`'
+        cluster: '`prod-cluster`'
+        engine: ""
+        comment: ""
     db1:
         name: db1
         cluster: production

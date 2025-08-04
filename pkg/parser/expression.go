@@ -139,14 +139,14 @@ type (
 
 	// IdentifierExpr represents column names or qualified names
 	IdentifierExpr struct {
-		Database *string `parser:"(@Ident '.')?"`
-		Table    *string `parser:"(@Ident '.')?"`
-		Name     string  `parser:"@Ident"`
+		Database *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Table    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name     string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
 	// FunctionCall represents function invocations
 	FunctionCall struct {
-		Name      string       `parser:"@Ident"`
+		Name      string       `parser:"@(Ident | BacktickIdent)"`
 		Arguments []Expression `parser:"'(' (@@ (',' @@)*)? ')'"`
 		Over      *OverClause  `parser:"@@?"`
 	}

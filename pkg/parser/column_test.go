@@ -15,6 +15,7 @@ var (
 	columnLexer = lexer.MustSimple([]lexer.SimpleRule{
 		{Name: "Comment", Pattern: `--[^\r\n]*`},
 		{Name: "String", Pattern: `'([^'\\]|\\.)*'`},
+		{Name: "BacktickIdent", Pattern: "`([^`\\\\]|\\\\.)*`"},
 		{Name: "Number", Pattern: `\d+(\.\d+)?`},
 		{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
 		{Name: "Punct", Pattern: `[(),.;=+\-*/]`},
@@ -251,6 +252,24 @@ func TestColumnParsing(t *testing.T) {
 				require.NotNil(t, col.Codec)
 				require.NotNil(t, col.TTL)
 				require.NotNil(t, col.Comment)
+			},
+		},
+		{
+			name:  "backtick identifier",
+			input: "`order` UInt32",
+			validate: func(t *testing.T, col *Column) {
+				require.Equal(t, "`order`", col.Name)
+				require.NotNil(t, col.DataType.Simple)
+				require.Equal(t, "UInt32", col.DataType.Simple.Name)
+			},
+		},
+		{
+			name:  "backtick identifier with special chars",
+			input: "`user-name` String",
+			validate: func(t *testing.T, col *Column) {
+				require.Equal(t, "`user-name`", col.Name)
+				require.NotNil(t, col.DataType.Simple)
+				require.Equal(t, "String", col.DataType.Simple.Name)
 			},
 		},
 	}

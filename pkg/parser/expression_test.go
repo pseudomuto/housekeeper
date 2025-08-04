@@ -44,6 +44,9 @@ func TestExpressionParsing(t *testing.T) {
 		{"simple identifier", "column_name", true},
 		{"qualified identifier", "table.column", true},
 		{"fully qualified", "db.table.column", true},
+		{"backtick identifier", "`order`", true},
+		{"backtick qualified", "`user-table`.`user-name`", true},
+		{"backtick with keyword", "`select`", true},
 
 		// Arithmetic
 		{"addition", "1 + 2", true},

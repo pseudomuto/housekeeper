@@ -22,9 +22,9 @@ type (
 		OrReplace   bool                  `parser:"@('OR' 'REPLACE')?"`
 		Dictionary  string                `parser:"'DICTIONARY'"`
 		IfNotExists *string               `parser:"(@'IF' 'NOT' 'EXISTS')?"`
-		Database    *string               `parser:"((@Ident '.')?"`
-		Name        string                `parser:"@Ident)"`
-		OnCluster   *string               `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string               `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name        string                `parser:"@(Ident | BacktickIdent))"`
+		OnCluster   *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Columns     []*DictionaryColumn   `parser:"'(' @@* ')'"`
 		PrimaryKey  *DictionaryPrimaryKey `parser:"@@?"`
 		Source      *DictionarySource     `parser:"@@"`
@@ -36,8 +36,8 @@ type (
 
 	// DictionaryColumn represents a column definition in dictionary
 	DictionaryColumn struct {
-		Name       string                   `parser:"@Ident"`
-		Type       string                   `parser:"@Ident"`
+		Name       string                   `parser:"@(Ident | BacktickIdent)"`
+		Type       string                   `parser:"@(Ident | BacktickIdent)"`
 		Default    *DictionaryColumnDefault `parser:"@@?"`
 		Attributes []*DictionaryColumnAttr  `parser:"@@*"`
 		Comma      *string                  `parser:"@','?"`
@@ -46,7 +46,7 @@ type (
 	// DictionaryColumnDefault represents DEFAULT or EXPRESSION clause
 	DictionaryColumnDefault struct {
 		Type       string `parser:"(@'DEFAULT' | @'EXPRESSION')"`
-		Expression string `parser:"@(String | Number | Ident)"`
+		Expression string `parser:"@(String | Number | Ident | BacktickIdent)"`
 	}
 
 	// DictionaryColumnAttr represents column attributes like IS_OBJECT_ID, HIERARCHICAL, INJECTIVE
@@ -56,18 +56,18 @@ type (
 
 	// DictionaryPrimaryKey represents PRIMARY KEY clause
 	DictionaryPrimaryKey struct {
-		Keys []string `parser:"'PRIMARY' 'KEY' @Ident (',' @Ident)*"`
+		Keys []string `parser:"'PRIMARY' 'KEY' @(Ident | BacktickIdent) (',' @(Ident | BacktickIdent))*"`
 	}
 
 	// DictionarySource represents SOURCE clause
 	DictionarySource struct {
-		Name       string                 `parser:"'SOURCE' '(' @Ident"`
+		Name       string                 `parser:"'SOURCE' '(' @(Ident | BacktickIdent)"`
 		Parameters []*DictionaryParameter `parser:"('(' @@* ')')? ')'"`
 	}
 
 	// DictionaryLayout represents LAYOUT clause
 	DictionaryLayout struct {
-		Name       string                 `parser:"'LAYOUT' '(' @Ident"`
+		Name       string                 `parser:"'LAYOUT' '(' @(Ident | BacktickIdent)"`
 		Parameters []*DictionaryParameter `parser:"('(' @@* ')')? ')'"`
 	}
 
@@ -102,15 +102,15 @@ type (
 
 	// DictionarySetting represents individual setting
 	DictionarySetting struct {
-		Name  string  `parser:"@Ident '='"`
-		Value string  `parser:"@(String | Number | Ident)"`
+		Name  string  `parser:"@(Ident | BacktickIdent) '='"`
+		Value string  `parser:"@(String | Number | Ident | BacktickIdent)"`
 		Comma *string `parser:"@','?"`
 	}
 
 	// DictionaryParameter represents parameters in SOURCE or LAYOUT
 	DictionaryParameter struct {
-		Name  string  `parser:"@Ident"`
-		Value string  `parser:"@(String | Number | Ident)"`
+		Name  string  `parser:"@(Ident | BacktickIdent)"`
+		Value string  `parser:"@(String | Number | Ident | BacktickIdent)"`
 		Comma *string `parser:"@','?"`
 	}
 
@@ -119,9 +119,9 @@ type (
 	//   ATTACH DICTIONARY [IF NOT EXISTS] [db.]dict_name [ON CLUSTER cluster]
 	AttachDictionaryStmt struct {
 		IfNotExists *string `parser:"'ATTACH' 'DICTIONARY' (@'IF' 'NOT' 'EXISTS')?"`
-		Database    *string `parser:"((@Ident '.')?"`
-		Name        string  `parser:"@Ident)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)? ';'"`
+		Database    *string `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name        string  `parser:"@(Ident | BacktickIdent))"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))? ';'"`
 	}
 
 	// DetachDictionaryStmt represents DETACH DICTIONARY statements.
@@ -129,9 +129,9 @@ type (
 	//   DETACH DICTIONARY [IF EXISTS] [db.]dict_name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]
 	DetachDictionaryStmt struct {
 		IfExists    *string `parser:"'DETACH' 'DICTIONARY' (@'IF' 'EXISTS')?"`
-		Database    *string `parser:"((@Ident '.')?"`
-		Name        string  `parser:"@Ident)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database    *string `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name        string  `parser:"@(Ident | BacktickIdent))"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Permanently *string `parser:"(@'PERMANENTLY')?"`
 		Sync        *string `parser:"(@'SYNC')? ';'"`
 	}
@@ -141,9 +141,9 @@ type (
 	//   DROP DICTIONARY [IF EXISTS] [db.]dict_name [ON CLUSTER cluster] [SYNC]
 	DropDictionaryStmt struct {
 		IfExists  *string `parser:"'DROP' 'DICTIONARY' (@'IF' 'EXISTS')?"`
-		Database  *string `parser:"((@Ident '.')?"`
-		Name      string  `parser:"@Ident)"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @Ident)?"`
+		Database  *string `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name      string  `parser:"@(Ident | BacktickIdent))"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Sync      *string `parser:"(@'SYNC')? ';'"`
 	}
 
@@ -151,14 +151,14 @@ type (
 	// Syntax: RENAME DICTIONARY [db.]name1 TO [db.]new_name1 [, [db.]name2 TO [db.]new_name2, ...] [ON CLUSTER cluster];
 	RenameDictionaryStmt struct {
 		Renames   []*DictionaryRename `parser:"'RENAME' 'DICTIONARY' @@ (',' @@)*"`
-		OnCluster *string             `parser:"('ON' 'CLUSTER' @Ident)? ';'"`
+		OnCluster *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))? ';'"`
 	}
 
 	// DictionaryRename represents a single dictionary rename operation
 	DictionaryRename struct {
-		FromDatabase *string `parser:"((@Ident '.')?"`
-		FromName     string  `parser:"@Ident)"`
-		ToDatabase   *string `parser:"'TO' ((@Ident '.')?"`
-		ToName       string  `parser:"@Ident)"`
+		FromDatabase *string `parser:"((@(Ident | BacktickIdent) '.')?"`
+		FromName     string  `parser:"@(Ident | BacktickIdent))"`
+		ToDatabase   *string `parser:"'TO' ((@(Ident | BacktickIdent) '.')?"`
+		ToName       string  `parser:"@(Ident | BacktickIdent))"`
 	}
 )

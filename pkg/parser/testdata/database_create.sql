@@ -21,3 +21,7 @@ CREATE DATABASE comment_db COMMENT 'This is a test database';
 
 -- CREATE DATABASE with all options
 CREATE DATABASE IF NOT EXISTS full_db ON CLUSTER production ENGINE = Atomic COMMENT 'Full featured database';
+
+-- CREATE DATABASE with backtick identifiers
+CREATE DATABASE `user-database` ENGINE = Atomic;
+CREATE DATABASE IF NOT EXISTS `order-db` ON CLUSTER `prod-cluster` COMMENT 'Database with special chars';

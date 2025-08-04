@@ -60,3 +60,22 @@ CREATE TABLE measurements (
     config_data String CODEC(LZ4HC(9))
 ) ENGINE = MergeTree()
 ORDER BY (device_id, created_at);
+
+-- Table with backtick identifiers
+CREATE TABLE `user-db`.`order-table` (
+    `user-id` UInt64,
+    `order-id` String,
+    `order-date` Date,
+    `select` String,  -- reserved keyword as column name
+    `group` LowCardinality(String)  -- reserved keyword as column name
+) ENGINE = MergeTree()
+ORDER BY (`user-id`, `order-date`);
+
+-- Table with mixed backtick and regular identifiers
+CREATE TABLE IF NOT EXISTS `analytics-db`.`user-events` ON CLUSTER `prod-cluster` (
+    id UInt64,
+    `user-name` String,
+    event_type String,
+    `created-at` DateTime DEFAULT now()
+) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/user-events', '{replica}')
+ORDER BY id;

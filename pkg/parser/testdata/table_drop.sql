@@ -27,8 +27,10 @@ DROP TABLE table1;
 DROP TABLE table2;
 DROP TABLE IF EXISTS table3;
 
--- DROP TABLE with special names (would need backticks in real ClickHouse)
--- Note: Parser currently doesn't support backtick-quoted identifiers
+-- DROP TABLE with backtick identifiers for special names and reserved keywords
+DROP TABLE `user-data`;
+DROP TABLE `order-db`.`select`;
+DROP TABLE IF EXISTS `analytics-db`.`user-events` ON CLUSTER `prod-cluster`;
 
 -- DROP TABLE with underscores and numbers
 DROP TABLE data_2023_archive;

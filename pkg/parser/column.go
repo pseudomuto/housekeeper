@@ -6,7 +6,7 @@ type (
 	// such as DEFAULT values, MATERIALIZED expressions, ALIAS definitions,
 	// compression CODECs, TTL settings, and comments.
 	Column struct {
-		Name     string         `parser:"@Ident"`
+		Name     string         `parser:"@(Ident | BacktickIdent)"`
 		DataType *DataType      `parser:"@@"`
 		Default  *DefaultClause `parser:"@@?"`
 		Codec    *CodecClause   `parser:"@@?"`
@@ -57,7 +57,7 @@ type (
 	// TupleElement represents a single element in a tuple, which can be named or unnamed
 	TupleElement struct {
 		// Try to parse name + type first, then fall back to just type
-		Name *string   `parser:"(@Ident"`
+		Name *string   `parser:"(@(Ident | BacktickIdent)"`
 		Type *DataType `parser:"@@)"`
 		// For unnamed tuples, we just have the type
 		UnnamedType *DataType `parser:"| @@"`
@@ -72,7 +72,7 @@ type (
 
 	// NestedColumn represents a column within a Nested type
 	NestedColumn struct {
-		Name string    `parser:"@Ident"`
+		Name string    `parser:"@(Ident | BacktickIdent)"`
 		Type *DataType `parser:"@@"`
 	}
 
@@ -94,14 +94,14 @@ type (
 
 	// SimpleType represents basic data types and parametric types
 	SimpleType struct {
-		Name       string          `parser:"@Ident"`
+		Name       string          `parser:"@(Ident | BacktickIdent)"`
 		Parameters []TypeParameter `parser:"('(' @@ (',' @@)* ')')?"`
 	}
 
 	// TypeParameter represents a parameter in a parametric type (can be number or identifier)
 	TypeParameter struct {
 		Number *string `parser:"@Number"`
-		Ident  *string `parser:"| @Ident"`
+		Ident  *string `parser:"| @(Ident | BacktickIdent)"`
 		String *string `parser:"| @String"`
 	}
 
@@ -120,7 +120,7 @@ type (
 
 	// CodecSpec represents a single codec specification (e.g., ZSTD, LZ4HC(9))
 	CodecSpec struct {
-		Name       string          `parser:"@Ident"`
+		Name       string          `parser:"@(Ident | BacktickIdent)"`
 		Parameters []TypeParameter `parser:"('(' @@ (',' @@)* ')')?"`
 	}
 
