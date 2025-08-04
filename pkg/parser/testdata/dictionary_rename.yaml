@@ -1,67 +1,21 @@
 dictionaries:
-    db.dict3:
-        name: dict3
-        database: db
-        cluster: ""
-        or_replace: false
-        comment: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    db.old_dict:
-        name: old_dict
-        database: db
-        cluster: ""
-        or_replace: false
-        comment: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    db1.dict1:
-        name: dict1
-        database: db1
-        cluster: production
-        or_replace: false
-        comment: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    dict1:
-        name: dict1
-        database: ""
-        cluster: ""
-        or_replace: false
-        comment: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    dict3:
-        name: dict3
-        database: ""
-        cluster: production
-        or_replace: false
-        comment: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    old_dict:
-        name: old_dict
-        database: ""
-        cluster: my_cluster
-        or_replace: false
-        comment: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
+    - name: old_dict
+      operation: RENAME
+    - name: old_dict
+      database: db
+      operation: RENAME
+    - name: dict1
+      operation: RENAME
+    - name: dict3
+      database: db
+      operation: RENAME
+    - name: old_dict
+      cluster: my_cluster
+      operation: RENAME
+    - name: dict1
+      database: db1
+      cluster: production
+      operation: RENAME
+    - name: dict3
+      cluster: production
+      operation: RENAME

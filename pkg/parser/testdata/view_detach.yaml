@@ -1,119 +1,38 @@
 views:
-    analytics.daily_summary:
-        name: daily_summary
-        database: analytics
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    analytics.updated_view:
-        name: updated_view
-        database: analytics
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    db.my_view:
-        name: my_view
-        database: db
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    old_view:
-        name: old_view
-        database: ""
-        cluster: production
-        or_replace: false
-        materialized: false
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    stats_view:
-        name: stats_view
-        database: ""
-        cluster: production
-        or_replace: false
-        materialized: false
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    users_view:
-        name: users_view
-        database: ""
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
+    - name: daily_summary
+      database: analytics
+      operation: DETACH
+    - name: users_view
+      operation: DETACH
+    - name: stats_view
+      cluster: production
+      operation: DETACH
+    - name: my_view
+      database: db
+      operation: DETACH
+    - name: updated_view
+      database: analytics
+      operation: DETACH
+    - name: old_view
+      cluster: production
+      operation: DETACH
 tables:
-    analytics.mv_aggregated:
-        name: mv_aggregated
-        database: analytics
-        cluster: ""
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.mv_joins:
-        name: mv_joins
-        database: analytics
-        cluster: ""
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: true
-        sync: true
-    analytics.mv_old:
-        name: mv_old
-        database: analytics
-        cluster: analytics_cluster
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: true
-        sync: true
-    mv_complex:
-        name: mv_complex
-        database: ""
-        cluster: production
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    mv_daily_stats:
-        name: mv_daily_stats
-        database: ""
-        cluster: ""
-        operation: DETACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
+    - name: mv_daily_stats
+      operation: DETACH
+    - name: mv_aggregated
+      database: analytics
+      operation: DETACH
+    - name: mv_complex
+      cluster: production
+      operation: DETACH
+    - name: mv_joins
+      database: analytics
+      operation: DETACH
+      permanently: true
+      sync: true
+    - name: mv_old
+      database: analytics
+      cluster: analytics_cluster
+      operation: DETACH
+      permanently: true
+      sync: true

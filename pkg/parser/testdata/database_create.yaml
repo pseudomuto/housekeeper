@@ -1,51 +1,22 @@
 databases:
-    '`order-db`':
-        name: '`order-db`'
-        cluster: '`prod-cluster`'
-        engine: ""
-        comment: Database with special chars
-    '`user-database`':
-        name: '`user-database`'
-        cluster: ""
-        engine: Atomic
-        comment: ""
-    basic_db:
-        name: basic_db
-        cluster: ""
-        engine: ""
-        comment: ""
-    cluster_db:
-        name: cluster_db
-        cluster: my_cluster
-        engine: ""
-        comment: ""
-    comment_db:
-        name: comment_db
-        cluster: ""
-        engine: ""
-        comment: This is a test database
-    conditional_db:
-        name: conditional_db
-        cluster: ""
-        engine: ""
-        comment: ""
-    engine_db:
-        name: engine_db
-        cluster: ""
-        engine: Atomic
-        comment: ""
-    full_db:
-        name: full_db
-        cluster: production
-        engine: Atomic
-        comment: Full featured database
-    materialized_db:
-        name: materialized_db
-        cluster: ""
-        engine: MaterializedMySQL('localhost:3306', 'database', 'user', 'password', 5000)
-        comment: ""
-    remote_db:
-        name: remote_db
-        cluster: ""
-        engine: MySQL('localhost:3306', 'database', 'user', 'password')
-        comment: ""
+    - name: basic_db
+    - name: conditional_db
+    - name: cluster_db
+      cluster: my_cluster
+    - name: engine_db
+      engine: Atomic
+    - name: remote_db
+      engine: MySQL('localhost:3306', 'database', 'user', 'password')
+    - name: materialized_db
+      engine: MaterializedMySQL('localhost:3306', 'database', 'user', 'password', 5000)
+    - name: comment_db
+      comment: This is a test database
+    - name: full_db
+      cluster: production
+      engine: Atomic
+      comment: Full featured database
+    - name: '`user-database`'
+      engine: Atomic
+    - name: '`order-db`'
+      cluster: '`prod-cluster`'
+      comment: Database with special chars

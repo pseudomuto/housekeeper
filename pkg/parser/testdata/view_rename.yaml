@@ -1,154 +1,55 @@
 tables:
-    analytics.mv2:
-        name: mv2
-        database: analytics
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.old:
-        name: old
-        database: analytics
-        cluster: analytics_cluster
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.old_mv:
-        name: old_mv
-        database: analytics
-        cluster: analytics_cluster
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.old_mv_summary:
-        name: old_mv_summary
-        database: analytics
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.old_summary:
-        name: old_summary
-        database: analytics
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.view2:
-        name: view2
-        database: analytics
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    db1.mv1:
-        name: mv1
-        database: db1
-        cluster: analytics_cluster
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    db1.v1:
-        name: v1
-        database: db1
-        cluster: analytics_cluster
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    db1.view1:
-        name: view1
-        database: db1
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    mv1:
-        name: mv1
-        database: ""
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    mv2:
-        name: mv2
-        database: ""
-        cluster: analytics_cluster
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    old_mv:
-        name: old_mv
-        database: ""
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    old_mv_stats:
-        name: old_mv_stats
-        database: ""
-        cluster: production
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    old_stats:
-        name: old_stats
-        database: ""
-        cluster: production
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    old_view:
-        name: old_view
-        database: ""
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    v2:
-        name: v2
-        database: ""
-        cluster: analytics_cluster
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    view1:
-        name: view1
-        database: ""
-        cluster: ""
-        operation: RENAME
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
+    - name: old_view
+      operation: RENAME
+    - name: old_summary
+      database: analytics
+      operation: RENAME
+    - name: view1
+      database: db1
+      operation: RENAME
+    - name: view1
+      operation: RENAME
+    - name: view2
+      database: analytics
+      operation: RENAME
+    - name: old_stats
+      cluster: production
+      operation: RENAME
+    - name: v1
+      database: db1
+      cluster: analytics_cluster
+      operation: RENAME
+    - name: v2
+      cluster: analytics_cluster
+      operation: RENAME
+    - name: old
+      database: analytics
+      cluster: analytics_cluster
+      operation: RENAME
+    - name: old_mv
+      operation: RENAME
+    - name: old_mv_summary
+      database: analytics
+      operation: RENAME
+    - name: mv1
+      database: db1
+      operation: RENAME
+    - name: mv1
+      operation: RENAME
+    - name: mv2
+      database: analytics
+      operation: RENAME
+    - name: old_mv_stats
+      cluster: production
+      operation: RENAME
+    - name: mv1
+      database: db1
+      cluster: analytics_cluster
+      operation: RENAME
+    - name: mv2
+      cluster: analytics_cluster
+      operation: RENAME
+    - name: old_mv
+      database: analytics
+      cluster: analytics_cluster
+      operation: RENAME

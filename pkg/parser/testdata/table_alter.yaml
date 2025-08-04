@@ -1,128 +1,618 @@
 tables:
-    analytics.events:
-        name: events
-        database: analytics
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            ADD_COLUMN: 2
-            ADD_PROJECTION: 4
-            ATTACH_PARTITION: 2
-            COMMENT_COLUMN: 1
-            DELETE_TTL: 1
-            DETACH_PARTITION: 4
-            DROP_COLUMN: 1
-            DROP_PARTITION: 1
-            DROP_PROJECTION: 3
-            FETCH_PARTITION: 1
-            FREEZE: 4
-            MODIFY_SAMPLE_BY: 1
-            MODIFY_SETTING: 1
-            MODIFY_TTL: 1
-            MOVE_PARTITION: 3
-            REMOVE_SAMPLE_BY: 1
-            RENAME_COLUMN: 1
-            REPLACE_PARTITION: 1
-            RESET_SETTING: 1
-    events:
-        name: events
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            ADD_INDEX: 1
-    logs:
-        name: logs
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            ADD_COLUMN: 1
-            ADD_INDEX: 2
-            DELETE: 1
-            DROP_INDEX: 2
-            MODIFY_TTL: 1
-    measurements:
-        name: measurements
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            CLEAR_COLUMN: 2
-            MODIFY_ORDER_BY: 1
-            RENAME_COLUMN: 1
-    missing_table:
-        name: missing_table
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: true
-        permanently: false
-        sync: false
-        alter_operations:
-            ADD_COLUMN: 1
-    orders:
-        name: orders
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            ADD_INDEX: 1
-    user_profiles:
-        name: user_profiles
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            DROP_COLUMN: 1
-    users:
-        name: users
-        database: ""
-        cluster: ""
-        operation: ALTER
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        alter_operations:
-            ADD_COLUMN: 4
-            ADD_CONSTRAINT: 2
-            COMMENT_COLUMN: 1
-            DROP_COLUMN: 1
-            DROP_CONSTRAINT: 2
-            MODIFY_COLUMN: 2
-            RENAME_COLUMN: 1
-            UPDATE: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+    - name: user_profiles
+      operation: ALTER
+      alter_operations:
+        DROP_COLUMN: 1
+    - name: measurements
+      operation: ALTER
+      alter_operations:
+        RENAME_COLUMN: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        COMMENT_COLUMN: 1
+    - name: logs
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+    - name: events
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+    - name: orders
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+    - name: logs
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+        DROP_INDEX: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_CONSTRAINT: 1
+        COMMENT_COLUMN: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_CONSTRAINT: 1
+        COMMENT_COLUMN: 1
+        DROP_CONSTRAINT: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_CONSTRAINT: 1
+        COMMENT_COLUMN: 1
+        DROP_CONSTRAINT: 1
+        UPDATE: 1
+    - name: logs
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+        DELETE: 1
+        DROP_INDEX: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        FREEZE: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        DELETE_TTL: 1
+        FREEZE: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        DELETE_TTL: 1
+        FREEZE: 1
+        MODIFY_TTL: 1
+    - name: measurements
+      operation: ALTER
+      alter_operations:
+        MODIFY_ORDER_BY: 1
+        RENAME_COLUMN: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        DELETE_TTL: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_TTL: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        DELETE_TTL: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        DELETE_TTL: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        DELETE_TTL: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FREEZE: 1
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: measurements
+      operation: ALTER
+      alter_operations:
+        CLEAR_COLUMN: 1
+        MODIFY_ORDER_BY: 1
+        RENAME_COLUMN: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 1
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 2
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 2
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 2
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: missing_table
+      operation: ALTER
+      if_exists: true
+      alter_operations:
+        ADD_COLUMN: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 2
+        ADD_CONSTRAINT: 1
+        COMMENT_COLUMN: 1
+        DROP_CONSTRAINT: 1
+        UPDATE: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 2
+        ADD_CONSTRAINT: 1
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 1
+        UPDATE: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 2
+        ADD_CONSTRAINT: 1
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 1
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: logs
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 2
+        DELETE: 1
+        DROP_INDEX: 1
+    - name: logs
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 2
+        DELETE: 1
+        DROP_INDEX: 2
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 2
+        ADD_CONSTRAINT: 2
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 1
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 2
+        ADD_CONSTRAINT: 2
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 2
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: measurements
+      operation: ALTER
+      alter_operations:
+        CLEAR_COLUMN: 2
+        MODIFY_ORDER_BY: 1
+        RENAME_COLUMN: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 3
+        ADD_CONSTRAINT: 2
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 2
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 4
+        ADD_CONSTRAINT: 2
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 2
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 2
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 3
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ATTACH_PARTITION: 2
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: logs
+      cluster: production
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_INDEX: 2
+        DELETE: 1
+        DROP_INDEX: 2
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 1
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 4
+        ADD_CONSTRAINT: 2
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 2
+        MODIFY_COLUMN: 1
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: users
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 4
+        ADD_CONSTRAINT: 2
+        COMMENT_COLUMN: 1
+        DROP_COLUMN: 1
+        DROP_CONSTRAINT: 2
+        MODIFY_COLUMN: 2
+        RENAME_COLUMN: 1
+        UPDATE: 1
+    - name: logs
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_INDEX: 2
+        DELETE: 1
+        DROP_INDEX: 2
+        MODIFY_TTL: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_PROJECTION: 1
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_PROJECTION: 2
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_PROJECTION: 3
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_PROJECTION: 3
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        DROP_PROJECTION: 1
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 1
+        ADD_PROJECTION: 3
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        DROP_PROJECTION: 2
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1
+    - name: events
+      database: analytics
+      operation: ALTER
+      alter_operations:
+        ADD_COLUMN: 2
+        ADD_PROJECTION: 4
+        ATTACH_PARTITION: 2
+        COMMENT_COLUMN: 1
+        DELETE_TTL: 1
+        DETACH_PARTITION: 4
+        DROP_COLUMN: 1
+        DROP_PARTITION: 1
+        DROP_PROJECTION: 3
+        FETCH_PARTITION: 1
+        FREEZE: 4
+        MODIFY_SAMPLE_BY: 1
+        MODIFY_SETTING: 1
+        MODIFY_TTL: 1
+        MOVE_PARTITION: 3
+        REMOVE_SAMPLE_BY: 1
+        RENAME_COLUMN: 1
+        REPLACE_PARTITION: 1
+        RESET_SETTING: 1

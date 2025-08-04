@@ -1,21 +1,16 @@
 databases:
-    basic_alter_db:
-        name: basic_alter_db
-        cluster: ""
-        engine: ""
-        comment: Updated comment
-    cluster_alter_db:
-        name: cluster_alter_db
-        cluster: production
-        engine: ""
-        comment: Production database
-    cluster_override_db:
-        name: cluster_override_db
-        cluster: production
-        engine: ""
-        comment: Updated with cluster
-    modify_test_db:
-        name: modify_test_db
-        cluster: ""
-        engine: Atomic
-        comment: Updated comment
+    - name: basic_alter_db
+      comment: Updated comment
+    - name: cluster_alter_db
+      cluster: production
+      comment: Production database
+    - name: modify_test_db
+      engine: Atomic
+      comment: Original comment
+    - name: modify_test_db
+      comment: Updated comment
+    - name: cluster_override_db
+      comment: Original comment
+    - name: cluster_override_db
+      cluster: production
+      comment: Updated with cluster

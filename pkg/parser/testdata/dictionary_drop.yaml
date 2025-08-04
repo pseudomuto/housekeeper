@@ -1,45 +1,15 @@
 dictionaries:
-    analytics.drop_full_dict:
-        name: drop_full_dict
-        database: analytics
-        cluster: ""
-        or_replace: false
-        comment: ""
-        operation: DROP
-        if_not_exists: false
-        if_exists: true
-        permanently: false
-        sync: true
-    analytics.drop_ifexists_dict:
-        name: drop_ifexists_dict
-        database: analytics
-        cluster: ""
-        or_replace: false
-        comment: ""
-        operation: DROP
-        if_not_exists: false
-        if_exists: true
-        permanently: false
-        sync: false
-    drop_basic_dict:
-        name: drop_basic_dict
-        database: ""
-        cluster: ""
-        or_replace: false
-        comment: ""
-        operation: DROP
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    drop_cluster_dict:
-        name: drop_cluster_dict
-        database: ""
-        cluster: production
-        or_replace: false
-        comment: ""
-        operation: DROP
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
+    - name: drop_basic_dict
+      operation: DROP
+    - name: drop_ifexists_dict
+      database: analytics
+      operation: DROP
+      if_exists: true
+    - name: drop_cluster_dict
+      cluster: production
+      operation: DROP
+    - name: drop_full_dict
+      database: analytics
+      operation: DROP
+      if_exists: true
+      sync: true

@@ -1,86 +1,25 @@
 views:
-    analytics.daily_summary:
-        name: daily_summary
-        database: analytics
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    db.my_view:
-        name: my_view
-        database: db
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    stats_view:
-        name: stats_view
-        database: ""
-        cluster: production
-        or_replace: false
-        materialized: false
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
-    users_view:
-        name: users_view
-        database: ""
-        cluster: ""
-        or_replace: false
-        materialized: false
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-        populate: false
+    - name: daily_summary
+      database: analytics
+      operation: ATTACH
+    - name: users_view
+      operation: ATTACH
+    - name: stats_view
+      cluster: production
+      operation: ATTACH
+    - name: my_view
+      database: db
+      operation: ATTACH
 tables:
-    analytics.mv_aggregated:
-        name: mv_aggregated
-        database: analytics
-        cluster: ""
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.mv_joins:
-        name: mv_joins
-        database: analytics
-        cluster: analytics_cluster
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    mv_complex:
-        name: mv_complex
-        database: ""
-        cluster: production
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    mv_daily_stats:
-        name: mv_daily_stats
-        database: ""
-        cluster: ""
-        operation: ATTACH
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
+    - name: mv_daily_stats
+      operation: ATTACH
+    - name: mv_aggregated
+      database: analytics
+      operation: ATTACH
+    - name: mv_complex
+      cluster: production
+      operation: ATTACH
+    - name: mv_joins
+      database: analytics
+      cluster: analytics_cluster
+      operation: ATTACH

@@ -1,21 +1,12 @@
 databases:
-    '`old-name`':
-        name: '`old-name`'
-        cluster: '`prod-cluster`'
-        engine: ""
-        comment: ""
-    db1:
-        name: db1
-        cluster: production
-        engine: ""
-        comment: ""
-    db3:
-        name: db3
-        cluster: production
-        engine: ""
-        comment: ""
-    old_db:
-        name: old_db
-        cluster: my_cluster
-        engine: ""
-        comment: ""
+    - name: old_db
+    - name: db1
+    - name: db3
+    - name: old_db
+      cluster: my_cluster
+    - name: db1
+      cluster: production
+    - name: db3
+      cluster: production
+    - name: '`old-name`'
+      cluster: '`prod-cluster`'

@@ -1,211 +1,64 @@
 tables:
-    '`analytics-db`.`user-events`':
-        name: '`user-events`'
-        database: '`analytics-db`'
-        cluster: '`prod-cluster`'
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    '`order-db`.`select`':
-        name: '`select`'
-        database: '`order-db`'
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    '`user-data`':
-        name: '`user-data`'
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.events:
-        name: events
-        database: analytics
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    analytics.old_events:
-        name: old_events
-        database: analytics
-        cluster: production
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: true
-    analytics.user_events_2023_01_backup:
-        name: user_events_2023_01_backup
-        database: analytics
-        cluster: production
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: true
-    data_2023_archive:
-        name: data_2023_archive
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    db1.missing_table:
-        name: missing_table
-        database: db1
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    logs:
-        name: logs
-        database: ""
-        cluster: analytics_cluster
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    measurements:
-        name: measurements
-        database: ""
-        cluster: production
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    missing_table:
-        name: missing_table
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: true
-    staging.temporary_data:
-        name: temporary_data
-        database: staging
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    table1:
-        name: table1
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    table2:
-        name: table2
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    table3:
-        name: table3
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    temp_table:
-        name: temp_table
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    temp_table_v2:
-        name: temp_table_v2
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    tmp_calculations:
-        name: tmp_calculations
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
-    tmp_results:
-        name: tmp_results
-        database: ""
-        cluster: compute_cluster
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: true
-    user_profiles:
-        name: user_profiles
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: true
-    users:
-        name: users
-        database: ""
-        cluster: ""
-        operation: DROP
-        or_replace: false
-        if_not_exists: false
-        if_exists: false
-        permanently: false
-        sync: false
+    - name: users
+      operation: DROP
+    - name: events
+      database: analytics
+      operation: DROP
+    - name: temp_table
+      operation: DROP
+    - name: temporary_data
+      database: staging
+      operation: DROP
+    - name: measurements
+      cluster: production
+      operation: DROP
+    - name: logs
+      cluster: analytics_cluster
+      operation: DROP
+    - name: user_profiles
+      operation: DROP
+      sync: true
+    - name: old_events
+      database: analytics
+      cluster: production
+      operation: DROP
+      sync: true
+    - name: table1
+      operation: DROP
+    - name: table2
+      operation: DROP
+    - name: table3
+      operation: DROP
+    - name: '`user-data`'
+      operation: DROP
+    - name: '`select`'
+      database: '`order-db`'
+      operation: DROP
+    - name: '`user-events`'
+      database: '`analytics-db`'
+      cluster: '`prod-cluster`'
+      operation: DROP
+    - name: data_2023_archive
+      operation: DROP
+    - name: temp_table_v2
+      operation: DROP
+    - name: missing_table
+      database: db1
+      operation: DROP
+    - name: missing_table
+      cluster: test_cluster
+      operation: DROP
+    - name: missing_table
+      operation: DROP
+      sync: true
+    - name: user_events_2023_01_backup
+      database: analytics
+      cluster: production
+      operation: DROP
+      sync: true
+    - name: tmp_calculations
+      operation: DROP
+    - name: tmp_results
+      cluster: compute_cluster
+      operation: DROP
+      sync: true

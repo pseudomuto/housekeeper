@@ -1,16 +1,5 @@
 databases:
-    basic_drop_db:
-        name: basic_drop_db
-        cluster: ""
-        engine: ""
-        comment: ""
-    cluster_drop_db:
-        name: cluster_drop_db
-        cluster: production
-        engine: ""
-        comment: ""
-    sync_drop_db:
-        name: sync_drop_db
-        cluster: ""
-        engine: ""
-        comment: ""
+    - name: basic_drop_db
+    - name: cluster_drop_db
+      cluster: production
+    - name: sync_drop_db
