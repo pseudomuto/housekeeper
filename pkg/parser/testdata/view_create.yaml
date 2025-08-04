@@ -53,3 +53,11 @@ views:
       materialized: true
       operation: CREATE
       engine: MergeTree()ORDERBY`timestamp`
+    - name: user_rankings
+      database: analytics
+      operation: CREATE
+    - name: mv_sales_trends
+      database: analytics
+      materialized: true
+      operation: CREATE
+      engine: MergeTree()ORDERBY(date,region)

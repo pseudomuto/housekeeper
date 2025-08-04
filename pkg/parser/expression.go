@@ -154,9 +154,9 @@ type (
 	// OverClause for window functions
 	OverClause struct {
 		Over        string        `parser:"'OVER'"`
-		PartitionBy []Expression  `parser:"('(' 'PARTITION' 'BY' @@ (',' @@)*"`
+		PartitionBy []Expression  `parser:"'(' ('PARTITION' 'BY' @@ (',' @@)*)?"`
 		OrderBy     []OrderByExpr `parser:"('ORDER' 'BY' @@ (',' @@)*)?"`
-		Frame       *WindowFrame  `parser:"@@? ')')?"`
+		Frame       *WindowFrame  `parser:"@@? ')'"`
 	}
 
 	// OrderByExpr for ORDER BY in OVER clause
@@ -168,18 +168,16 @@ type (
 
 	// WindowFrame for window functions
 	WindowFrame struct {
-		Type  string      `parser:"@('ROWS' | 'RANGE')"`
-		Start *FrameBound `parser:"@@"`
-		End   *FrameBound `parser:"('AND' @@)?"`
+		Type      string     `parser:"@('ROWS' | 'RANGE')"`
+		Between   bool       `parser:"@'BETWEEN'?"`
+		Start     FrameBound `parser:"@@"`
+		End       *FrameBound `parser:"('AND' @@)?"`
 	}
 
 	// FrameBound represents window frame boundaries
 	FrameBound struct {
-		Unbounded bool    `parser:"@'UNBOUNDED'?"`
-		Preceding bool    `parser:"@'PRECEDING'?"`
-		Current   bool    `parser:"| @('CURRENT' 'ROW')"`
-		Following bool    `parser:"| @'FOLLOWING'"`
-		Value     *string `parser:"(@Number (@'PRECEDING' | @'FOLLOWING'))?"`
+		Type      string `parser:"@('UNBOUNDED' | 'CURRENT' | Number)"`
+		Direction string `parser:"@('PRECEDING' | 'FOLLOWING' | 'ROW')?"`
 	}
 
 	// ParenExpression represents parenthesized expressions

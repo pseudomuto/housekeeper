@@ -177,3 +177,22 @@ CREATE TABLE complex_table (
     
 ) ENGINE = MergeTree()
 ORDER BY id;
+
+-- CREATE TABLE with projection using window functions
+CREATE TABLE analytics.sales_data (
+    date Date,
+    region String,
+    product_id UInt64,
+    sales_amount Decimal(10, 2),
+    PROJECTION sales_rankings (
+        SELECT 
+            date,
+            region,
+            product_id,
+            sales_amount,
+            rank() OVER (PARTITION BY date, region ORDER BY sales_amount DESC) AS daily_rank,
+            row_number() OVER (ORDER BY sales_amount DESC) AS overall_rank
+        ORDER BY date, region, daily_rank
+    )
+) ENGINE = MergeTree()
+ORDER BY (date, region, product_id);

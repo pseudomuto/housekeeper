@@ -124,9 +124,25 @@ func TestExpressionParsing(t *testing.T) {
 		{"DELETE WHERE", "timestamp < now() - years(1)", true},
 		{"complex WHERE", "status = 'inactive' AND last_login < now() - days(30)", true},
 
-		// Window functions - temporarily disabled due to frame parsing issues
-		// {"window function", "row_number() OVER (PARTITION BY category ORDER BY price DESC)", true},
-		// {"window with frame", "sum(amount) OVER (PARTITION BY user_id ORDER BY date ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)", true},
+		// Window functions
+		{"simple window function", "row_number() OVER ()", true},
+		{"window with partition", "rank() OVER (PARTITION BY category)", true},
+		{"window with order", "dense_rank() OVER (ORDER BY price DESC)", true},
+		{"window with partition and order", "row_number() OVER (PARTITION BY category ORDER BY price DESC)", true},
+		{"window with multiple partitions", "sum(amount) OVER (PARTITION BY user_id, category ORDER BY date)", true},
+		{"window with nulls handling", "rank() OVER (ORDER BY score DESC NULLS LAST)", true},
+		{"window with frame - current row", "sum(amount) OVER (ORDER BY date ROWS CURRENT ROW)", true},
+		{"window with frame - unbounded preceding", "sum(amount) OVER (ORDER BY date ROWS UNBOUNDED PRECEDING)", true},
+		{"window with frame - between", "sum(amount) OVER (ORDER BY date ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)", true},
+		{"window with frame - following", "avg(price) OVER (ORDER BY date ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING)", true},
+		{"window with range frame", "sum(amount) OVER (ORDER BY date RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)", true},
+		
+		// Advanced window function tests
+		{"window with complex partition", "lead(price, 2, 0) OVER (PARTITION BY category, brand ORDER BY date DESC)", true},
+		{"window with first_value", "first_value(name) OVER (PARTITION BY department ORDER BY salary DESC NULLS FIRST)", true},
+		{"window with nth_value", "nth_value(score, 3) OVER (ORDER BY score DESC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)", true},
+		{"window without frame but with order", "cumsum(amount) OVER (PARTITION BY user_id ORDER BY timestamp)", true},
+		{"window with range and numeric value", "sum(sales) OVER (ORDER BY date RANGE BETWEEN 30 PRECEDING AND 10 FOLLOWING)", true},
 	}
 
 	for _, tt := range tests {

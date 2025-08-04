@@ -210,3 +210,17 @@ tables:
         - name: created_at
           data_type: DateTime
       order_by: expression
+    - name: sales_data
+      database: analytics
+      operation: CREATE
+      engine: MergeTree
+      columns:
+        - name: date
+          data_type: Date
+        - name: region
+          data_type: String
+        - name: product_id
+          data_type: UInt64
+        - name: sales_amount
+          data_type: Decimal(10, 2)
+      order_by: expression

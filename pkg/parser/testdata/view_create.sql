@@ -68,3 +68,40 @@ AS SELECT
 FROM `events-table` 
 GROUP BY `timestamp`;
 
+
+
+-- CREATE VIEW with window functions
+CREATE VIEW analytics.user_rankings AS
+SELECT 
+    user_id,
+    name,
+    score,
+    row_number() OVER (ORDER BY score DESC) as rank,
+    rank() OVER (PARTITION BY category ORDER BY score DESC) as category_rank,
+    lag(score, 1) OVER (ORDER BY score DESC) as prev_score
+FROM user_scores
+ORDER BY score DESC;
+
+-- CREATE MATERIALIZED VIEW with complex window functions and frames
+CREATE MATERIALIZED VIEW analytics.mv_sales_trends
+ENGINE = MergeTree()
+ORDER BY (date, region)
+AS SELECT 
+    date,
+    region,
+    sales_amount,
+    sum(sales_amount) OVER (
+        PARTITION BY region 
+        ORDER BY date 
+        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) as seven_day_total,
+    avg(sales_amount) OVER (
+        PARTITION BY region 
+        ORDER BY date 
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) as running_avg,
+    dense_rank() OVER (
+        PARTITION BY date 
+        ORDER BY sales_amount DESC
+    ) as daily_rank
+FROM daily_sales;
