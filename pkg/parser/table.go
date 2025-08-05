@@ -138,7 +138,7 @@ type (
 	TableEngine struct {
 		Engine     string            `parser:"'ENGINE' '='"`
 		Name       string            `parser:"@(Ident | BacktickIdent)"`
-		Parameters []EngineParameter `parser:"'(' (@@ (',' @@)*)? ')'"`
+		Parameters []EngineParameter `parser:"('(' (@@ (',' @@)*)? ')')?"`
 	}
 
 	// EngineParameter represents a parameter in an ENGINE clause

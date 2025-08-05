@@ -379,7 +379,45 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedView.To = *view.To
 			}
 			if view.Engine != nil {
-				expectedView.Engine = view.Engine.Raw
+				// Build engine string from new ViewEngine structure
+				engineStr := view.Engine.Name
+				if len(view.Engine.Parameters) > 0 {
+					engineStr += "("
+					var params []string
+					for _, param := range view.Engine.Parameters {
+						if param.String != nil {
+							params = append(params, *param.String)
+						} else if param.Number != nil {
+							params = append(params, *param.Number)
+						} else if param.Ident != nil {
+							params = append(params, *param.Ident)
+						}
+					}
+					engineStr += strings.Join(params, ",") + ")"
+				} else {
+					// Add empty parentheses if no parameters
+					engineStr += "()"
+				}
+
+				// Add ORDER BY clause if present
+				if view.Engine.OrderBy != nil {
+					exprStr := view.Engine.OrderBy.Expression.String()
+					// Handle different formats based on whether it's a tuple or single expression
+					if len(exprStr) > 2 && exprStr[0] == '(' && exprStr[len(exprStr)-1] == ')' {
+						// Tuple expression: ORDERBY(date,user_id)
+						engineStr += "ORDERBY(" + exprStr[1:len(exprStr)-1] + ")"
+					} else {
+						// Single expression: ORDERBYdate
+						engineStr += "ORDERBY" + exprStr
+					}
+				}
+
+				// Add other clauses as needed
+				if view.Engine.PartitionBy != nil {
+					engineStr += "PARTITIONBY(" + view.Engine.PartitionBy.Expression.String() + ")"
+				}
+
+				expectedView.Engine = engineStr
 			}
 			expectedViews = append(expectedViews, expectedView)
 

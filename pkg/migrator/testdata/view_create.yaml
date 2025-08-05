@@ -6,7 +6,7 @@ target_sql: |
 expected_migration:
   up_contains:
     - "CREATE VIEW analytics.daily_summary AS SELECTdate,count(*)astotalFROMeventsGROUPBYdate;"
-    - "CREATE MATERIALIZED VIEW analytics.mv_daily_stats ENGINE = MergeTree()ORDERBYdate AS SELECTtoDate(timestamp)asdate,count()ascntFROMeventsGROUPBYdate;"
+    - "CREATE MATERIALIZED VIEW analytics.mv_daily_stats ENGINE = MergeTree() ORDER BY date AS SELECTtoDate(timestamp)asdate,count()ascntFROMeventsGROUPBYdate;"
   down_contains:
     - "DROP VIEW IF EXISTS analytics.daily_summary;"
     - "DROP TABLE IF EXISTS analytics.mv_daily_stats;"
@@ -14,3 +14,4 @@ expected_migration:
   diff_types:
     - "CREATE"
     - "CREATE"
+

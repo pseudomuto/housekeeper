@@ -4,6 +4,7 @@ views:
       operation: ATTACH
     - name: users_view
       operation: ATTACH
+      if_not_exists: true
     - name: stats_view
       cluster: production
       operation: ATTACH

@@ -4,6 +4,7 @@ views:
       operation: CREATE
     - name: users_view
       operation: CREATE
+      if_not_exists: true
     - name: stats_view
       cluster: production
       operation: CREATE
@@ -37,6 +38,7 @@ views:
       or_replace: true
       materialized: true
       operation: CREATE
+      if_not_exists: true
       to: analytics.destination_table
       engine: ReplacingMergeTree(version)
       populate: true

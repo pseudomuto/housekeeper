@@ -4,15 +4,19 @@ views:
       operation: DROP
     - name: users_view
       operation: DROP
+      if_exists: true
     - name: stats_view
       cluster: production
       operation: DROP
     - name: my_view
       database: db
       operation: DROP
+      sync: true
     - name: old_view
       cluster: production
       operation: DROP
+      if_exists: true
+      sync: true
 tables:
     - name: mv_daily_stats
       operation: DROP

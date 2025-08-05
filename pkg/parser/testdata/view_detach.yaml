@@ -4,18 +4,24 @@ views:
       operation: DETACH
     - name: users_view
       operation: DETACH
+      if_exists: true
     - name: stats_view
       cluster: production
       operation: DETACH
     - name: my_view
       database: db
       operation: DETACH
+      permanently: true
     - name: updated_view
       database: analytics
       operation: DETACH
+      sync: true
     - name: old_view
       cluster: production
       operation: DETACH
+      if_exists: true
+      permanently: true
+      sync: true
 tables:
     - name: mv_daily_stats
       operation: DETACH

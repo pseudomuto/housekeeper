@@ -263,7 +263,57 @@ func engineClausesAreEqual(engine1, engine2 *parser.ViewEngine) bool {
 	if engine1 == nil || engine2 == nil {
 		return false
 	}
-	return strings.TrimSpace(engine1.Raw) == strings.TrimSpace(engine2.Raw)
+	return strings.TrimSpace(buildEngineString(engine1)) == strings.TrimSpace(buildEngineString(engine2))
+}
+
+// buildEngineString builds an engine string from ViewEngine struct
+// This builds a properly formatted string with spaces for readability
+func buildEngineString(engine *parser.ViewEngine) string {
+	if engine == nil {
+		return ""
+	}
+
+	result := engine.Name
+
+	// Add parameters - always add parentheses for engines like MergeTree()
+	if len(engine.Parameters) > 0 {
+		var params []string
+		for _, param := range engine.Parameters {
+			if param.String != nil {
+				params = append(params, *param.String)
+			} else if param.Number != nil {
+				params = append(params, *param.Number)
+			} else if param.Ident != nil {
+				params = append(params, *param.Ident)
+			}
+		}
+		result += "(" + strings.Join(params, ", ") + ")"
+	} else {
+		// Add empty parentheses for engines like MergeTree()
+		result += "()"
+	}
+
+	// Add ORDER BY if present (proper format with spaces)
+	if engine.OrderBy != nil {
+		result += " ORDER BY " + engine.OrderBy.Expression.String()
+	}
+
+	// Add PARTITION BY if present (proper format with spaces)
+	if engine.PartitionBy != nil {
+		result += " PARTITION BY " + engine.PartitionBy.Expression.String()
+	}
+
+	// Add PRIMARY KEY if present (proper format with spaces)
+	if engine.PrimaryKey != nil {
+		result += " PRIMARY KEY " + engine.PrimaryKey.Expression.String()
+	}
+
+	// Add SAMPLE BY if present (proper format with spaces)
+	if engine.SampleBy != nil {
+		result += " SAMPLE BY " + engine.SampleBy.Expression.String()
+	}
+
+	return result
 }
 
 // selectClausesAreEqual compares two SELECT clauses
@@ -413,7 +463,7 @@ func generateCreateViewSQL(view *ViewInfo) string {
 	}
 
 	if view.Statement.Engine != nil {
-		sql += " ENGINE = " + strings.TrimSpace(view.Statement.Engine.Raw)
+		sql += " ENGINE = " + buildEngineString(view.Statement.Engine)
 	}
 
 	if view.Statement.Populate {
