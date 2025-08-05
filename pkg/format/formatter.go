@@ -35,6 +35,7 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -53,98 +54,228 @@ type (
 		AlignColumns bool
 	}
 
-	// formatter handles SQL statement formatting with configurable options
-	formatter struct {
+	// Formatter handles SQL statement formatting with configurable options
+	Formatter struct {
 		options *FormatterOptions
 	}
 )
 
-// DefaultOptions returns standard formatting options
-func DefaultOptions() *FormatterOptions {
-	return &FormatterOptions{
-		IndentSize:        4,
-		MaxLineLength:     120,
-		UppercaseKeywords: true,
-		AlignColumns:      true,
-	}
+// Defaults provides the standard formatting options for ClickHouse DDL statements.
+//
+// These defaults use:
+//   - 4-space indentation
+//   - Uppercase SQL keywords
+//   - Column alignment in table definitions
+//   - 120 character line length suggestion
+var Defaults = FormatterOptions{
+	IndentSize:        4,
+	MaxLineLength:     120,
+	UppercaseKeywords: true,
+	AlignColumns:      true,
 }
 
-// Format formats one or more statements with the given options
-func Format(options *FormatterOptions, statements ...*parser.Statement) string {
+// New creates a new Formatter with the specified options.
+//
+// To use default options, pass format.Defaults. The returned Formatter
+// can be used to format ClickHouse DDL statements with consistent styling.
+//
+// Example:
+//
+//	import (
+//		"bytes"
+//		"fmt"
+//		"github.com/pseudomuto/housekeeper/pkg/format"
+//		"github.com/pseudomuto/housekeeper/pkg/parser"
+//	)
+//
+//	// Create formatter with default options
+//	formatter := format.New(format.Defaults)
+//
+//	// Create formatter with custom options
+//	formatter := format.New(format.FormatterOptions{
+//		IndentSize:        2,
+//		UppercaseKeywords: false,
+//		AlignColumns:      true,
+//	})
+//
+//	// Parse SQL statement
+//	grammar, err := parser.ParseSQL("CREATE TABLE users (id UInt64, name String) ENGINE = MergeTree();")
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// Format to buffer
+//	var buf bytes.Buffer
+//	err = formatter.Format(&buf, grammar.Statements...)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	fmt.Println(buf.String())
+//	// Output:
+//	// CREATE TABLE `users` (
+//	//     `id`   UInt64,
+//	//     `name` String
+//	// )
+//	// ENGINE = MergeTree();
+func New(options FormatterOptions) *Formatter {
+	return &Formatter{options: &options}
+}
+
+// Format provides a convenient way to format statements without creating a Formatter instance.
+//
+// This is equivalent to calling New(&opts).Format(w, statements...) but more concise
+// when you only need to format statements once.
+//
+// Example:
+//
+//	import (
+//		"bytes"
+//		"github.com/pseudomuto/housekeeper/pkg/format"
+//		"github.com/pseudomuto/housekeeper/pkg/parser"
+//	)
+//
+//	grammar, _ := parser.ParseSQL("CREATE DATABASE test;")
+//	var buf bytes.Buffer
+//	err := format.Format(&buf, format.Defaults, grammar.Statements...)
+//	if err != nil {
+//		panic(err)
+//	}
+func Format(w io.Writer, opts FormatterOptions, statements ...*parser.Statement) error {
+	return New(opts).Format(w, statements...)
+}
+
+// FormatGrammar provides a convenient way to format all statements from a parsed grammar.
+//
+// This is equivalent to calling Format(w, opts, grammar.Statements...) but more concise
+// when you have a complete parsed grammar object.
+//
+// Example:
+//
+//	import (
+//		"bytes"
+//		"github.com/pseudomuto/housekeeper/pkg/format"
+//		"github.com/pseudomuto/housekeeper/pkg/parser"
+//	)
+//
+//	grammar, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
+//	var buf bytes.Buffer
+//	err := format.FormatGrammar(&buf, format.Defaults, grammar)
+//	if err != nil {
+//		panic(err)
+//	}
+func FormatGrammar(w io.Writer, opts FormatterOptions, grammar *parser.Grammar) error {
+	if grammar == nil {
+		return nil
+	}
+	return Format(w, opts, grammar.Statements...)
+}
+
+// Format writes formatted SQL statements to the provided writer.
+//
+// Each statement is formatted according to the formatter's configuration and
+// written to the writer. Multiple statements are separated by double newlines.
+// Any write errors are returned immediately.
+//
+// Parameters:
+//   - w: The io.Writer to write formatted SQL to
+//   - statements: Variable number of parsed statements to format
+//
+// Returns an error if any write operation fails, nil otherwise.
+func (f *Formatter) Format(w io.Writer, statements ...*parser.Statement) error {
 	if len(statements) == 0 {
-		return ""
+		return nil
 	}
 
-	f := newFormatter(options)
-	formattedStmts := make([]string, 0, len(statements))
-
+	first := true
 	for _, stmt := range statements {
-		if formatted := f.statement(stmt); formatted != "" {
-			formattedStmts = append(formattedStmts, formatted)
+		if stmt == nil {
+			continue
 		}
-	}
 
-	return strings.Join(formattedStmts, "\n\n")
+		if !first {
+			if _, err := w.Write([]byte("\n\n")); err != nil {
+				return err
+			}
+		}
+
+		if err := f.statement(w, stmt); err != nil {
+			return err
+		}
+		first = false
+	}
+	return nil
+}
+
+// FormatGrammar formats all statements from a parsed grammar using this formatter's configuration.
+//
+// This is equivalent to calling f.Format(w, grammar.Statements...) but more concise
+// when you have a complete parsed grammar object.
+func (f *Formatter) FormatGrammar(w io.Writer, grammar *parser.Grammar) error {
+	if grammar == nil {
+		return nil
+	}
+	return f.Format(w, grammar.Statements...)
 }
 
 // statement formats a complete parser statement
-func (f *formatter) statement(stmt *parser.Statement) string {
+func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 	if stmt == nil {
-		return ""
+		return nil
 	}
 
 	switch {
 	case stmt.CreateDatabase != nil:
-		return f.createDatabase(stmt.CreateDatabase)
+		return f.createDatabase(w, stmt.CreateDatabase)
 	case stmt.AlterDatabase != nil:
-		return f.alterDatabase(stmt.AlterDatabase)
+		return f.alterDatabase(w, stmt.AlterDatabase)
 	case stmt.AttachDatabase != nil:
-		return f.attachDatabase(stmt.AttachDatabase)
+		return f.attachDatabase(w, stmt.AttachDatabase)
 	case stmt.DetachDatabase != nil:
-		return f.detachDatabase(stmt.DetachDatabase)
+		return f.detachDatabase(w, stmt.DetachDatabase)
 	case stmt.DropDatabase != nil:
-		return f.dropDatabase(stmt.DropDatabase)
+		return f.dropDatabase(w, stmt.DropDatabase)
 	case stmt.RenameDatabase != nil:
-		return f.renameDatabase(stmt.RenameDatabase)
+		return f.renameDatabase(w, stmt.RenameDatabase)
 	case stmt.CreateTable != nil:
-		return f.createTable(stmt.CreateTable)
+		return f.createTable(w, stmt.CreateTable)
 	case stmt.AlterTable != nil:
-		return f.alterTable(stmt.AlterTable)
+		return f.alterTable(w, stmt.AlterTable)
 	case stmt.AttachTable != nil:
-		return f.attachTable(stmt.AttachTable)
+		return f.attachTable(w, stmt.AttachTable)
 	case stmt.DetachTable != nil:
-		return f.detachTable(stmt.DetachTable)
+		return f.detachTable(w, stmt.DetachTable)
 	case stmt.DropTable != nil:
-		return f.dropTable(stmt.DropTable)
+		return f.dropTable(w, stmt.DropTable)
 	case stmt.RenameTable != nil:
-		return f.renameTable(stmt.RenameTable)
+		return f.renameTable(w, stmt.RenameTable)
 	case stmt.CreateDictionary != nil:
-		return f.createDictionary(stmt.CreateDictionary)
+		return f.createDictionary(w, stmt.CreateDictionary)
 	case stmt.AttachDictionary != nil:
-		return f.attachDictionary(stmt.AttachDictionary)
+		return f.attachDictionary(w, stmt.AttachDictionary)
 	case stmt.DetachDictionary != nil:
-		return f.detachDictionary(stmt.DetachDictionary)
+		return f.detachDictionary(w, stmt.DetachDictionary)
 	case stmt.DropDictionary != nil:
-		return f.dropDictionary(stmt.DropDictionary)
+		return f.dropDictionary(w, stmt.DropDictionary)
 	case stmt.RenameDictionary != nil:
-		return f.renameDictionary(stmt.RenameDictionary)
+		return f.renameDictionary(w, stmt.RenameDictionary)
 	case stmt.CreateView != nil:
-		return f.createView(stmt.CreateView)
+		return f.createView(w, stmt.CreateView)
 	case stmt.AttachView != nil:
-		return f.attachView(stmt.AttachView)
+		return f.attachView(w, stmt.AttachView)
 	case stmt.DetachView != nil:
-		return f.detachView(stmt.DetachView)
+		return f.detachView(w, stmt.DetachView)
 	case stmt.DropView != nil:
-		return f.dropView(stmt.DropView)
+		return f.dropView(w, stmt.DropView)
 	case stmt.SelectStatement != nil:
-		return f.selectStatement(stmt.SelectStatement)
+		return f.selectStatement(w, stmt.SelectStatement)
 	default:
-		return ""
+		return nil
 	}
 }
 
 // keyword formats a keyword according to the formatter options
-func (f *formatter) keyword(kw string) string {
+func (f *Formatter) keyword(kw string) string {
 	if f.options.UppercaseKeywords {
 		return strings.ToUpper(kw)
 	}
@@ -152,12 +283,12 @@ func (f *formatter) keyword(kw string) string {
 }
 
 // indent returns the specified number of indent levels as spaces
-func (f *formatter) indent(level int) string {
+func (f *Formatter) indent(level int) string {
 	return strings.Repeat(" ", level*f.options.IndentSize)
 }
 
 // qualifiedName formats a database-qualified name with backticks
-func (f *formatter) qualifiedName(database *string, name string) string {
+func (f *Formatter) qualifiedName(database *string, name string) string {
 	if database != nil && *database != "" {
 		return "`" + *database + "`.`" + name + "`"
 	}
@@ -165,14 +296,6 @@ func (f *formatter) qualifiedName(database *string, name string) string {
 }
 
 // identifier formats a single identifier with backticks
-func (f *formatter) identifier(name string) string {
+func (f *Formatter) identifier(name string) string {
 	return "`" + name + "`"
-}
-
-// newFormatter creates a new formatter with the specified options
-func newFormatter(options *FormatterOptions) *formatter {
-	if options == nil {
-		options = DefaultOptions()
-	}
-	return &formatter{options: options}
 }

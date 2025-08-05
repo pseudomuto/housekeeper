@@ -1,12 +1,13 @@
 package format_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/pseudomuto/housekeeper/pkg/format"
+	. "github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/golden"
@@ -36,7 +37,10 @@ func TestGoldenFiles(t *testing.T) {
 			require.NoError(t, err, "Failed to parse SQL from %s", inputFile)
 
 			// Format all statements using the new API
-			result := format.Format(format.DefaultOptions(), grammar.Statements...)
+			var buf bytes.Buffer
+			err = Format(&buf, Defaults, grammar.Statements...)
+			require.NoError(t, err)
+			result := buf.String()
 
 			// Add final newline for proper file ending
 			if result != "" {

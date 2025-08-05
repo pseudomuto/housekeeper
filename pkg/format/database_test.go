@@ -1,11 +1,11 @@
 package format_test
 
 import (
+	"bytes"
 	"testing"
 
-	"github.com/pseudomuto/housekeeper/pkg/format"
+	. "github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,8 +43,11 @@ func TestFormatter_Database(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, grammar.Statements, 1)
 
-			formatted := format.Format(format.DefaultOptions(), grammar.Statements[0])
-			assert.Equal(t, tt.expected, formatted)
+			var buf bytes.Buffer
+			err = Format(&buf, Defaults, grammar.Statements[0])
+			require.NoError(t, err)
+			formatted := buf.String()
+			require.Equal(t, tt.expected, formatted)
 		})
 	}
 }

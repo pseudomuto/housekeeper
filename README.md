@@ -9,6 +9,7 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 - **Modern Parser**: Built with participle v2 for robust, maintainable ClickHouse DDL parsing
 - **Complete DDL Support**: Full support for databases, dictionaries, views, and table operations
 - **Complete Query Engine**: Full SELECT statement parsing with joins, subqueries, CTEs, and window functions
+- **SQL Formatting**: Professional SQL output with configurable styling, indentation, and ClickHouse-optimized backtick formatting
 - **Intelligent Migrations**: Smart comparison and migration generation with proper operation ordering
 - **Expression Engine**: Advanced expression parsing with proper operator precedence
 - **Cluster-Aware**: Full support for `ON CLUSTER` distributed DDL operations
@@ -562,6 +563,73 @@ See the `examples/` directory for comprehensive sample schema files demonstratin
 
 The parser can be used programmatically for schema analysis and custom tooling:
 
+### SQL Formatting
+
+The format package provides professional SQL formatting for ClickHouse DDL statements:
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "log"
+    
+    "github.com/pseudomuto/housekeeper/pkg/format"
+    "github.com/pseudomuto/housekeeper/pkg/parser"
+)
+
+func main() {
+    // Parse SQL statements
+    sql := `CREATE DATABASE analytics ENGINE = Atomic; CREATE TABLE analytics.events (id UUID, timestamp DateTime) ENGINE = MergeTree ORDER BY timestamp;`
+    
+    grammar, err := parser.ParseSQL(sql)
+    if err != nil {
+        log.Fatalf("Parse error: %v", err)
+    }
+    
+    // Format with custom options
+    formatter := format.New(format.FormatterOptions{
+        IndentSize:        2,
+        UppercaseKeywords: false,
+        AlignColumns:      true,
+    })
+    
+    var buf bytes.Buffer
+    err = formatter.Format(&buf, grammar.Statements...)
+    if err != nil {
+        log.Fatalf("Format error: %v", err)
+    }
+    
+    fmt.Println(buf.String())
+    // Output:
+    // create database `analytics` engine = Atomic();
+    //
+    // create table `analytics`.`events` (
+    //   `id`        UUID,
+    //   `timestamp` DateTime
+    // )
+    // engine = MergeTree()
+    // order by `timestamp`;
+    
+    // Or use the convenience function with defaults
+    var buf2 bytes.Buffer
+    err = format.Format(&buf2, format.Defaults, grammar.Statements...)
+    if err != nil {
+        log.Fatalf("Format error: %v", err)
+    }
+    
+    // Or format the entire grammar at once
+    var buf3 bytes.Buffer
+    err = format.FormatGrammar(&buf3, format.Defaults, grammar)
+    if err != nil {
+        log.Fatalf("Format error: %v", err)
+    }
+}
+```
+
+### Schema Analysis
+
 ```go
 package main
 
@@ -847,6 +915,7 @@ Housekeeper is built with a modern, extensible architecture designed for reliabi
 - **Participle-based Parser**: Modern parsing using structured grammar rules instead of regex patterns
 - **Query Engine**: Complete SELECT statement parsing with joins, subqueries, CTEs, and window functions
 - **Expression Engine**: Comprehensive expression parsing with proper operator precedence
+- **SQL Formatter**: Professional SQL formatting with configurable styling and ClickHouse-optimized output
 - **Schema Comparison**: Intelligent difference detection between current and target schemas
 - **Migration Generator**: Creates executable up/down SQL migrations with proper operation ordering
 - **ClickHouse Client**: Connects and reads current schema state from live instances
@@ -968,6 +1037,7 @@ Housekeeper provides a comprehensive solution for ClickHouse schema management w
 - **Complete Dictionary Operations**: Full lifecycle management with complex attributes and all ClickHouse features  
 - **Complete View Operations**: Regular and materialized views with ENGINE support and proper migration strategies
 - **Complete Query Engine**: Full SELECT statement parsing with CTEs, joins, window functions, and subqueries
+- **Professional SQL Formatting**: Configurable styling, proper indentation, backtick formatting, and column alignment
 - **Advanced Expression Engine**: Comprehensive expression parsing with proper operator precedence
 - **Intelligent Migrations**: Smart comparison algorithms with rename detection and proper operation ordering
 - **Robust Testing**: Extensive testdata-driven test suite with automatic YAML generation
@@ -977,6 +1047,7 @@ Housekeeper provides a comprehensive solution for ClickHouse schema management w
 
 - **Production Ready**: Battle-tested parser with comprehensive ClickHouse DDL support
 - **Maintainable**: Clear grammar rules instead of complex regex patterns
+- **Professional Output**: Clean, formatted SQL with consistent styling and ClickHouse best practices
 - **Extensible**: Easy to add new ClickHouse features as they emerge
 - **Reliable**: Extensive test coverage with both parsing and migration test suites
 - **Intelligent**: Rename detection avoids unnecessary DROP+CREATE operations

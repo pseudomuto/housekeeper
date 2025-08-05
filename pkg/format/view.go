@@ -1,13 +1,14 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // CreateView formats a CREATE VIEW statement (both regular and materialized)
-func (f *formatter) createView(stmt *parser.CreateViewStmt) string {
+func (f *Formatter) createView(w io.Writer, stmt *parser.CreateViewStmt) error {
 	var lines []string
 
 	// Build the header line
@@ -62,11 +63,12 @@ func (f *formatter) createView(stmt *parser.CreateViewStmt) string {
 		lines = append(lines, f.keyword("AS")+" "+f.formatSelectStatement(stmt.AsSelect))
 	}
 
-	return strings.Join(lines, "\n") + ";"
+	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+	return err
 }
 
 // AttachView formats an ATTACH VIEW statement
-func (f *formatter) attachView(stmt *parser.AttachViewStmt) string {
+func (f *Formatter) attachView(w io.Writer, stmt *parser.AttachViewStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH VIEW"))
@@ -81,11 +83,12 @@ func (f *formatter) attachView(stmt *parser.AttachViewStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DetachView formats a DETACH VIEW statement
-func (f *formatter) detachView(stmt *parser.DetachViewStmt) string {
+func (f *Formatter) detachView(w io.Writer, stmt *parser.DetachViewStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH VIEW"))
@@ -108,11 +111,12 @@ func (f *formatter) detachView(stmt *parser.DetachViewStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DropView formats a DROP VIEW statement
-func (f *formatter) dropView(stmt *parser.DropViewStmt) string {
+func (f *Formatter) dropView(w io.Writer, stmt *parser.DropViewStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP VIEW"))
@@ -131,11 +135,12 @@ func (f *formatter) dropView(stmt *parser.DropViewStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // formatViewEngine formats a materialized view ENGINE clause with optional DDL
-func (f *formatter) formatViewEngine(engine *parser.ViewEngine) string {
+func (f *Formatter) formatViewEngine(engine *parser.ViewEngine) string {
 	if engine == nil {
 		return ""
 	}

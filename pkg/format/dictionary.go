@@ -1,13 +1,14 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // CreateDictionary formats a CREATE DICTIONARY statement
-func (f *formatter) createDictionary(stmt *parser.CreateDictionaryStmt) string {
+func (f *Formatter) createDictionary(w io.Writer, stmt *parser.CreateDictionaryStmt) error {
 	var lines []string
 
 	// Build the header line
@@ -80,11 +81,12 @@ func (f *formatter) createDictionary(stmt *parser.CreateDictionaryStmt) string {
 		lines = append(lines, f.keyword("COMMENT")+" "+*stmt.Comment)
 	}
 
-	return strings.Join(lines, "\n") + ";"
+	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+	return err
 }
 
 // AttachDictionary formats an ATTACH DICTIONARY statement
-func (f *formatter) attachDictionary(stmt *parser.AttachDictionaryStmt) string {
+func (f *Formatter) attachDictionary(w io.Writer, stmt *parser.AttachDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH DICTIONARY"))
@@ -99,11 +101,12 @@ func (f *formatter) attachDictionary(stmt *parser.AttachDictionaryStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DetachDictionary formats a DETACH DICTIONARY statement
-func (f *formatter) detachDictionary(stmt *parser.DetachDictionaryStmt) string {
+func (f *Formatter) detachDictionary(w io.Writer, stmt *parser.DetachDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH DICTIONARY"))
@@ -126,11 +129,12 @@ func (f *formatter) detachDictionary(stmt *parser.DetachDictionaryStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DropDictionary formats a DROP DICTIONARY statement
-func (f *formatter) dropDictionary(stmt *parser.DropDictionaryStmt) string {
+func (f *Formatter) dropDictionary(w io.Writer, stmt *parser.DropDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP DICTIONARY"))
@@ -149,11 +153,12 @@ func (f *formatter) dropDictionary(stmt *parser.DropDictionaryStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // RenameDictionary formats a RENAME DICTIONARY statement
-func (f *formatter) renameDictionary(stmt *parser.RenameDictionaryStmt) string {
+func (f *Formatter) renameDictionary(w io.Writer, stmt *parser.RenameDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("RENAME DICTIONARY"))
@@ -170,11 +175,12 @@ func (f *formatter) renameDictionary(stmt *parser.RenameDictionaryStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // formatDictionaryColumns formats dictionary column definitions
-func (f *formatter) formatDictionaryColumns(columns []*parser.DictionaryColumn) []string {
+func (f *Formatter) formatDictionaryColumns(columns []*parser.DictionaryColumn) []string {
 	if len(columns) == 0 {
 		return nil
 	}
@@ -202,7 +208,7 @@ func (f *formatter) formatDictionaryColumns(columns []*parser.DictionaryColumn) 
 }
 
 // formatDictionaryColumn formats a single dictionary column definition
-func (f *formatter) formatDictionaryColumn(col *parser.DictionaryColumn, alignWidth int) string {
+func (f *Formatter) formatDictionaryColumn(col *parser.DictionaryColumn, alignWidth int) string {
 	parts := make([]string, 0, 6) // Approximate capacity for typical column parts
 
 	// Column name (with optional alignment)
@@ -230,7 +236,7 @@ func (f *formatter) formatDictionaryColumn(col *parser.DictionaryColumn, alignWi
 }
 
 // formatDictionarySource formats a dictionary source specification
-func (f *formatter) formatDictionarySource(source *parser.DictionarySource) string {
+func (f *Formatter) formatDictionarySource(source *parser.DictionarySource) string {
 	if source == nil {
 		return ""
 	}
@@ -250,7 +256,7 @@ func (f *formatter) formatDictionarySource(source *parser.DictionarySource) stri
 }
 
 // formatDictionaryLayout formats a dictionary layout specification
-func (f *formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) string {
+func (f *Formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) string {
 	if layout == nil {
 		return ""
 	}
@@ -270,7 +276,7 @@ func (f *formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) stri
 }
 
 // formatDictionaryLifetime formats a dictionary lifetime specification
-func (f *formatter) formatDictionaryLifetime(lifetime *parser.DictionaryLifetime) string {
+func (f *Formatter) formatDictionaryLifetime(lifetime *parser.DictionaryLifetime) string {
 	if lifetime == nil {
 		return ""
 	}
@@ -289,7 +295,7 @@ func (f *formatter) formatDictionaryLifetime(lifetime *parser.DictionaryLifetime
 }
 
 // formatDictionarySettings formats dictionary settings
-func (f *formatter) formatDictionarySettings(settings *parser.DictionarySettings) string {
+func (f *Formatter) formatDictionarySettings(settings *parser.DictionarySettings) string {
 	if settings == nil || len(settings.Settings) == 0 {
 		return ""
 	}

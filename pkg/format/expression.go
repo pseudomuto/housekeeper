@@ -7,7 +7,7 @@ import (
 )
 
 // formatExpression formats an expression
-func (f *formatter) formatExpression(expr *parser.Expression) string {
+func (f *Formatter) formatExpression(expr *parser.Expression) string {
 	if expr == nil {
 		return ""
 	}
@@ -15,7 +15,7 @@ func (f *formatter) formatExpression(expr *parser.Expression) string {
 }
 
 // formatDataType formats a data type specification
-func (f *formatter) formatDataType(dataType *parser.DataType) string {
+func (f *Formatter) formatDataType(dataType *parser.DataType) string {
 	if dataType == nil {
 		return ""
 	}
@@ -47,7 +47,7 @@ func (f *formatter) formatDataType(dataType *parser.DataType) string {
 }
 
 // formatSimpleDataType formats a simple data type
-func (f *formatter) formatSimpleDataType(simple *parser.SimpleType) string {
+func (f *Formatter) formatSimpleDataType(simple *parser.SimpleType) string {
 	if simple == nil {
 		return ""
 	}
@@ -72,7 +72,7 @@ func (f *formatter) formatSimpleDataType(simple *parser.SimpleType) string {
 }
 
 // formatTupleDataType formats a tuple data type
-func (f *formatter) formatTupleDataType(tuple *parser.TupleType) string {
+func (f *Formatter) formatTupleDataType(tuple *parser.TupleType) string {
 	if tuple == nil || len(tuple.Elements) == 0 {
 		return "Tuple()"
 	}
@@ -93,7 +93,7 @@ func (f *formatter) formatTupleDataType(tuple *parser.TupleType) string {
 }
 
 // formatNestedDataType formats a nested data type
-func (f *formatter) formatNestedDataType(nested *parser.NestedType) string {
+func (f *Formatter) formatNestedDataType(nested *parser.NestedType) string {
 	if nested == nil || len(nested.Columns) == 0 {
 		return "Nested()"
 	}
@@ -108,7 +108,7 @@ func (f *formatter) formatNestedDataType(nested *parser.NestedType) string {
 }
 
 // formatCodec formats a codec specification
-func (f *formatter) formatCodec(codec *parser.CodecClause) string {
+func (f *Formatter) formatCodec(codec *parser.CodecClause) string {
 	if codec == nil || len(codec.Codecs) == 0 {
 		return ""
 	}
