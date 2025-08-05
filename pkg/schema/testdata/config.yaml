@@ -1,0 +1,15 @@
+environments:
+  - name: local
+    dev: clickhouse://localhost:9000/dev
+    url: clickhouse://localhost:9000/prod
+    entrypoint: db/main.sql
+  - name: staging
+    url: clickhouse://staging:9443/staging_db
+    entrypoint: schemas/staging.sql
+  - name: production
+    url: clickhouse://prod:9443/prod_db
+    entrypoint: schemas/production.sql
+  - name: special-chars_123
+    dev: "clickhouse://user:p@ss@host:9000/db-name"
+    url: "clickhouse://user:complex!pass@host:9443/prod_db"
+    entrypoint: "schemas/special chars & symbols.sql"
