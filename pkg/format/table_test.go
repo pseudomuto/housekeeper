@@ -55,15 +55,13 @@ func TestFormatter_Table(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, grammar.Statements, 1)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			formatted := format.Format(format.DefaultOptions(), grammar.Statements[0])
 			lines := strings.Split(formatted, "\n")
 
 			// Compare line by line for better error reporting
@@ -75,7 +73,7 @@ func TestFormatter_Table(t *testing.T) {
 	}
 }
 
-func TestFormatter_AlterTable(t *testing.T) {
+func TestFormatter_alterTable(t *testing.T) {
 	tests := []struct {
 		name     string
 		sql      string
@@ -171,15 +169,13 @@ func TestFormatter_AlterTable(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, grammar.Statements, 1)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			formatted := format.Format(format.DefaultOptions(), grammar.Statements[0])
 			lines := strings.Split(formatted, "\n")
 
 			require.Len(t, lines, len(tt.expected), "Number of lines mismatch")

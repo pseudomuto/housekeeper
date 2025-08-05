@@ -7,7 +7,7 @@ import (
 )
 
 // CreateView formats a CREATE VIEW statement (both regular and materialized)
-func (f *Formatter) CreateView(stmt *parser.CreateViewStmt) string {
+func (f *formatter) createView(stmt *parser.CreateViewStmt) string {
 	var lines []string
 
 	// Build the header line
@@ -66,7 +66,7 @@ func (f *Formatter) CreateView(stmt *parser.CreateViewStmt) string {
 }
 
 // AttachView formats an ATTACH VIEW statement
-func (f *Formatter) AttachView(stmt *parser.AttachViewStmt) string {
+func (f *formatter) attachView(stmt *parser.AttachViewStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH VIEW"))
@@ -85,7 +85,7 @@ func (f *Formatter) AttachView(stmt *parser.AttachViewStmt) string {
 }
 
 // DetachView formats a DETACH VIEW statement
-func (f *Formatter) DetachView(stmt *parser.DetachViewStmt) string {
+func (f *formatter) detachView(stmt *parser.DetachViewStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH VIEW"))
@@ -112,7 +112,7 @@ func (f *Formatter) DetachView(stmt *parser.DetachViewStmt) string {
 }
 
 // DropView formats a DROP VIEW statement
-func (f *Formatter) DropView(stmt *parser.DropViewStmt) string {
+func (f *formatter) dropView(stmt *parser.DropViewStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP VIEW"))
@@ -135,7 +135,7 @@ func (f *Formatter) DropView(stmt *parser.DropViewStmt) string {
 }
 
 // formatViewEngine formats a materialized view ENGINE clause with optional DDL
-func (f *Formatter) formatViewEngine(engine *parser.ViewEngine) string {
+func (f *formatter) formatViewEngine(engine *parser.ViewEngine) string {
 	if engine == nil {
 		return ""
 	}

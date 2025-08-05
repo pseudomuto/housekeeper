@@ -7,7 +7,7 @@ import (
 )
 
 // CreateDictionary formats a CREATE DICTIONARY statement
-func (f *Formatter) CreateDictionary(stmt *parser.CreateDictionaryStmt) string {
+func (f *formatter) createDictionary(stmt *parser.CreateDictionaryStmt) string {
 	var lines []string
 
 	// Build the header line
@@ -84,7 +84,7 @@ func (f *Formatter) CreateDictionary(stmt *parser.CreateDictionaryStmt) string {
 }
 
 // AttachDictionary formats an ATTACH DICTIONARY statement
-func (f *Formatter) AttachDictionary(stmt *parser.AttachDictionaryStmt) string {
+func (f *formatter) attachDictionary(stmt *parser.AttachDictionaryStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH DICTIONARY"))
@@ -103,7 +103,7 @@ func (f *Formatter) AttachDictionary(stmt *parser.AttachDictionaryStmt) string {
 }
 
 // DetachDictionary formats a DETACH DICTIONARY statement
-func (f *Formatter) DetachDictionary(stmt *parser.DetachDictionaryStmt) string {
+func (f *formatter) detachDictionary(stmt *parser.DetachDictionaryStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH DICTIONARY"))
@@ -130,7 +130,7 @@ func (f *Formatter) DetachDictionary(stmt *parser.DetachDictionaryStmt) string {
 }
 
 // DropDictionary formats a DROP DICTIONARY statement
-func (f *Formatter) DropDictionary(stmt *parser.DropDictionaryStmt) string {
+func (f *formatter) dropDictionary(stmt *parser.DropDictionaryStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP DICTIONARY"))
@@ -153,7 +153,7 @@ func (f *Formatter) DropDictionary(stmt *parser.DropDictionaryStmt) string {
 }
 
 // RenameDictionary formats a RENAME DICTIONARY statement
-func (f *Formatter) RenameDictionary(stmt *parser.RenameDictionaryStmt) string {
+func (f *formatter) renameDictionary(stmt *parser.RenameDictionaryStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("RENAME DICTIONARY"))
@@ -174,7 +174,7 @@ func (f *Formatter) RenameDictionary(stmt *parser.RenameDictionaryStmt) string {
 }
 
 // formatDictionaryColumns formats dictionary column definitions
-func (f *Formatter) formatDictionaryColumns(columns []*parser.DictionaryColumn) []string {
+func (f *formatter) formatDictionaryColumns(columns []*parser.DictionaryColumn) []string {
 	if len(columns) == 0 {
 		return nil
 	}
@@ -202,7 +202,7 @@ func (f *Formatter) formatDictionaryColumns(columns []*parser.DictionaryColumn) 
 }
 
 // formatDictionaryColumn formats a single dictionary column definition
-func (f *Formatter) formatDictionaryColumn(col *parser.DictionaryColumn, alignWidth int) string {
+func (f *formatter) formatDictionaryColumn(col *parser.DictionaryColumn, alignWidth int) string {
 	parts := make([]string, 0, 6) // Approximate capacity for typical column parts
 
 	// Column name (with optional alignment)
@@ -230,7 +230,7 @@ func (f *Formatter) formatDictionaryColumn(col *parser.DictionaryColumn, alignWi
 }
 
 // formatDictionarySource formats a dictionary source specification
-func (f *Formatter) formatDictionarySource(source *parser.DictionarySource) string {
+func (f *formatter) formatDictionarySource(source *parser.DictionarySource) string {
 	if source == nil {
 		return ""
 	}
@@ -250,7 +250,7 @@ func (f *Formatter) formatDictionarySource(source *parser.DictionarySource) stri
 }
 
 // formatDictionaryLayout formats a dictionary layout specification
-func (f *Formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) string {
+func (f *formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) string {
 	if layout == nil {
 		return ""
 	}
@@ -270,7 +270,7 @@ func (f *Formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) stri
 }
 
 // formatDictionaryLifetime formats a dictionary lifetime specification
-func (f *Formatter) formatDictionaryLifetime(lifetime *parser.DictionaryLifetime) string {
+func (f *formatter) formatDictionaryLifetime(lifetime *parser.DictionaryLifetime) string {
 	if lifetime == nil {
 		return ""
 	}
@@ -289,7 +289,7 @@ func (f *Formatter) formatDictionaryLifetime(lifetime *parser.DictionaryLifetime
 }
 
 // formatDictionarySettings formats dictionary settings
-func (f *Formatter) formatDictionarySettings(settings *parser.DictionarySettings) string {
+func (f *formatter) formatDictionarySettings(settings *parser.DictionarySettings) string {
 	if settings == nil || len(settings.Settings) == 0 {
 		return ""
 	}

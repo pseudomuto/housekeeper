@@ -37,15 +37,13 @@ func TestFormatter_Database(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, grammar.Statements, 1)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			formatted := format.Format(format.DefaultOptions(), grammar.Statements[0])
 			assert.Equal(t, tt.expected, formatted)
 		})
 	}

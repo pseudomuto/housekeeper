@@ -7,7 +7,7 @@ import (
 )
 
 // SelectStatement formats a top-level SELECT statement
-func (f *Formatter) SelectStatement(stmt *parser.TopLevelSelectStatement) string {
+func (f *formatter) selectStatement(stmt *parser.TopLevelSelectStatement) string {
 	if stmt == nil {
 		return ""
 	}
@@ -20,7 +20,7 @@ func (f *Formatter) SelectStatement(stmt *parser.TopLevelSelectStatement) string
 }
 
 // formatSelectStatement formats a SELECT statement for views and subqueries
-func (f *Formatter) formatSelectStatement(stmt *parser.SelectStatement) string {
+func (f *formatter) formatSelectStatement(stmt *parser.SelectStatement) string {
 	if stmt == nil {
 		return ""
 	}
@@ -80,7 +80,7 @@ func (f *Formatter) formatSelectStatement(stmt *parser.SelectStatement) string {
 }
 
 // formatWithClause formats WITH clause for CTEs
-func (f *Formatter) formatWithClause(with *parser.WithClause) string {
+func (f *formatter) formatWithClause(with *parser.WithClause) string {
 	if with == nil || len(with.CTEs) == 0 {
 		return ""
 	}
@@ -115,7 +115,7 @@ func (f *Formatter) formatWithClause(with *parser.WithClause) string {
 }
 
 // formatSelectColumns formats the column list in SELECT
-func (f *Formatter) formatSelectColumns(columns []parser.SelectColumn) []string {
+func (f *formatter) formatSelectColumns(columns []parser.SelectColumn) []string {
 	var result []string
 	for _, col := range columns {
 		if col.Star != nil {
@@ -132,7 +132,7 @@ func (f *Formatter) formatSelectColumns(columns []parser.SelectColumn) []string 
 }
 
 // formatFromClause formats FROM clause with joins
-func (f *Formatter) formatFromClause(from *parser.FromClause) string {
+func (f *formatter) formatFromClause(from *parser.FromClause) string {
 	if from == nil {
 		return ""
 	}
@@ -148,7 +148,7 @@ func (f *Formatter) formatFromClause(from *parser.FromClause) string {
 }
 
 // formatTableRef formats a table reference
-func (f *Formatter) formatTableRef(ref *parser.TableRef) string {
+func (f *formatter) formatTableRef(ref *parser.TableRef) string {
 	if ref == nil {
 		return ""
 	}
@@ -164,7 +164,7 @@ func (f *Formatter) formatTableRef(ref *parser.TableRef) string {
 }
 
 // formatTableNameWithAlias formats table name with optional alias
-func (f *Formatter) formatTableNameWithAlias(table *parser.TableNameWithAlias) string {
+func (f *formatter) formatTableNameWithAlias(table *parser.TableNameWithAlias) string {
 	if table == nil {
 		return ""
 	}
@@ -177,7 +177,7 @@ func (f *Formatter) formatTableNameWithAlias(table *parser.TableNameWithAlias) s
 }
 
 // formatSubqueryWithAlias formats subquery with optional alias
-func (f *Formatter) formatSubqueryWithAlias(sub *parser.SubqueryWithAlias) string {
+func (f *formatter) formatSubqueryWithAlias(sub *parser.SubqueryWithAlias) string {
 	if sub == nil {
 		return ""
 	}
@@ -190,7 +190,7 @@ func (f *Formatter) formatSubqueryWithAlias(sub *parser.SubqueryWithAlias) strin
 }
 
 // formatFunctionWithAlias formats function with optional alias
-func (f *Formatter) formatFunctionWithAlias(fn *parser.FunctionWithAlias) string {
+func (f *formatter) formatFunctionWithAlias(fn *parser.FunctionWithAlias) string {
 	if fn == nil {
 		return ""
 	}
@@ -213,7 +213,7 @@ func (f *Formatter) formatFunctionWithAlias(fn *parser.FunctionWithAlias) string
 }
 
 // formatFunctionArg formats function argument
-func (f *Formatter) formatFunctionArg(arg *parser.FunctionArg) string {
+func (f *formatter) formatFunctionArg(arg *parser.FunctionArg) string {
 	if arg == nil {
 		return ""
 	}
@@ -228,7 +228,7 @@ func (f *Formatter) formatFunctionArg(arg *parser.FunctionArg) string {
 }
 
 // formatJoinClause formats JOIN clauses
-func (f *Formatter) formatJoinClause(join *parser.JoinClause) string {
+func (f *formatter) formatJoinClause(join *parser.JoinClause) string {
 	if join == nil {
 		return ""
 	}
@@ -258,7 +258,7 @@ func (f *Formatter) formatJoinClause(join *parser.JoinClause) string {
 }
 
 // formatWhereClause formats WHERE clause
-func (f *Formatter) formatWhereClause(where *parser.WhereClause) string {
+func (f *formatter) formatWhereClause(where *parser.WhereClause) string {
 	if where == nil {
 		return ""
 	}
@@ -266,7 +266,7 @@ func (f *Formatter) formatWhereClause(where *parser.WhereClause) string {
 }
 
 // formatGroupByClause formats GROUP BY clause
-func (f *Formatter) formatGroupByClause(groupBy *parser.GroupByClause) string {
+func (f *formatter) formatGroupByClause(groupBy *parser.GroupByClause) string {
 	if groupBy == nil || len(groupBy.Columns) == 0 {
 		return ""
 	}
@@ -285,7 +285,7 @@ func (f *Formatter) formatGroupByClause(groupBy *parser.GroupByClause) string {
 }
 
 // formatHavingClause formats HAVING clause
-func (f *Formatter) formatHavingClause(having *parser.HavingClause) string {
+func (f *formatter) formatHavingClause(having *parser.HavingClause) string {
 	if having == nil {
 		return ""
 	}
@@ -293,7 +293,7 @@ func (f *Formatter) formatHavingClause(having *parser.HavingClause) string {
 }
 
 // formatSelectOrderByClause formats ORDER BY clause for SELECT
-func (f *Formatter) formatSelectOrderByClause(orderBy *parser.SelectOrderByClause) string {
+func (f *formatter) formatSelectOrderByClause(orderBy *parser.SelectOrderByClause) string {
 	if orderBy == nil || len(orderBy.Columns) == 0 {
 		return ""
 	}
@@ -316,7 +316,7 @@ func (f *Formatter) formatSelectOrderByClause(orderBy *parser.SelectOrderByClaus
 }
 
 // formatLimitClause formats LIMIT clause
-func (f *Formatter) formatLimitClause(limit *parser.LimitClause) string {
+func (f *formatter) formatLimitClause(limit *parser.LimitClause) string {
 	if limit == nil {
 		return ""
 	}
@@ -329,7 +329,7 @@ func (f *Formatter) formatLimitClause(limit *parser.LimitClause) string {
 }
 
 // formatSettingsClause formats SETTINGS clause for SELECT
-func (f *Formatter) formatSettingsClause(settings *parser.SettingsClause) string {
+func (f *formatter) formatSettingsClause(settings *parser.SettingsClause) string {
 	if settings == nil || len(settings.Values) == 0 {
 		return ""
 	}
@@ -342,7 +342,7 @@ func (f *Formatter) formatSettingsClause(settings *parser.SettingsClause) string
 }
 
 // appendSelectColumns appends SELECT columns to lines, handling single/multiple line formatting
-func (f *Formatter) appendSelectColumns(lines []string, selectLine string, columns []parser.SelectColumn) []string {
+func (f *formatter) appendSelectColumns(lines []string, selectLine string, columns []parser.SelectColumn) []string {
 	if len(columns) == 0 {
 		return append(lines, selectLine)
 	}

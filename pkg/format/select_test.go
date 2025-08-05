@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFormatter_SelectStatement(t *testing.T) {
+func TestFormatter_selectStatement(t *testing.T) {
 	tests := []struct {
 		name     string
 		sql      string
@@ -167,8 +167,6 @@ func TestFormatter_SelectStatement(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
@@ -176,7 +174,7 @@ func TestFormatter_SelectStatement(t *testing.T) {
 			require.Len(t, grammar.Statements, 1)
 			require.NotNil(t, grammar.Statements[0].SelectStatement)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			formatted := format.Format(format.DefaultOptions(), grammar.Statements[0])
 			lines := strings.Split(formatted, "\n")
 
 			// Compare line by line for better error reporting
@@ -219,15 +217,13 @@ func TestFormatter_SelectInView(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, grammar.Statements, 1)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			formatted := format.Format(format.DefaultOptions(), grammar.Statements[0])
 			lines := strings.Split(formatted, "\n")
 
 			// Compare line by line for better error reporting

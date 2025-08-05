@@ -7,7 +7,7 @@ import (
 )
 
 // CreateDatabase formats a CREATE DATABASE statement
-func (f *Formatter) CreateDatabase(stmt *parser.CreateDatabaseStmt) string {
+func (f *formatter) createDatabase(stmt *parser.CreateDatabaseStmt) string {
 	var parts []string
 
 	// CREATE DATABASE
@@ -40,7 +40,7 @@ func (f *Formatter) CreateDatabase(stmt *parser.CreateDatabaseStmt) string {
 }
 
 // AlterDatabase formats an ALTER DATABASE statement
-func (f *Formatter) AlterDatabase(stmt *parser.AlterDatabaseStmt) string {
+func (f *formatter) alterDatabase(stmt *parser.AlterDatabaseStmt) string {
 	var parts []string
 
 	// ALTER DATABASE
@@ -60,7 +60,7 @@ func (f *Formatter) AlterDatabase(stmt *parser.AlterDatabaseStmt) string {
 }
 
 // AttachDatabase formats an ATTACH DATABASE statement
-func (f *Formatter) AttachDatabase(stmt *parser.AttachDatabaseStmt) string {
+func (f *formatter) attachDatabase(stmt *parser.AttachDatabaseStmt) string {
 	var parts []string
 
 	// ATTACH DATABASE
@@ -88,7 +88,7 @@ func (f *Formatter) AttachDatabase(stmt *parser.AttachDatabaseStmt) string {
 }
 
 // DetachDatabase formats a DETACH DATABASE statement
-func (f *Formatter) DetachDatabase(stmt *parser.DetachDatabaseStmt) string {
+func (f *formatter) detachDatabase(stmt *parser.DetachDatabaseStmt) string {
 	var parts []string
 
 	// DETACH DATABASE
@@ -121,7 +121,7 @@ func (f *Formatter) DetachDatabase(stmt *parser.DetachDatabaseStmt) string {
 }
 
 // DropDatabase formats a DROP DATABASE statement
-func (f *Formatter) DropDatabase(stmt *parser.DropDatabaseStmt) string {
+func (f *formatter) dropDatabase(stmt *parser.DropDatabaseStmt) string {
 	var parts []string
 
 	// DROP DATABASE
@@ -149,7 +149,7 @@ func (f *Formatter) DropDatabase(stmt *parser.DropDatabaseStmt) string {
 }
 
 // RenameDatabase formats a RENAME DATABASE statement
-func (f *Formatter) RenameDatabase(stmt *parser.RenameDatabaseStmt) string {
+func (f *formatter) renameDatabase(stmt *parser.RenameDatabaseStmt) string {
 	var parts []string
 
 	// RENAME DATABASE
@@ -171,7 +171,7 @@ func (f *Formatter) RenameDatabase(stmt *parser.RenameDatabaseStmt) string {
 }
 
 // formatDatabaseEngine formats a database engine specification
-func (f *Formatter) formatDatabaseEngine(engine *parser.DatabaseEngine) string {
+func (f *formatter) formatDatabaseEngine(engine *parser.DatabaseEngine) string {
 	if engine == nil {
 		return ""
 	}

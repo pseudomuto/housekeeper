@@ -7,7 +7,7 @@ import (
 )
 
 // CreateTable formats a CREATE TABLE statement with proper indentation and alignment
-func (f *Formatter) CreateTable(stmt *parser.CreateTableStmt) string {
+func (f *formatter) createTable(stmt *parser.CreateTableStmt) string {
 	lines := make([]string, 0, 10) // Approximate capacity for typical table
 
 	// Build the header line
@@ -88,7 +88,7 @@ func (f *Formatter) CreateTable(stmt *parser.CreateTableStmt) string {
 }
 
 // AlterTable formats an ALTER TABLE statement
-func (f *Formatter) AlterTable(stmt *parser.AlterTableStmt) string {
+func (f *formatter) alterTable(stmt *parser.AlterTableStmt) string {
 	lines := make([]string, 0, len(stmt.Operations)+1) // Header + operations
 
 	// Header
@@ -118,7 +118,7 @@ func (f *Formatter) AlterTable(stmt *parser.AlterTableStmt) string {
 }
 
 // AttachTable formats an ATTACH TABLE statement
-func (f *Formatter) AttachTable(stmt *parser.AttachTableStmt) string {
+func (f *formatter) attachTable(stmt *parser.AttachTableStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH TABLE"))
@@ -137,7 +137,7 @@ func (f *Formatter) AttachTable(stmt *parser.AttachTableStmt) string {
 }
 
 // DetachTable formats a DETACH TABLE statement
-func (f *Formatter) DetachTable(stmt *parser.DetachTableStmt) string {
+func (f *formatter) detachTable(stmt *parser.DetachTableStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH TABLE"))
@@ -164,7 +164,7 @@ func (f *Formatter) DetachTable(stmt *parser.DetachTableStmt) string {
 }
 
 // DropTable formats a DROP TABLE statement
-func (f *Formatter) DropTable(stmt *parser.DropTableStmt) string {
+func (f *formatter) dropTable(stmt *parser.DropTableStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP TABLE"))
@@ -187,7 +187,7 @@ func (f *Formatter) DropTable(stmt *parser.DropTableStmt) string {
 }
 
 // RenameTable formats a RENAME TABLE statement
-func (f *Formatter) RenameTable(stmt *parser.RenameTableStmt) string {
+func (f *formatter) renameTable(stmt *parser.RenameTableStmt) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("RENAME TABLE"))
@@ -208,7 +208,7 @@ func (f *Formatter) RenameTable(stmt *parser.RenameTableStmt) string {
 }
 
 // formatTableElements formats table elements with optional alignment
-func (f *Formatter) formatTableElements(elements []*parser.TableElement) []string {
+func (f *formatter) formatTableElements(elements []*parser.TableElement) []string {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -244,7 +244,7 @@ func (f *Formatter) formatTableElements(elements []*parser.TableElement) []strin
 }
 
 // formatColumn formats a single column definition
-func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
+func (f *formatter) formatColumn(col *parser.Column, alignWidth int) string {
 	var parts []string
 
 	// Column name (with optional alignment)
@@ -285,7 +285,7 @@ func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 }
 
 // formatIndexDefinition formats an index definition
-func (f *Formatter) formatIndexDefinition(idx *parser.IndexDefinition) string {
+func (f *formatter) formatIndexDefinition(idx *parser.IndexDefinition) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("INDEX"))
@@ -301,7 +301,7 @@ func (f *Formatter) formatIndexDefinition(idx *parser.IndexDefinition) string {
 }
 
 // formatConstraintDefinition formats a constraint definition
-func (f *Formatter) formatConstraintDefinition(constraint *parser.ConstraintDefinition) string {
+func (f *formatter) formatConstraintDefinition(constraint *parser.ConstraintDefinition) string {
 	var parts []string
 
 	parts = append(parts, f.keyword("CONSTRAINT"))
@@ -313,7 +313,7 @@ func (f *Formatter) formatConstraintDefinition(constraint *parser.ConstraintDefi
 }
 
 // formatTableEngine formats a table engine specification
-func (f *Formatter) formatTableEngine(engine *parser.TableEngine) string {
+func (f *formatter) formatTableEngine(engine *parser.TableEngine) string {
 	if engine == nil {
 		return ""
 	}
@@ -339,7 +339,7 @@ func (f *Formatter) formatTableEngine(engine *parser.TableEngine) string {
 }
 
 // formatTableSettings formats the SETTINGS clause
-func (f *Formatter) formatTableSettings(settings *parser.TableSettingsClause) string {
+func (f *formatter) formatTableSettings(settings *parser.TableSettingsClause) string {
 	if settings == nil || len(settings.Settings) == 0 {
 		return ""
 	}
@@ -357,7 +357,7 @@ func (f *Formatter) formatTableSettings(settings *parser.TableSettingsClause) st
 }
 
 // formatAlterOperation formats a single ALTER TABLE operation
-func (f *Formatter) formatAlterOperation(op *parser.AlterTableOperation) string {
+func (f *formatter) formatAlterOperation(op *parser.AlterTableOperation) string {
 	switch {
 	case op.AddColumn != nil:
 		return f.formatAddColumn(op.AddColumn)
@@ -385,7 +385,7 @@ func (f *Formatter) formatAlterOperation(op *parser.AlterTableOperation) string 
 }
 
 // Helper functions for ALTER operations
-func (f *Formatter) formatAddColumn(op *parser.AddColumnOperation) string {
+func (f *formatter) formatAddColumn(op *parser.AddColumnOperation) string {
 	var parts []string
 	parts = append(parts, f.keyword("ADD COLUMN"))
 
@@ -404,7 +404,7 @@ func (f *Formatter) formatAddColumn(op *parser.AddColumnOperation) string {
 	return strings.Join(parts, " ")
 }
 
-func (f *Formatter) formatDropColumn(op *parser.DropColumnOperation) string {
+func (f *formatter) formatDropColumn(op *parser.DropColumnOperation) string {
 	var parts []string
 	parts = append(parts, f.keyword("DROP COLUMN"))
 
@@ -416,7 +416,7 @@ func (f *Formatter) formatDropColumn(op *parser.DropColumnOperation) string {
 	return strings.Join(parts, " ")
 }
 
-func (f *Formatter) formatModifyColumn(op *parser.ModifyColumnOperation) string {
+func (f *formatter) formatModifyColumn(op *parser.ModifyColumnOperation) string {
 	var parts []string
 	parts = append(parts, f.keyword("MODIFY COLUMN"))
 
@@ -435,7 +435,7 @@ func (f *Formatter) formatModifyColumn(op *parser.ModifyColumnOperation) string 
 	return strings.Join(parts, " ")
 }
 
-func (f *Formatter) formatRenameColumn(op *parser.RenameColumnOperation) string {
+func (f *formatter) formatRenameColumn(op *parser.RenameColumnOperation) string {
 	var parts []string
 	parts = append(parts, f.keyword("RENAME COLUMN"))
 
@@ -447,7 +447,7 @@ func (f *Formatter) formatRenameColumn(op *parser.RenameColumnOperation) string 
 	return strings.Join(parts, " ")
 }
 
-func (f *Formatter) formatCommentColumn(op *parser.CommentColumnOperation) string {
+func (f *formatter) formatCommentColumn(op *parser.CommentColumnOperation) string {
 	var parts []string
 	parts = append(parts, f.keyword("COMMENT COLUMN"))
 
@@ -459,7 +459,7 @@ func (f *Formatter) formatCommentColumn(op *parser.CommentColumnOperation) strin
 	return strings.Join(parts, " ")
 }
 
-func (f *Formatter) formatClearColumn(op *parser.ClearColumnOperation) string {
+func (f *formatter) formatClearColumn(op *parser.ClearColumnOperation) string {
 	var parts []string
 	parts = append(parts, f.keyword("CLEAR COLUMN"))
 
@@ -475,7 +475,7 @@ func (f *Formatter) formatClearColumn(op *parser.ClearColumnOperation) string {
 }
 
 // formatAddIndex formats ADD INDEX operations
-func (f *Formatter) formatAddIndex(op *parser.AddIndexOperation) string {
+func (f *formatter) formatAddIndex(op *parser.AddIndexOperation) string {
 	if op == nil {
 		return ""
 	}
@@ -510,7 +510,7 @@ func (f *Formatter) formatAddIndex(op *parser.AddIndexOperation) string {
 }
 
 // formatDropIndex formats DROP INDEX operations
-func (f *Formatter) formatDropIndex(op *parser.DropIndexOperation) string {
+func (f *formatter) formatDropIndex(op *parser.DropIndexOperation) string {
 	if op == nil {
 		return ""
 	}
@@ -528,7 +528,7 @@ func (f *Formatter) formatDropIndex(op *parser.DropIndexOperation) string {
 }
 
 // formatAddConstraint formats ADD CONSTRAINT operations
-func (f *Formatter) formatAddConstraint(op *parser.AddConstraintOperation) string {
+func (f *formatter) formatAddConstraint(op *parser.AddConstraintOperation) string {
 	if op == nil {
 		return ""
 	}
@@ -548,7 +548,7 @@ func (f *Formatter) formatAddConstraint(op *parser.AddConstraintOperation) strin
 }
 
 // formatDropConstraint formats DROP CONSTRAINT operations
-func (f *Formatter) formatDropConstraint(op *parser.DropConstraintOperation) string {
+func (f *formatter) formatDropConstraint(op *parser.DropConstraintOperation) string {
 	if op == nil {
 		return ""
 	}

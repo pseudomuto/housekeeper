@@ -21,8 +21,6 @@ func TestGoldenFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, matches, "No *.in.sql files found in testdata directory")
 
-	formatter := format.NewDefault()
-
 	for _, inputFile := range matches {
 		// Derive output filename: "example.in.sql" -> "example.sql"
 		basename := filepath.Base(inputFile)
@@ -37,17 +35,8 @@ func TestGoldenFiles(t *testing.T) {
 			grammar, err := parser.ParseSQL(string(inputSQL))
 			require.NoError(t, err, "Failed to parse SQL from %s", inputFile)
 
-			// Format all statements
-			var formattedStatements []string
-			for _, stmt := range grammar.Statements {
-				formatted := formatter.Statement(stmt)
-				if formatted != "" {
-					formattedStatements = append(formattedStatements, formatted)
-				}
-			}
-
-			// Join with double newlines for readability
-			result := strings.Join(formattedStatements, "\n\n")
+			// Format all statements using the new API
+			result := format.Format(format.DefaultOptions(), grammar.Statements...)
 
 			// Add final newline for proper file ending
 			if result != "" {
