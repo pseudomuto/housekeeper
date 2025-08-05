@@ -6,8 +6,8 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.14.0
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.8.4
-	github.com/urfave/cli/v3 v3.0.0-alpha9
+	github.com/stretchr/testify v1.10.0
+	github.com/urfave/cli/v3 v3.3.8
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -24,7 +24,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opentelemetry.io/otel v1.17.0 // indirect
 	go.opentelemetry.io/otel/trace v1.17.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
