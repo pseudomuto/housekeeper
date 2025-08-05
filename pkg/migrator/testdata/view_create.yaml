@@ -1,8 +1,8 @@
 description: "Creating and managing views and materialized views"
 current_sql: ""
 target_sql: |
-  CREATE VIEW analytics.daily_summary AS SELECT date, count(*) as total FROM events GROUP BY date;
-  CREATE MATERIALIZED VIEW analytics.mv_daily_stats ENGINE = MergeTree() ORDER BY date AS SELECT toDate(timestamp) as date, count() as cnt FROM events GROUP BY date;
+  CREATE VIEW analytics.daily_summary AS SELECT date, count(*) AS total FROM events GROUP BY date;
+  CREATE MATERIALIZED VIEW analytics.mv_daily_stats ENGINE = MergeTree() ORDER BY date AS SELECT toDate(timestamp) AS date, count() AS cnt FROM events GROUP BY date;
 expected_migration:
   up_contains:
     - "CREATE VIEW analytics.daily_summary AS SELECTdate,count(*)astotalFROMeventsGROUPBYdate;"

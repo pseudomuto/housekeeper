@@ -1,10 +1,10 @@
 description: "Altering views and materialized views"
 current_sql: |
-  CREATE VIEW analytics.stats AS SELECT count(*) as total FROM events;
-  CREATE MATERIALIZED VIEW analytics.mv_stats ENGINE = MergeTree() ORDER BY date AS SELECT toDate(timestamp) as date FROM events;
+  CREATE VIEW analytics.stats AS SELECT count(*) AS total FROM events;
+  CREATE MATERIALIZED VIEW analytics.mv_stats ENGINE = MergeTree() ORDER BY date AS SELECT toDate(timestamp) AS date FROM events;
 target_sql: |
-  CREATE VIEW analytics.stats AS SELECT count(*) as total, max(timestamp) as latest FROM events;
-  CREATE MATERIALIZED VIEW analytics.mv_stats ENGINE = MergeTree() ORDER BY date AS SELECT toDate(timestamp) as date, count() as cnt FROM events GROUP BY date;
+  CREATE VIEW analytics.stats AS SELECT count(*) AS total, max(timestamp) AS latest FROM events;
+  CREATE MATERIALIZED VIEW analytics.mv_stats ENGINE = MergeTree() ORDER BY date AS SELECT toDate(timestamp) AS date, count() AS cnt FROM events GROUP BY date;
 expected_migration:
   up_contains:
     - "CREATE OR REPLACE VIEW analytics.stats AS SELECTcount(*)astotal,max(timestamp)aslatestFROMevents;"

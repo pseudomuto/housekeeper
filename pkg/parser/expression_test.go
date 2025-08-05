@@ -79,7 +79,7 @@ func TestExpressionParsing(t *testing.T) {
 		// IN
 		{"IN list", "id IN (1, 2, 3)", true},
 		{"NOT IN list", "status NOT IN ('deleted', 'archived')", true},
-		// {"IN subquery", "user_id IN (SELECT id FROM users)", true}, // Subquery parsing not fully implemented
+		{"IN subquery", "user_id IN (SELECT id FROM users)", true}, // Testing if subquery parsing now works
 
 		// BETWEEN
 		{"BETWEEN", "age BETWEEN 18 AND 65", true},

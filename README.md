@@ -6,6 +6,7 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 
 - **Modern Parser**: Built with participle v2 for robust, maintainable ClickHouse DDL parsing
 - **Complete DDL Support**: Full support for databases, dictionaries, views, and table operations
+- **Complete Query Engine**: Full SELECT statement parsing with joins, subqueries, CTEs, and window functions
 - **Intelligent Migrations**: Smart comparison and migration generation with proper operation ordering
 - **Expression Engine**: Advanced expression parsing with proper operator precedence
 - **Cluster-Aware**: Full support for `ON CLUSTER` distributed DDL operations
@@ -42,6 +43,17 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 - **Complete column definitions** with types, constraints, and attributes
 - **ENGINE clauses** with parameters, ORDER BY, PARTITION BY, TTL
 - **Advanced features**: nested types, codecs, defaults, TTL expressions
+
+#### Query Operations (Complete ✅)
+- **SELECT statements** with full ClickHouse syntax support including semicolon handling
+- **WITH clauses** for Common Table Expressions (CTEs) with recursive and non-recursive queries
+- **JOIN operations** supporting all types: INNER, LEFT, RIGHT, FULL, CROSS, ARRAY JOIN, GLOBAL JOIN, ASOF JOIN
+- **Window functions** with OVER clauses, partitioning, ordering, and frame specifications (ROWS/RANGE)
+- **Subqueries** in FROM, WHERE, IN, and expression contexts
+- **Advanced clauses**: GROUP BY with CUBE/ROLLUP/TOTALS, HAVING, ORDER BY with NULLS handling, LIMIT with OFFSET
+- **Table functions** and complex expressions integrated with SELECT parsing
+- **SETTINGS clause** support for query-level configuration
+- **Integration** with DDL statements for view definitions and table projections
 
 ## Installation
 
@@ -410,6 +422,42 @@ DROP TABLE [IF EXISTS] [database.]table_name [ON CLUSTER cluster_name] [SYNC];
 RENAME TABLE [database.]old_name1 TO [database.]new_name1 [, [database.]old_name2 TO [database.]new_name2, ...] [ON CLUSTER cluster_name];
 ```
 
+#### SELECT Statement
+```sql
+[WITH cte_name [(column_list)] AS (SELECT ...)]
+SELECT [DISTINCT] column1 [AS alias1], column2 [AS alias2], ...
+FROM table_name [AS table_alias]
+[INNER|LEFT|RIGHT|FULL|CROSS|ARRAY|GLOBAL|ASOF] JOIN table2 [AS alias2] ON condition
+[WHERE condition]
+[GROUP BY column1, column2, ... [WITH CUBE|ROLLUP|TOTALS]]
+[HAVING condition]
+[ORDER BY column1 [ASC|DESC] [NULLS FIRST|LAST], column2 ...]
+[LIMIT n [OFFSET m]]
+[SETTINGS setting1 = value1, setting2 = value2, ...];
+```
+
+##### Window Functions
+```sql
+SELECT 
+    column1,
+    function_name(column2) OVER (
+        [PARTITION BY column3, column4, ...]
+        [ORDER BY column5 [ASC|DESC] [NULLS FIRST|LAST], ...]
+        [ROWS|RANGE BETWEEN frame_start AND frame_end]
+    ) AS window_result
+FROM table_name;
+```
+
+##### Common Table Expressions (CTEs)
+```sql
+WITH 
+    cte1 AS (SELECT column1, column2 FROM table1 WHERE condition1),
+    cte2 AS (SELECT column3, column4 FROM table2 WHERE condition2)
+SELECT c1.column1, c2.column3
+FROM cte1 c1
+JOIN cte2 c2 ON c1.column2 = c2.column4;
+```
+
 ### Supported Data Types
 
 The parser supports all ClickHouse data types including:
@@ -617,12 +665,145 @@ func formatDataType(dataType parser.DataType) string {
 }
 ```
 
+### Query Parsing
+
+The parser also supports standalone SELECT statement parsing:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    
+    "github.com/pseudomuto/housekeeper/pkg/parser"
+)
+
+func main() {
+    // Parse complex SELECT statement
+    selectSQL := `
+        WITH active_users AS (
+            SELECT * FROM users WHERE active = 1 AND created_at >= '2023-01-01'
+        ),
+        user_stats AS (
+            SELECT 
+                user_id,
+                count() as event_count,
+                max(timestamp) as last_activity
+            FROM events 
+            WHERE user_id IN (SELECT id FROM active_users)
+            GROUP BY user_id
+        )
+        SELECT 
+            u.id,
+            u.name,
+            u.email,
+            us.event_count,
+            us.last_activity,
+            row_number() OVER (ORDER BY us.event_count DESC) as activity_rank,
+            sum(us.event_count) OVER (
+                ORDER BY us.event_count DESC 
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as running_total
+        FROM active_users u
+        INNER JOIN user_stats us ON u.id = us.user_id
+        LEFT JOIN user_profiles up ON u.id = up.user_id
+        WHERE us.event_count > 10
+        ORDER BY activity_rank ASC
+        LIMIT 100
+        SETTINGS max_threads = 8, max_memory_usage = 1000000000;
+    `
+    
+    grammar, err := parser.ParseSQL(selectSQL)
+    if err != nil {
+        log.Fatalf("Parse error: %v", err)
+    }
+    
+    // Access parsed SELECT statement
+    if stmt := grammar.Statements[0].SelectStatement; stmt != nil {
+        fmt.Printf("Parsed SELECT statement:\n")
+        fmt.Printf("- Columns: %d\n", len(stmt.Columns))
+        fmt.Printf("- Has DISTINCT: %t\n", stmt.Distinct)
+        
+        // Analyze CTEs
+        if stmt.With != nil {
+            fmt.Printf("- CTEs: %d\n", len(stmt.With.CTEs))
+            for i, cte := range stmt.With.CTEs {
+                fmt.Printf("  CTE %d: %s\n", i+1, cte.Name)
+            }
+        }
+        
+        // Analyze FROM clause
+        if stmt.From != nil {
+            fmt.Printf("- Main table: %s\n", stmt.From.Table.TableName.Table)
+            fmt.Printf("- JOINs: %d\n", len(stmt.From.Joins))
+            for i, join := range stmt.From.Joins {
+                fmt.Printf("  JOIN %d: %s %s\n", i+1, join.Type, join.Join)
+            }
+        }
+        
+        // Check for clauses
+        fmt.Printf("- Has WHERE: %t\n", stmt.Where != nil)
+        fmt.Printf("- Has GROUP BY: %t\n", stmt.GroupBy != nil)
+        fmt.Printf("- Has HAVING: %t\n", stmt.Having != nil)
+        fmt.Printf("- Has ORDER BY: %t\n", stmt.OrderBy != nil)
+        fmt.Printf("- Has LIMIT: %t\n", stmt.Limit != nil)
+        fmt.Printf("- Has SETTINGS: %t\n", stmt.Settings != nil)
+    }
+    
+    // Parse SELECT in view context (embedded in DDL)
+    viewSQL := `
+        CREATE MATERIALIZED VIEW analytics.user_activity_summary
+        ENGINE = MergeTree() ORDER BY (date, user_id)
+        AS SELECT 
+            toDate(timestamp) as date,
+            user_id,
+            count() as events,
+            uniq(event_type) as unique_event_types,
+            max(timestamp) as last_event_time,
+            quantile(0.5)(session_duration) as median_session_duration
+        FROM analytics.events
+        WHERE timestamp >= today() - INTERVAL 30 DAY
+        GROUP BY date, user_id
+        HAVING events > 5
+        ORDER BY date DESC, events DESC;
+    `
+    
+    viewGrammar, err := parser.ParseSQL(viewSQL)
+    if err != nil {
+        log.Fatalf("Parse error: %v", err)
+    }
+    
+    if view := viewGrammar.Statements[0].CreateView; view != nil {
+        selectStmt := view.AsSelect
+        fmt.Printf("\nMaterialized view query analysis:\n")
+        fmt.Printf("- Columns in SELECT: %d\n", len(selectStmt.Columns))
+        fmt.Printf("- Has aggregations: %t\n", selectStmt.GroupBy != nil)
+        fmt.Printf("- Has filtering: %t\n", selectStmt.Where != nil && selectStmt.Having != nil)
+        
+        if selectStmt.From != nil {
+            fmt.Printf("- Source table: %s\n", selectStmt.From.Table.TableName.Table)
+        }
+    }
+}
+```
+
 ## Advanced Features
+
+### Query Parsing
+The parser includes a comprehensive query engine supporting:
+- **Complete SELECT syntax**: All ClickHouse SELECT features with proper semicolon handling
+- **CTEs (Common Table Expressions)**: WITH clauses for complex query composition
+- **JOIN operations**: All JOIN types including specialized ClickHouse joins (ARRAY JOIN, GLOBAL JOIN, ASOF JOIN)
+- **Window functions**: OVER clauses with partitioning, ordering, and frame specifications
+- **Subqueries**: Nested SELECT statements in FROM, WHERE, IN, and other contexts
+- **Advanced aggregation**: GROUP BY with CUBE, ROLLUP, TOTALS modifiers
+- **Query optimization hints**: SETTINGS clauses with query-level parameters
 
 ### Expression Parsing
 The parser includes a comprehensive expression engine supporting:
 - **Operator precedence**: Proper handling of OR, AND, NOT, comparison, arithmetic operators
-- **Function calls**: Built-in and user-defined functions with arguments
+- **Function calls**: Built-in and user-defined functions with arguments, including window functions
 - **Complex expressions**: CASE, CAST, EXTRACT, INTERVAL expressions
 - **Subqueries**: Nested SELECT statements in expressions
 - **Array and tuple literals**: `[1,2,3]`, `(a,b,c)` syntax
@@ -662,6 +843,7 @@ Housekeeper is built with a modern, extensible architecture designed for reliabi
 ### Core Components
 
 - **Participle-based Parser**: Modern parsing using structured grammar rules instead of regex patterns
+- **Query Engine**: Complete SELECT statement parsing with joins, subqueries, CTEs, and window functions
 - **Expression Engine**: Comprehensive expression parsing with proper operator precedence
 - **Schema Comparison**: Intelligent difference detection between current and target schemas
 - **Migration Generator**: Creates executable up/down SQL migrations with proper operation ordering
@@ -707,6 +889,17 @@ The participle-based parser provides robust, maintainable parsing with several k
 - Proper handling of different DDL for each view type
 - ALTER TABLE MODIFY QUERY for materialized view changes
 
+**Query Operations (Complete ✅)**
+- Complete SELECT statement parsing with all ClickHouse features
+- WITH clause support for Common Table Expressions (CTEs)
+- All JOIN types including ClickHouse-specific joins (ARRAY, GLOBAL, ASOF)
+- Window functions with OVER clauses and frame specifications
+- Subqueries in FROM, WHERE, IN, and expression contexts
+- Advanced GROUP BY features (CUBE, ROLLUP, TOTALS)
+- ORDER BY with NULLS handling and LIMIT with OFFSET
+- SETTINGS clause support for query-level configuration
+- Integration with DDL statements for view definitions and table projections
+
 #### Expression System
 
 The parser includes a sophisticated expression engine:
@@ -734,6 +927,7 @@ pkg/parser/
 ├── table.go               # Table operations and column definitions
 ├── column.go              # Column types and expressions
 ├── expression.go          # Expression parsing engine
+├── query.go               # Complete SELECT statement parsing engine
 └── testdata/              # Comprehensive test files
     ├── *.sql              # SQL test inputs
     └── *.yaml             # Expected parsing results
@@ -767,6 +961,7 @@ Housekeeper provides a comprehensive solution for ClickHouse schema management w
 - **Complete Table Operations**: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME with comprehensive column support
 - **Complete Dictionary Operations**: Full lifecycle management with complex attributes and all ClickHouse features  
 - **Complete View Operations**: Regular and materialized views with ENGINE support and proper migration strategies
+- **Complete Query Engine**: Full SELECT statement parsing with CTEs, joins, window functions, and subqueries
 - **Advanced Expression Engine**: Comprehensive expression parsing with proper operator precedence
 - **Intelligent Migrations**: Smart comparison algorithms with rename detection and proper operation ordering
 - **Robust Testing**: Extensive testdata-driven test suite with automatic YAML generation

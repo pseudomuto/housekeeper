@@ -146,9 +146,15 @@ type (
 
 	// FunctionCall represents function invocations
 	FunctionCall struct {
-		Name      string       `parser:"@(Ident | BacktickIdent)"`
-		Arguments []Expression `parser:"'(' (@@ (',' @@)*)? ')'"`
-		Over      *OverClause  `parser:"@@?"`
+		Name      string           `parser:"@(Ident | BacktickIdent)"`
+		Arguments []FunctionArg    `parser:"'(' (@@ (',' @@)*)? ')'"`
+		Over      *OverClause      `parser:"@@?"`
+	}
+
+	// FunctionArg represents arguments in function calls (can be * or expression)
+	FunctionArg struct {
+		Star       *string    `parser:"@'*'"`
+		Expression *Expression `parser:"| @@"`
 	}
 
 	// OverClause for window functions
@@ -238,11 +244,9 @@ type (
 
 	// Subquery represents a subquery expression
 	Subquery struct {
-		Select string `parser:"'(' 'SELECT'"`
-		// For now, capture the rest as raw text
-		// A full implementation would parse the complete SELECT statement
-		Query string `parser:"@(~')')*"`
-		Close string `parser:"')'"`
+		OpenParen    string           `parser:"'('"`
+		SelectStmt   SelectStatement  `parser:"@@"`
+		CloseParen   string           `parser:"')'"`
 	}
 
 	// BetweenExpression handles BETWEEN operations (part of comparison)
@@ -478,6 +482,17 @@ func (f FunctionCall) String() string {
 	return result
 }
 
+func (a FunctionArg) String() string {
+	if a.Star != nil {
+		return "*"
+	}
+	if a.Expression != nil {
+		return a.Expression.String()
+	}
+	return ""
+}
+
+
 func (t TupleExpression) String() string {
 	result := "("
 	for i, elem := range t.Elements {
@@ -548,7 +563,9 @@ func (b BetweenExpression) String() string {
 }
 
 func (s Subquery) String() string {
-	return "(SELECT " + s.Query + ")"
+	// For now, return a simple representation
+	// A full implementation would render the complete SELECT statement
+	return "(SELECT ...)"
 }
 
 // formatDataTypeForExpression formats a DataType for use in expressions

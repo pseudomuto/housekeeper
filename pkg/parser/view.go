@@ -19,7 +19,7 @@ type (
 		To           *string       `parser:"('TO' @((Ident | BacktickIdent) ('.' (Ident | BacktickIdent))?))?"`
 		Engine       *ViewEngine   `parser:"@@?"`
 		Populate     bool          `parser:"@'POPULATE'?"`
-		AsSelect     *SelectClause `parser:"'AS' @@"`
+		AsSelect     *SelectStatement `parser:"'AS' @@"`
 		Semicolon    bool          `parser:"';'"`
 	}
 
@@ -65,12 +65,6 @@ type (
 		Semicolon bool    `parser:"';'"`
 	}
 
-	// SelectClause represents a SELECT statement in a view definition.
-	// This captures the entire SELECT query as a raw string.
-	// We use a simple approach of capturing everything that's not a semicolon.
-	SelectClause struct {
-		Raw string `parser:"@(~';')+"`
-	}
 
 	// ViewEngine represents ENGINE = clause for materialized views.
 	// This captures everything from ENGINE = until the next major clause (POPULATE, AS, or ;).

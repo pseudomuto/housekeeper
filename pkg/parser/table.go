@@ -128,38 +128,12 @@ type (
 
 	// ProjectionSelect represents the SELECT clause within projection parentheses
 	ProjectionSelect struct {
-		OpenParen   string                     `parser:"'('"`
-		Select      string                     `parser:"'SELECT'"`
-		Columns     []ProjectionSelectColumn   `parser:"@@ (',' @@)*"`
-		GroupBy     *ProjectionGroupBy         `parser:"@@?"`
-		OrderBy     *ProjectionOrderBy         `parser:"@@?"`
-		CloseParen  string                     `parser:"')'"`
+		OpenParen    string           `parser:"'('"`
+		SelectStmt   SelectStatement  `parser:"@@"`
+		CloseParen   string           `parser:"')'"`
 	}
 
-	// ProjectionSelectColumn represents columns in projection SELECT
-	ProjectionSelectColumn struct {
-		Star  *string    `parser:"@'*'"`
-		Expr  *Expression `parser:"| @@"`
-		Alias *string    `parser:"('AS' @(Ident | BacktickIdent))?"`
-	}
 
-	// ProjectionGroupBy represents GROUP BY clause in projections
-	ProjectionGroupBy struct {
-		GroupBy    string       `parser:"'GROUP' 'BY'"`
-		Columns    []Expression `parser:"@@ (',' @@)*"`
-	}
-
-	// ProjectionOrderBy represents ORDER BY clause in projections  
-	ProjectionOrderBy struct {
-		OrderBy    string                   `parser:"'ORDER' 'BY'"`
-		Columns    []ProjectionOrderColumn  `parser:"@@ (',' @@)*"`
-	}
-
-	// ProjectionOrderColumn represents a column in ORDER BY with optional ASC/DESC
-	ProjectionOrderColumn struct {
-		Expr      Expression `parser:"@@"`
-		Direction *string    `parser:"@('ASC' | 'DESC')?"`
-	}
 
 	// TableEngine represents the ENGINE clause for tables
 	// Examples: ENGINE = MergeTree(), ENGINE = ReplicatedMergeTree('/path', 'replica')

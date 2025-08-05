@@ -23,6 +23,7 @@ type TestCase struct {
 	Dictionaries []ExpectedDictionary `yaml:"dictionaries,omitempty"`
 	Views        []ExpectedView       `yaml:"views,omitempty"`
 	Tables       []ExpectedTable      `yaml:"tables,omitempty"`
+	Queries      []ExpectedQuery      `yaml:"queries,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -95,6 +96,20 @@ type ExpectedColumn struct {
 	Codec    string `yaml:"codec,omitempty"`
 	TTL      string `yaml:"ttl,omitempty"`
 	Comment  string `yaml:"comment,omitempty"`
+}
+
+// ExpectedQuery represents expected SELECT query properties
+type ExpectedQuery struct {
+	Distinct    bool     `yaml:"distinct,omitempty"`
+	Columns     []string `yaml:"columns,omitempty"`
+	From        string   `yaml:"from,omitempty"`
+	HasWhere    bool     `yaml:"has_where,omitempty"`
+	HasGroupBy  bool     `yaml:"has_group_by,omitempty"`
+	HasHaving   bool     `yaml:"has_having,omitempty"`
+	HasOrderBy  bool     `yaml:"has_order_by,omitempty"`
+	HasLimit    bool     `yaml:"has_limit,omitempty"`
+	JoinCount   int      `yaml:"join_count,omitempty"`
+	WindowFuncs bool     `yaml:"window_functions,omitempty"`
 }
 
 var updateFlag = flag.Bool("update", false, "update YAML test files")
@@ -175,6 +190,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
 	var expectedTables []ExpectedTable
+	var expectedQueries []ExpectedQuery
 	
 	// Keep track of accumulated ALTER operations by table name
 	alterOperations := make(map[string]map[string]int)
@@ -648,6 +664,59 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			}
 			
 			expectedTables = append(expectedTables, expectedTable)
+		} else if stmt.SelectStatement != nil {
+			sel := stmt.SelectStatement
+			expectedQuery := ExpectedQuery{
+				Distinct: sel.Distinct,
+			}
+			
+			// Extract column information
+			if sel.Columns != nil {
+				for _, col := range sel.Columns {
+					if col.Star != nil {
+						expectedQuery.Columns = append(expectedQuery.Columns, "*")
+					} else if col.Expression != nil {
+						// For simplicity, just indicate we have non-wildcard columns
+						if len(expectedQuery.Columns) == 0 || expectedQuery.Columns[0] != "non_wildcard" {
+							expectedQuery.Columns = append(expectedQuery.Columns, "non_wildcard")
+						}
+					}
+				}
+			}
+			
+			// Extract FROM information
+			if sel.From != nil {
+				if sel.From.Table.TableName != nil {
+					table := sel.From.Table.TableName
+					if table.Database != nil {
+						expectedQuery.From = *table.Database + "." + table.Table
+					} else {
+						expectedQuery.From = table.Table
+					}
+				}
+				
+				// Count JOINs
+				expectedQuery.JoinCount = len(sel.From.Joins)
+			}
+			
+			// Check for clauses
+			expectedQuery.HasWhere = sel.Where != nil
+			expectedQuery.HasGroupBy = sel.GroupBy != nil
+			expectedQuery.HasHaving = sel.Having != nil
+			expectedQuery.HasOrderBy = sel.OrderBy != nil
+			expectedQuery.HasLimit = sel.Limit != nil
+			
+			// Check for window functions in columns
+			if sel.Columns != nil {
+				for _, col := range sel.Columns {
+					if col.Expression != nil && hasWindowFunction(col.Expression) {
+						expectedQuery.WindowFuncs = true
+						break
+					}
+				}
+			}
+			
+			expectedQueries = append(expectedQueries, expectedQuery)
 		}
 	}
 
@@ -664,9 +733,32 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 	if len(expectedTables) > 0 {
 		testCase.Tables = expectedTables
 	}
+	if len(expectedQueries) > 0 {
+		testCase.Queries = expectedQueries
+	}
 
 	return testCase
 }
+
+// hasWindowFunction checks if an expression contains window functions
+func hasWindowFunction(expr *Expression) bool {
+	if expr == nil {
+		return false
+	}
+	// Navigate through the expression hierarchy to find function calls
+	if expr.Or != nil && expr.Or.And != nil && expr.Or.And.Not != nil && 
+	   expr.Or.And.Not.Comparison != nil && expr.Or.And.Not.Comparison.Addition != nil &&
+	   expr.Or.And.Not.Comparison.Addition.Multiplication != nil && 
+	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary != nil &&
+	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary != nil &&
+	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Function != nil &&
+	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Function.Over != nil {
+		return true
+	}
+	// Could add more recursive checks for nested expressions
+	return false
+}
+
 func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlFile string) {
 	// Use the same logic as generateTestCaseFromGrammar to extract actual results
 	actualTestCase := generateTestCaseFromGrammar(actualGrammar)
@@ -680,6 +772,8 @@ func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlF
 		"Wrong number of views in %s", sqlFile)
 	require.Len(t, actualTestCase.Tables, len(expected.Tables),
 		"Wrong number of tables in %s", sqlFile)
+	require.Len(t, actualTestCase.Queries, len(expected.Queries),
+		"Wrong number of queries in %s", sqlFile)
 
 	// Check databases in order
 	for i, expectedDB := range expected.Databases {
