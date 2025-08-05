@@ -41,7 +41,7 @@
 //
 //	// Parse current schema (from ClickHouse or existing SQL files)
 //	currentGrammar, _ := parser.ParseSQL("CREATE DATABASE analytics;")
-//	
+//
 //	// Parse target schema (from SQL files)
 //	targetGrammar, _ := parser.ParseSQLFromDirectory("schema/")
 //
@@ -60,7 +60,7 @@
 //	timestamp := time.Now().Format("20060102150405")
 //	upFile := fmt.Sprintf("%s_setup_analytics_schema.up.sql", timestamp)
 //	downFile := fmt.Sprintf("%s_setup_analytics_schema.down.sql", timestamp)
-//	
+//
 //	os.WriteFile(upFile, []byte(migration.Up), 0644)
 //	os.WriteFile(downFile, []byte(migration.Down), 0644)
 //

@@ -116,7 +116,7 @@ var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
 func formatEngine(engine *DatabaseEngine) string {
-	if engine.Parameters == nil || len(engine.Parameters) == 0 {
+	if len(engine.Parameters) == 0 {
 		return engine.Name
 	}
 
@@ -162,7 +162,7 @@ func TestParserWithTestdata(t *testing.T) {
 				yamlData, err := yaml.Marshal(&expectedResult)
 				require.NoError(t, err, "Failed to marshal YAML for %s", yamlFile)
 
-				err = os.WriteFile(yamlPath, yamlData, 0644)
+				err = os.WriteFile(yamlPath, yamlData, 0o600)
 				require.NoError(t, err, "Failed to write YAML file: %s", yamlFile)
 
 				t.Logf("Updated %s", yamlFile)
@@ -185,18 +185,21 @@ func TestParserWithTestdata(t *testing.T) {
 
 // generateTestCaseFromGrammar converts a parsed grammar into a TestCase for YAML generation
 // Processing statements in order to preserve the sequence from the SQL file
+//
+//nolint:gocognit,gocyclo,maintidx // Complex test case generation function handles all DDL statement types
 func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 	var expectedDatabases []ExpectedDatabase
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
 	var expectedTables []ExpectedTable
 	var expectedQueries []ExpectedQuery
-	
+
 	// Keep track of accumulated ALTER operations by table name
 	alterOperations := make(map[string]map[string]int)
-	
+
 	// Process statements in order
 	for _, stmt := range grammar.Statements {
+		//nolint:nestif // Complex nested logic needed for comprehensive test case generation
 		if stmt.CreateDatabase != nil {
 			db := stmt.CreateDatabase
 			expectedDB := ExpectedDatabase{
@@ -212,7 +215,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDB.Comment = removeQuotes(*db.Comment)
 			}
 			expectedDatabases = append(expectedDatabases, expectedDB)
-			
+
 		} else if stmt.AlterDatabase != nil {
 			db := stmt.AlterDatabase
 			expectedDB := ExpectedDatabase{
@@ -225,7 +228,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDB.Comment = removeQuotes(*db.Action.ModifyComment)
 			}
 			expectedDatabases = append(expectedDatabases, expectedDB)
-			
+
 		} else if stmt.AttachDatabase != nil {
 			db := stmt.AttachDatabase
 			expectedDB := ExpectedDatabase{
@@ -238,7 +241,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDB.Engine = formatEngine(db.Engine)
 			}
 			expectedDatabases = append(expectedDatabases, expectedDB)
-			
+
 		} else if stmt.DetachDatabase != nil {
 			db := stmt.DetachDatabase
 			// Skip IF EXISTS operations since they may not refer to existing databases
@@ -251,7 +254,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedDatabases = append(expectedDatabases, expectedDB)
 			}
-			
+
 		} else if stmt.DropDatabase != nil {
 			db := stmt.DropDatabase
 			// Skip IF EXISTS operations since they may not refer to existing databases
@@ -264,7 +267,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedDatabases = append(expectedDatabases, expectedDB)
 			}
-			
+
 		} else if stmt.RenameDatabase != nil {
 			for _, rename := range stmt.RenameDatabase.Renames {
 				expectedDB := ExpectedDatabase{
@@ -275,7 +278,6 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedDatabases = append(expectedDatabases, expectedDB)
 			}
-
 		} else if stmt.CreateDictionary != nil {
 			dict := stmt.CreateDictionary
 			expectedDict := ExpectedDictionary{
@@ -294,7 +296,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDict.Comment = removeQuotes(*dict.Comment)
 			}
 			expectedDictionaries = append(expectedDictionaries, expectedDict)
-			
+
 		} else if stmt.AttachDictionary != nil {
 			dict := stmt.AttachDictionary
 			expectedDict := ExpectedDictionary{
@@ -309,7 +311,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDict.Cluster = *dict.OnCluster
 			}
 			expectedDictionaries = append(expectedDictionaries, expectedDict)
-			
+
 		} else if stmt.DetachDictionary != nil {
 			dict := stmt.DetachDictionary
 			expectedDict := ExpectedDictionary{
@@ -326,7 +328,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDict.Cluster = *dict.OnCluster
 			}
 			expectedDictionaries = append(expectedDictionaries, expectedDict)
-			
+
 		} else if stmt.DropDictionary != nil {
 			dict := stmt.DropDictionary
 			expectedDict := ExpectedDictionary{
@@ -342,7 +344,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedDict.Cluster = *dict.OnCluster
 			}
 			expectedDictionaries = append(expectedDictionaries, expectedDict)
-			
+
 		} else if stmt.RenameDictionary != nil {
 			for _, rename := range stmt.RenameDictionary.Renames {
 				expectedDict := ExpectedDictionary{
@@ -357,7 +359,6 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedDictionaries = append(expectedDictionaries, expectedDict)
 			}
-			
 		} else if stmt.CreateView != nil {
 			view := stmt.CreateView
 			expectedView := ExpectedView{
@@ -381,7 +382,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedView.Engine = view.Engine.Raw
 			}
 			expectedViews = append(expectedViews, expectedView)
-			
+
 		} else if stmt.AttachView != nil {
 			view := stmt.AttachView
 			expectedView := ExpectedView{
@@ -396,7 +397,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedView.Cluster = *view.OnCluster
 			}
 			expectedViews = append(expectedViews, expectedView)
-			
+
 		} else if stmt.DetachView != nil {
 			view := stmt.DetachView
 			expectedView := ExpectedView{
@@ -413,7 +414,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedView.Cluster = *view.OnCluster
 			}
 			expectedViews = append(expectedViews, expectedView)
-			
+
 		} else if stmt.DropView != nil {
 			view := stmt.DropView
 			expectedView := ExpectedView{
@@ -429,7 +430,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedView.Cluster = *view.OnCluster
 			}
 			expectedViews = append(expectedViews, expectedView)
-			
+
 		} else if stmt.CreateTable != nil {
 			table := stmt.CreateTable
 			expectedTable := ExpectedTable{
@@ -500,7 +501,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			}
 			expectedTable.Columns = columns
 			expectedTables = append(expectedTables, expectedTable)
-			
+
 		} else if stmt.AttachTable != nil {
 			table := stmt.AttachTable
 			expectedTable := ExpectedTable{
@@ -515,7 +516,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedTable.Cluster = *table.OnCluster
 			}
 			expectedTables = append(expectedTables, expectedTable)
-			
+
 		} else if stmt.DetachTable != nil {
 			table := stmt.DetachTable
 			expectedTable := ExpectedTable{
@@ -532,7 +533,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedTable.Cluster = *table.OnCluster
 			}
 			expectedTables = append(expectedTables, expectedTable)
-			
+
 		} else if stmt.DropTable != nil {
 			table := stmt.DropTable
 			expectedTable := ExpectedTable{
@@ -548,7 +549,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				expectedTable.Cluster = *table.OnCluster
 			}
 			expectedTables = append(expectedTables, expectedTable)
-			
+
 		} else if stmt.RenameTable != nil {
 			for _, rename := range stmt.RenameTable.Renames {
 				expectedTable := ExpectedTable{
@@ -563,7 +564,6 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				}
 				expectedTables = append(expectedTables, expectedTable)
 			}
-			
 		} else if stmt.AlterTable != nil {
 			table := stmt.AlterTable
 			tableName := table.Name
@@ -575,7 +575,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			if alterOperations[tableName] == nil {
 				alterOperations[tableName] = make(map[string]int)
 			}
-			
+
 			// Count and accumulate operations by type
 			for _, op := range table.Operations {
 				if op.AddColumn != nil {
@@ -636,7 +636,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 					alterOperations[tableName]["RESET_SETTING"]++
 				}
 			}
-			
+
 			// Create ALTER TABLE entry immediately to preserve order
 			var database, name string
 			if parts := strings.Split(tableName, "."); len(parts) == 2 {
@@ -645,7 +645,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 			} else {
 				name = tableName
 			}
-			
+
 			expectedTable := ExpectedTable{
 				Name:            name,
 				Database:        database,
@@ -653,23 +653,23 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 				IfExists:        table.IfExists,
 				AlterOperations: make(map[string]int),
 			}
-			
+
 			if table.OnCluster != nil {
 				expectedTable.Cluster = *table.OnCluster
 			}
-			
+
 			// Copy the accumulated operations for this table
 			for opType, count := range alterOperations[tableName] {
 				expectedTable.AlterOperations[opType] = count
 			}
-			
+
 			expectedTables = append(expectedTables, expectedTable)
 		} else if stmt.SelectStatement != nil {
 			sel := stmt.SelectStatement
 			expectedQuery := ExpectedQuery{
 				Distinct: sel.Distinct,
 			}
-			
+
 			// Extract column information
 			if sel.Columns != nil {
 				for _, col := range sel.Columns {
@@ -683,7 +683,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 					}
 				}
 			}
-			
+
 			// Extract FROM information
 			if sel.From != nil {
 				if sel.From.Table.TableName != nil {
@@ -694,18 +694,18 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 						expectedQuery.From = table.Table
 					}
 				}
-				
+
 				// Count JOINs
 				expectedQuery.JoinCount = len(sel.From.Joins)
 			}
-			
+
 			// Check for clauses
 			expectedQuery.HasWhere = sel.Where != nil
 			expectedQuery.HasGroupBy = sel.GroupBy != nil
 			expectedQuery.HasHaving = sel.Having != nil
 			expectedQuery.HasOrderBy = sel.OrderBy != nil
 			expectedQuery.HasLimit = sel.Limit != nil
-			
+
 			// Check for window functions in columns
 			if sel.Columns != nil {
 				for _, col := range sel.Columns {
@@ -715,7 +715,7 @@ func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
 					}
 				}
 			}
-			
+
 			expectedQueries = append(expectedQueries, expectedQuery)
 		}
 	}
@@ -746,13 +746,13 @@ func hasWindowFunction(expr *Expression) bool {
 		return false
 	}
 	// Navigate through the expression hierarchy to find function calls
-	if expr.Or != nil && expr.Or.And != nil && expr.Or.And.Not != nil && 
-	   expr.Or.And.Not.Comparison != nil && expr.Or.And.Not.Comparison.Addition != nil &&
-	   expr.Or.And.Not.Comparison.Addition.Multiplication != nil && 
-	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary != nil &&
-	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary != nil &&
-	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Function != nil &&
-	   expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Function.Over != nil {
+	if expr.Or != nil && expr.Or.And != nil && expr.Or.And.Not != nil &&
+		expr.Or.And.Not.Comparison != nil && expr.Or.And.Not.Comparison.Addition != nil &&
+		expr.Or.And.Not.Comparison.Addition.Multiplication != nil &&
+		expr.Or.And.Not.Comparison.Addition.Multiplication.Unary != nil &&
+		expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary != nil &&
+		expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Function != nil &&
+		expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Function.Over != nil {
 		return true
 	}
 	// Could add more recursive checks for nested expressions
@@ -762,7 +762,7 @@ func hasWindowFunction(expr *Expression) bool {
 func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlFile string) {
 	// Use the same logic as generateTestCaseFromGrammar to extract actual results
 	actualTestCase := generateTestCaseFromGrammar(actualGrammar)
-	
+
 	// Compare arrays by length first
 	require.Len(t, actualTestCase.Databases, len(expected.Databases),
 		"Wrong number of databases in %s", sqlFile)
@@ -956,6 +956,7 @@ func formatDataType(dataType *DataType) string {
 	if dataType.LowCardinality != nil {
 		return "LowCardinality(" + formatDataType(dataType.LowCardinality.Type) + ")"
 	}
+	//nolint:nestif // Complex nested logic needed for data type formatting in tests
 	if dataType.Simple != nil {
 		result := dataType.Simple.Name
 		if len(dataType.Simple.Parameters) > 0 {

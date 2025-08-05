@@ -56,7 +56,7 @@ type (
 //	        fmt.Printf("Dictionary: %s\n", name)
 //	    }
 //	}
-func NewClient(dsn string) (*Client, error) {
+func NewClient(ctx context.Context, dsn string) (*Client, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{dsn},
 	})
@@ -64,7 +64,7 @@ func NewClient(dsn string) (*Client, error) {
 		return nil, err
 	}
 
-	if err := conn.Ping(context.Background()); err != nil {
+	if err := conn.Ping(ctx); err != nil {
 		return nil, err
 	}
 
@@ -160,7 +160,7 @@ func (c *Client) ExecuteMigration(ctx context.Context, sql string) error {
 //
 // Returns a slice of SQL DDL statements or an error if schema retrieval fails.
 func (c *Client) GetSchemaRecreationStatements(ctx context.Context) ([]string, error) {
-	var statements []string
+	statements := make([]string, 0, 100) // Pre-allocate with estimated capacity
 
 	databases, err := c.listDatabases(ctx)
 	if err != nil {

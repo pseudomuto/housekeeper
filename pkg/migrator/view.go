@@ -106,6 +106,7 @@ func CompareViewGrammars(current, target *parser.Grammar) ([]*ViewDiff, error) {
 
 	// Find views to alter or rename
 	for name, currentView := range currentViews {
+		//nolint:nestif // Complex nested logic needed for view comparison and rename detection
 		if targetView, exists := targetViews[name]; exists {
 			// Check if it's a rename by comparing properties (excluding names)
 			if isViewRename(currentView, targetViews) {
@@ -283,14 +284,14 @@ func selectStatementToString(stmt *parser.SelectStatement) string {
 	if stmt == nil {
 		return ""
 	}
-	
+
 	// Build SQL without spaces to match expected format
 	sql := "SELECT"
-	
+
 	if stmt.Distinct {
 		sql += "DISTINCT"
 	}
-	
+
 	// Add columns
 	if len(stmt.Columns) > 0 {
 		for i, col := range stmt.Columns {
@@ -307,8 +308,9 @@ func selectStatementToString(stmt *parser.SelectStatement) string {
 			}
 		}
 	}
-	
+
 	// Add FROM clause
+	//nolint:nestif // Complex nested logic needed for SELECT statement formatting
 	if stmt.From != nil {
 		sql += "FROM"
 		if stmt.From.Table.TableName != nil {
@@ -320,7 +322,7 @@ func selectStatementToString(stmt *parser.SelectStatement) string {
 				sql += "as" + *stmt.From.Table.TableName.Alias.Name
 			}
 		}
-		
+
 		// Add JOINs
 		for _, join := range stmt.From.Joins {
 			if join.Type != "" {
@@ -331,12 +333,12 @@ func selectStatementToString(stmt *parser.SelectStatement) string {
 			sql += "table"
 		}
 	}
-	
+
 	// Add WHERE clause
 	if stmt.Where != nil {
 		sql += "WHEREcondition"
 	}
-	
+
 	// Add GROUP BY clause with actual columns
 	if stmt.GroupBy != nil && len(stmt.GroupBy.Columns) > 0 {
 		sql += "GROUPBY"
@@ -347,22 +349,22 @@ func selectStatementToString(stmt *parser.SelectStatement) string {
 			sql += col.String()
 		}
 	}
-	
+
 	// Add HAVING clause
 	if stmt.Having != nil {
 		sql += "HAVINGcondition"
 	}
-	
+
 	// Add ORDER BY clause
 	if stmt.OrderBy != nil {
 		sql += "ORDERBYcolumns"
 	}
-	
+
 	// Add LIMIT clause
 	if stmt.Limit != nil {
 		sql += "LIMITn"
 	}
-	
+
 	return sql
 }
 

@@ -97,7 +97,7 @@ func TestSelectParsing(t *testing.T) {
 			if !strings.HasSuffix(query, ";") {
 				query += ";"
 			}
-			
+
 			grammar, err := ParseSQL(query)
 			if tt.valid {
 				require.NoError(t, err, "Failed to parse: %s", query)
@@ -116,8 +116,8 @@ func TestSelectParsing(t *testing.T) {
 func TestSelectStatementFixture(t *testing.T) {
 	// This test serves as both a fixture and validation of comprehensive SELECT support
 	fixtures := []struct {
-		description string
-		query       string
+		description      string
+		query            string
 		expectedFeatures []string
 	}{
 		{
@@ -185,7 +185,7 @@ func TestSelectStatementFixture(t *testing.T) {
 			require.NotNil(t, grammar, "Parser returned nil result for: %s", fixture.description)
 			require.Len(t, grammar.Statements, 1, "Expected exactly one statement")
 			require.NotNil(t, grammar.Statements[0].SelectStatement, "Expected top-level SELECT statement")
-			
+
 			// Log the successful parsing for documentation
 			t.Logf("✅ Successfully parsed: %s", fixture.description)
 			t.Logf("   Features: %v", fixture.expectedFeatures)
@@ -205,12 +205,12 @@ func TestSemicolonRequirement(t *testing.T) {
 		// Top-level SELECT statements must have semicolons
 		{"top_level_with_semicolon", "SELECT 1;", true, "Top-level SELECT requires semicolon"},
 		{"top_level_without_semicolon", "SELECT 1", false, "Top-level SELECT without semicolon should fail"},
-		
+
 		// Subqueries must NOT have semicolons
 		{"subquery_in_from", "SELECT * FROM (SELECT id FROM users) AS sub;", true, "Subquery should not need semicolon"},
 		{"subquery_in_where", "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders);", true, "Subquery in WHERE should not need semicolon"},
 		{"subquery_with_semicolon", "SELECT * FROM (SELECT id FROM users;) AS sub;", false, "Subquery with semicolon should be invalid"},
-		
+
 		// Complex cases
 		{"nested_subqueries", "SELECT * FROM (SELECT * FROM (SELECT id FROM users) AS inner) AS outer;", true, "Nested subqueries should work"},
 		{"top_level_complex", "SELECT u.name FROM users AS u WHERE u.id IN (SELECT user_id FROM orders) ORDER BY u.name;", true, "Complex top-level with subquery"},
@@ -222,11 +222,11 @@ func TestSemicolonRequirement(t *testing.T) {
 			if tt.shouldWork {
 				require.NoError(t, err, "Failed to parse: %s - %s", tt.sql, tt.description)
 				require.NotNil(t, grammar)
-				require.Greater(t, len(grammar.Statements), 0, "Should have parsed at least one statement")
+				require.NotEmpty(t, grammar.Statements, "Should have parsed at least one statement")
 			} else {
 				require.Error(t, err, "Expected parse error: %s - %s", tt.sql, tt.description)
 			}
-			
+
 			t.Logf("✅ %s: %s", tt.description, tt.sql)
 		})
 	}
@@ -236,14 +236,14 @@ func TestSemicolonRequirement(t *testing.T) {
 func TestQueryFixtures(t *testing.T) {
 	// This test validates that our SELECT queries are covered by the standard testdata framework
 	// The actual parsing is tested by TestParserWithTestdata which includes query.sql
-	
+
 	// Verify that query.sql and query.yaml exist
 	_, err := os.Stat("testdata/query.sql")
 	require.NoError(t, err, "query.sql should exist in testdata")
-	
+
 	_, err = os.Stat("testdata/query.yaml")
 	require.NoError(t, err, "query.yaml should exist in testdata")
-	
+
 	t.Log("✅ SELECT query testdata files exist and are part of standard testdata framework")
 	t.Log("📋 All SELECT parsing is tested through TestParserWithTestdata")
 }
@@ -267,7 +267,7 @@ func TestParseSelectStatement(t *testing.T) {
 			if !strings.HasSuffix(query, ";") {
 				query += ";"
 			}
-			
+
 			grammar, err := ParseSQL(query)
 			if tt.valid {
 				require.NoError(t, err, "Failed to parse: %s", query)

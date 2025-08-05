@@ -160,28 +160,28 @@ type (
 
 	// Statement represents any DDL or DML statement
 	Statement struct {
-		CreateDatabase   *CreateDatabaseStmt   `parser:"@@"`
-		AlterDatabase    *AlterDatabaseStmt    `parser:"| @@"`
-		AttachDatabase   *AttachDatabaseStmt   `parser:"| @@"`
-		DetachDatabase   *DetachDatabaseStmt   `parser:"| @@"`
-		DropDatabase     *DropDatabaseStmt     `parser:"| @@"`
-		RenameDatabase   *RenameDatabaseStmt   `parser:"| @@"`
-		CreateTable      *CreateTableStmt      `parser:"| @@"`
-		AlterTable       *AlterTableStmt       `parser:"| @@"`
-		CreateDictionary *CreateDictionaryStmt `parser:"| @@"`
-		CreateView       *CreateViewStmt       `parser:"| @@"`
-		AttachView       *AttachViewStmt       `parser:"| @@"`
-		AttachDictionary *AttachDictionaryStmt `parser:"| @@"`
-		DetachView       *DetachViewStmt       `parser:"| @@"`
-		DetachDictionary *DetachDictionaryStmt `parser:"| @@"`
-		DropView         *DropViewStmt         `parser:"| @@"`
-		DropDictionary   *DropDictionaryStmt   `parser:"| @@"`
-		AttachTable      *AttachTableStmt      `parser:"| @@"`
-		DetachTable      *DetachTableStmt      `parser:"| @@"`
-		DropTable        *DropTableStmt        `parser:"| @@"`
-		RenameTable      *RenameTableStmt      `parser:"| @@"`
-		RenameDictionary *RenameDictionaryStmt `parser:"| @@"`
-		SelectStatement  *TopLevelSelectStatement     `parser:"| @@"`
+		CreateDatabase   *CreateDatabaseStmt      `parser:"@@"`
+		AlterDatabase    *AlterDatabaseStmt       `parser:"| @@"`
+		AttachDatabase   *AttachDatabaseStmt      `parser:"| @@"`
+		DetachDatabase   *DetachDatabaseStmt      `parser:"| @@"`
+		DropDatabase     *DropDatabaseStmt        `parser:"| @@"`
+		RenameDatabase   *RenameDatabaseStmt      `parser:"| @@"`
+		CreateTable      *CreateTableStmt         `parser:"| @@"`
+		AlterTable       *AlterTableStmt          `parser:"| @@"`
+		CreateDictionary *CreateDictionaryStmt    `parser:"| @@"`
+		CreateView       *CreateViewStmt          `parser:"| @@"`
+		AttachView       *AttachViewStmt          `parser:"| @@"`
+		AttachDictionary *AttachDictionaryStmt    `parser:"| @@"`
+		DetachView       *DetachViewStmt          `parser:"| @@"`
+		DetachDictionary *DetachDictionaryStmt    `parser:"| @@"`
+		DropView         *DropViewStmt            `parser:"| @@"`
+		DropDictionary   *DropDictionaryStmt      `parser:"| @@"`
+		AttachTable      *AttachTableStmt         `parser:"| @@"`
+		DetachTable      *DetachTableStmt         `parser:"| @@"`
+		DropTable        *DropTableStmt           `parser:"| @@"`
+		RenameTable      *RenameTableStmt         `parser:"| @@"`
+		RenameDictionary *RenameDictionaryStmt    `parser:"| @@"`
+		SelectStatement  *TopLevelSelectStatement `parser:"| @@"`
 	}
 )
 
@@ -357,40 +357,3 @@ func ParseSQLFromDirectory(dir string) (*Grammar, error) {
 
 // parseBalancedParentheses parses content within balanced parentheses
 // starting from the given position in the input string
-func parseBalancedParentheses(input string, start int) (content string, end int, err error) {
-	if start >= len(input) || input[start] != '(' {
-		return "", start, fmt.Errorf("expected '(' at position %d", start)
-	}
-
-	depth := 0
-	i := start
-	contentStart := start + 1
-
-	for i < len(input) {
-		char := input[i]
-		switch char {
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				// Found the matching closing parenthesis
-				content = input[contentStart:i]
-				return content, i + 1, nil
-			}
-		case '\'':
-			// Skip string literals to avoid counting parentheses inside strings
-			i++
-			for i < len(input) && input[i] != '\'' {
-				if input[i] == '\\' && i+1 < len(input) {
-					i += 2 // Skip escaped character
-				} else {
-					i++
-				}
-			}
-		}
-		i++
-	}
-
-	return "", i, fmt.Errorf("unmatched parentheses starting at position %d", start)
-}

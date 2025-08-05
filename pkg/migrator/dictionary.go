@@ -533,6 +533,14 @@ func generateDropDictionarySQL(dict *DictionaryInfo) string {
 func reconstructDictionarySQL(stmt *parser.CreateDictionaryStmt, useOrReplace bool) string {
 	var parts []string
 
+	parts = buildDictionaryHeader(parts, stmt, useOrReplace)
+	parts = buildDictionaryColumns(parts, stmt)
+	parts = buildDictionaryOptions(parts, stmt)
+
+	return strings.Join(parts, " ") + ";"
+}
+
+func buildDictionaryHeader(parts []string, stmt *parser.CreateDictionaryStmt, useOrReplace bool) []string {
 	// CREATE [OR REPLACE] DICTIONARY
 	if useOrReplace {
 		parts = append(parts, "CREATE OR REPLACE DICTIONARY")
@@ -557,6 +565,10 @@ func reconstructDictionarySQL(stmt *parser.CreateDictionaryStmt, useOrReplace bo
 		parts = append(parts, "ON CLUSTER", *stmt.OnCluster)
 	}
 
+	return parts
+}
+
+func buildDictionaryColumns(parts []string, stmt *parser.CreateDictionaryStmt) []string {
 	// Columns
 	if len(stmt.Columns) > 0 {
 		parts = append(parts, "(")
@@ -585,32 +597,18 @@ func reconstructDictionarySQL(stmt *parser.CreateDictionaryStmt, useOrReplace bo
 		parts = append(parts, "PRIMARY KEY", strings.Join(stmt.PrimaryKey.Keys, ", "))
 	}
 
+	return parts
+}
+
+func buildDictionaryOptions(parts []string, stmt *parser.CreateDictionaryStmt) []string {
 	// SOURCE
 	if stmt.Source != nil {
-		sourceStr := "SOURCE(" + stmt.Source.Name
-		if len(stmt.Source.Parameters) > 0 {
-			var paramStrs []string
-			for _, param := range stmt.Source.Parameters {
-				paramStrs = append(paramStrs, param.Name+" "+param.Value)
-			}
-			sourceStr += "(" + strings.Join(paramStrs, ", ") + ")"
-		}
-		sourceStr += ")"
-		parts = append(parts, sourceStr)
+		parts = append(parts, buildSourceClause(stmt.Source))
 	}
 
 	// LAYOUT
 	if stmt.Layout != nil {
-		layoutStr := "LAYOUT(" + stmt.Layout.Name
-		if len(stmt.Layout.Parameters) > 0 {
-			var paramStrs []string
-			for _, param := range stmt.Layout.Parameters {
-				paramStrs = append(paramStrs, param.Name+" "+param.Value)
-			}
-			layoutStr += "(" + strings.Join(paramStrs, ", ") + ")"
-		}
-		layoutStr += ")"
-		parts = append(parts, layoutStr)
+		parts = append(parts, buildLayoutClause(stmt.Layout))
 	}
 
 	// LIFETIME
@@ -637,5 +635,29 @@ func reconstructDictionarySQL(stmt *parser.CreateDictionaryStmt, useOrReplace bo
 		parts = append(parts, "COMMENT", *stmt.Comment)
 	}
 
-	return strings.Join(parts, " ") + ";"
+	return parts
+}
+
+func buildSourceClause(source *parser.DictionarySource) string {
+	sourceStr := "SOURCE(" + source.Name
+	if len(source.Parameters) > 0 {
+		var paramStrs []string
+		for _, param := range source.Parameters {
+			paramStrs = append(paramStrs, param.Name+" "+param.Value)
+		}
+		sourceStr += "(" + strings.Join(paramStrs, ", ") + ")"
+	}
+	return sourceStr + ")"
+}
+
+func buildLayoutClause(layout *parser.DictionaryLayout) string {
+	layoutStr := "LAYOUT(" + layout.Name
+	if len(layout.Parameters) > 0 {
+		var paramStrs []string
+		for _, param := range layout.Parameters {
+			paramStrs = append(paramStrs, param.Name+" "+param.Value)
+		}
+		layoutStr += "(" + strings.Join(paramStrs, ", ") + ")"
+	}
+	return layoutStr + ")"
 }

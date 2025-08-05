@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	"github.com/alecthomas/participle/v2"
-	"github.com/stretchr/testify/require"
-
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/stretchr/testify/require"
 )
 
 // TestExpression is a wrapper to test expression parsing in isolation
@@ -136,7 +135,7 @@ func TestExpressionParsing(t *testing.T) {
 		{"window with frame - between", "sum(amount) OVER (ORDER BY date ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)", true},
 		{"window with frame - following", "avg(price) OVER (ORDER BY date ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING)", true},
 		{"window with range frame", "sum(amount) OVER (ORDER BY date RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)", true},
-		
+
 		// Advanced window function tests
 		{"window with complex partition", "lead(price, 2, 0) OVER (PARTITION BY category, brand ORDER BY date DESC)", true},
 		{"window with first_value", "first_value(name) OVER (PARTITION BY department ORDER BY salary DESC NULLS FIRST)", true},

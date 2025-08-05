@@ -21,23 +21,23 @@ type (
 	//   [SETTINGS name=value, ...]
 	//   [COMMENT 'comment']
 	CreateTableStmt struct {
-		Create      string                `parser:"'CREATE'"`
-		OrReplace   bool                  `parser:"@('OR' 'REPLACE')?"`
-		Table       string                `parser:"'TABLE'"`
-		IfNotExists bool                  `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database    *string               `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name        string                `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Elements    []TableElement        `parser:"'(' @@ (',' @@)* ')'"`
-		Engine      *TableEngine          `parser:"@@"`
-		OrderBy     *OrderByClause        `parser:"@@?"`
-		PartitionBy *PartitionByClause    `parser:"@@?"`
-		PrimaryKey  *PrimaryKeyClause     `parser:"@@?"`
-		SampleBy    *SampleByClause       `parser:"@@?"`
-		TTL         *TableTTLClause       `parser:"@@?"`
-		Settings    *TableSettingsClause  `parser:"@@?"`
-		Comment     *string               `parser:"('COMMENT' @String)?"`
-		Semicolon   bool                  `parser:"';'"`
+		Create      string               `parser:"'CREATE'"`
+		OrReplace   bool                 `parser:"@('OR' 'REPLACE')?"`
+		Table       string               `parser:"'TABLE'"`
+		IfNotExists bool                 `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Database    *string              `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string               `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string              `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Elements    []TableElement       `parser:"'(' @@ (',' @@)* ')'"`
+		Engine      *TableEngine         `parser:"@@"`
+		OrderBy     *OrderByClause       `parser:"@@?"`
+		PartitionBy *PartitionByClause   `parser:"@@?"`
+		PrimaryKey  *PrimaryKeyClause    `parser:"@@?"`
+		SampleBy    *SampleByClause      `parser:"@@?"`
+		TTL         *TableTTLClause      `parser:"@@?"`
+		Settings    *TableSettingsClause `parser:"@@?"`
+		Comment     *string              `parser:"('COMMENT' @String)?"`
+		Semicolon   bool                 `parser:"';'"`
 	}
 
 	// TableElement represents an element within table definition (column, index, constraint, or projection)
@@ -63,17 +63,17 @@ type (
 	// IndexType represents different ClickHouse index types
 	IndexType struct {
 		// Simple index types
-		BloomFilter  bool `parser:"@'bloom_filter'"`
-		MinMax       bool `parser:"| @'minmax'"`  
-		Hypothesis   bool `parser:"| @'hypothesis'"`
-		
+		BloomFilter bool `parser:"@'bloom_filter'"`
+		MinMax      bool `parser:"| @'minmax'"`
+		Hypothesis  bool `parser:"| @'hypothesis'"`
+
 		// Parametric index types
-		Set          *IndexSetType          `parser:"| @@"`
-		TokenBF      *IndexTokenBFType      `parser:"| @@"`
-		NGramBF      *IndexNGramBFType      `parser:"| @@"`
-		
+		Set     *IndexSetType     `parser:"| @@"`
+		TokenBF *IndexTokenBFType `parser:"| @@"`
+		NGramBF *IndexNGramBFType `parser:"| @@"`
+
 		// Custom/future index types - fallback to string
-		Custom       *string                `parser:"| @(Ident | BacktickIdent)"`
+		Custom *string `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// IndexSetType represents set(max_rows) index type
@@ -121,19 +121,17 @@ type (
 	// ClickHouse syntax:
 	//   PROJECTION projection_name (SELECT ... [GROUP BY ...] [ORDER BY ...])
 	ProjectionDefinition struct {
-		Projection  string            `parser:"'PROJECTION'"`
-		Name        string            `parser:"@(Ident | BacktickIdent)"`
+		Projection   string           `parser:"'PROJECTION'"`
+		Name         string           `parser:"@(Ident | BacktickIdent)"`
 		SelectClause ProjectionSelect `parser:"@@"`
 	}
 
 	// ProjectionSelect represents the SELECT clause within projection parentheses
 	ProjectionSelect struct {
-		OpenParen    string           `parser:"'('"`
-		SelectStmt   SelectStatement  `parser:"@@"`
-		CloseParen   string           `parser:"')'"`
+		OpenParen  string          `parser:"'('"`
+		SelectStmt SelectStatement `parser:"@@"`
+		CloseParen string          `parser:"')'"`
 	}
-
-
 
 	// TableEngine represents the ENGINE clause for tables
 	// Examples: ENGINE = MergeTree(), ENGINE = ReplicatedMergeTree('/path', 'replica')
@@ -537,18 +535,18 @@ type (
 	// ClickHouse syntax:
 	//   ADD PROJECTION [IF NOT EXISTS] projection_name (SELECT ...)
 	AddProjectionOperation struct {
-		Add           string            `parser:"'ADD' 'PROJECTION'"`
-		IfNotExists   bool              `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Name          string            `parser:"@(Ident | BacktickIdent)"`
-		SelectClause  ProjectionSelect  `parser:"@@"`
+		Add          string           `parser:"'ADD' 'PROJECTION'"`
+		IfNotExists  bool             `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Name         string           `parser:"@(Ident | BacktickIdent)"`
+		SelectClause ProjectionSelect `parser:"@@"`
 	}
 
 	// DropProjectionOperation represents DROP PROJECTION operation
 	// ClickHouse syntax:
 	//   DROP PROJECTION [IF EXISTS] projection_name
 	DropProjectionOperation struct {
-		Drop       string `parser:"'DROP' 'PROJECTION'"`
-		IfExists   bool   `parser:"@('IF' 'EXISTS')?"`
-		Name       string `parser:"@(Ident | BacktickIdent)"`
+		Drop     string `parser:"'DROP' 'PROJECTION'"`
+		IfExists bool   `parser:"@('IF' 'EXISTS')?"`
+		Name     string `parser:"@(Ident | BacktickIdent)"`
 	}
 )

@@ -5,9 +5,8 @@ import (
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
-	"github.com/stretchr/testify/require"
-
 	. "github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/stretchr/testify/require"
 )
 
 // Test lexer and parser for column definitions
@@ -31,6 +30,7 @@ var (
 	)
 )
 
+//nolint:maintidx // Comprehensive test function covers all column parsing scenarios
 func TestColumnParsing(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -5,19 +5,19 @@ package parser
 type (
 	// SelectStatement represents a SELECT statement (for subqueries, no semicolon)
 	SelectStatement struct {
-		With      *WithClause    `parser:"@@?"`
-		Select    string         `parser:"'SELECT'"`
-		Distinct  bool           `parser:"@'DISTINCT'?"`
-		Columns   []SelectColumn `parser:"@@ (',' @@)*"`
-		From      *FromClause    `parser:"@@?"`
-		Where     *WhereClause   `parser:"@@?"`
-		GroupBy   *GroupByClause `parser:"@@?"`
-		Having    *HavingClause  `parser:"@@?"`
-		OrderBy   *SelectOrderByClause `parser:"@@?"`
-		Limit     *LimitClause   `parser:"@@?"`
-		Settings  *SettingsClause `parser:"@@?"`
+		With     *WithClause          `parser:"@@?"`
+		Select   string               `parser:"'SELECT'"`
+		Distinct bool                 `parser:"@'DISTINCT'?"`
+		Columns  []SelectColumn       `parser:"@@ (',' @@)*"`
+		From     *FromClause          `parser:"@@?"`
+		Where    *WhereClause         `parser:"@@?"`
+		GroupBy  *GroupByClause       `parser:"@@?"`
+		Having   *HavingClause        `parser:"@@?"`
+		OrderBy  *SelectOrderByClause `parser:"@@?"`
+		Limit    *LimitClause         `parser:"@@?"`
+		Settings *SettingsClause      `parser:"@@?"`
 	}
-	
+
 	// TopLevelSelectStatement represents a top-level SELECT statement (requires semicolon)
 	TopLevelSelectStatement struct {
 		SelectStatement
@@ -26,48 +26,48 @@ type (
 
 	// WithClause represents WITH clause for CTEs
 	WithClause struct {
-		With string         `parser:"'WITH'"`
+		With string                  `parser:"'WITH'"`
 		CTEs []CommonTableExpression `parser:"@@ (',' @@)*"`
 	}
 
 	// CommonTableExpression represents a single CTE
 	CommonTableExpression struct {
-		Name   string          `parser:"@(Ident | BacktickIdent)"`
-		As     string          `parser:"'AS'"`
-		Query  *SelectStatement `parser:"'(' @@ ')'"`
+		Name  string           `parser:"@(Ident | BacktickIdent)"`
+		As    string           `parser:"'AS'"`
+		Query *SelectStatement `parser:"'(' @@ ')'"`
 	}
 
 	// SelectColumn represents a column in SELECT clause
 	SelectColumn struct {
-		Star       *string    `parser:"@'*'"`
+		Star       *string     `parser:"@'*'"`
 		Expression *Expression `parser:"| @@"`
-		Alias      *string    `parser:"('AS' @(Ident | BacktickIdent))?"`
+		Alias      *string     `parser:"('AS' @(Ident | BacktickIdent))?"`
 	}
 
 	// FromClause represents FROM clause with joins
 	FromClause struct {
-		From   string      `parser:"'FROM'"`
-		Table  TableRef    `parser:"@@"`
-		Joins  []JoinClause `parser:"@@*"`
+		From  string       `parser:"'FROM'"`
+		Table TableRef     `parser:"@@"`
+		Joins []JoinClause `parser:"@@*"`
 	}
 
 	// TableRef represents a table reference (table, subquery, or function)
 	TableRef struct {
 		// Table reference with optional alias
-		TableName  *TableNameWithAlias  `parser:"@@"`
+		TableName *TableNameWithAlias `parser:"@@"`
 		// OR subquery with optional alias
-		Subquery   *SubqueryWithAlias   `parser:"| @@"`
+		Subquery *SubqueryWithAlias `parser:"| @@"`
 		// OR table function with optional alias
-		Function   *FunctionWithAlias   `parser:"| @@"`
+		Function *FunctionWithAlias `parser:"| @@"`
 	}
 
 	// TableNameWithAlias represents a table name with optional alias
 	TableNameWithAlias struct {
-		Database   *string          `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Table      string           `parser:"@(Ident | BacktickIdent)"`
-		Alias      *TableAlias      `parser:"@@?"`
+		Database *string     `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Table    string      `parser:"@(Ident | BacktickIdent)"`
+		Alias    *TableAlias `parser:"@@?"`
 	}
-	
+
 	// TableAlias represents a table alias - requires explicit AS keyword
 	TableAlias struct {
 		Name *string `parser:"'AS' @(Ident | BacktickIdent)"`
@@ -75,28 +75,27 @@ type (
 
 	// SubqueryWithAlias represents a subquery with optional alias
 	SubqueryWithAlias struct {
-		Subquery   SelectStatement   `parser:"'(' @@ ')'"`
-		Alias      *string          `parser:"('AS' @(Ident | BacktickIdent))?"`
+		Subquery SelectStatement `parser:"'(' @@ ')'"`
+		Alias    *string         `parser:"('AS' @(Ident | BacktickIdent))?"`
 	}
 
 	// FunctionWithAlias represents a table function with optional alias
 	FunctionWithAlias struct {
-		Function   TableFunction    `parser:"@@"`
-		Alias      *string          `parser:"('AS' @(Ident | BacktickIdent))?"`
+		Function TableFunction `parser:"@@"`
+		Alias    *string       `parser:"('AS' @(Ident | BacktickIdent))?"`
 	}
-
 
 	// TableFunction represents table functions like numbers(), remote(), etc.
 	TableFunction struct {
-		Name      string           `parser:"@(Ident | BacktickIdent)"`
-		Arguments []FunctionArg    `parser:"'(' (@@ (',' @@)*)? ')'"`
+		Name      string        `parser:"@(Ident | BacktickIdent)"`
+		Arguments []FunctionArg `parser:"'(' (@@ (',' @@)*)? ')'"`
 	}
 
 	// JoinClause represents JOIN operations
 	JoinClause struct {
-		Type      string      `parser:"@('INNER' | 'LEFT' | 'RIGHT' | 'FULL' | 'CROSS')?"`
-		Join      string      `parser:"@('JOIN' | 'ARRAY' 'JOIN' | 'GLOBAL' 'JOIN' | 'ASOF' 'JOIN')"`
-		Table     TableRef    `parser:"@@"`
+		Type      string         `parser:"@('INNER' | 'LEFT' | 'RIGHT' | 'FULL' | 'CROSS')?"`
+		Join      string         `parser:"@('JOIN' | 'ARRAY' 'JOIN' | 'GLOBAL' 'JOIN' | 'ASOF' 'JOIN')"`
+		Table     TableRef       `parser:"@@"`
 		Condition *JoinCondition `parser:"@@?"`
 	}
 
@@ -114,12 +113,12 @@ type (
 
 	// GroupByClause represents GROUP BY clause
 	GroupByClause struct {
-		GroupBy   string       `parser:"'GROUP' 'BY'"`
-		Columns   []Expression `parser:"@@ (',' @@)*"`
-		WithClause *string     `parser:"('WITH' @('CUBE' | 'ROLLUP' | 'TOTALS'))?"`
+		GroupBy    string       `parser:"'GROUP' 'BY'"`
+		Columns    []Expression `parser:"@@ (',' @@)*"`
+		WithClause *string      `parser:"('WITH' @('CUBE' | 'ROLLUP' | 'TOTALS'))?"`
 	}
 
-	// HavingClause represents HAVING clause  
+	// HavingClause represents HAVING clause
 	HavingClause struct {
 		Having    string     `parser:"'HAVING'"`
 		Condition Expression `parser:"@@"`
@@ -141,10 +140,10 @@ type (
 
 	// LimitClause represents LIMIT clause
 	LimitClause struct {
-		Limit  string      `parser:"'LIMIT'"`
-		Count  Expression  `parser:"@@"`
+		Limit  string        `parser:"'LIMIT'"`
+		Count  Expression    `parser:"@@"`
 		Offset *OffsetClause `parser:"@@?"`
-		By     *LimitBy    `parser:"@@?"`
+		By     *LimitBy      `parser:"@@?"`
 	}
 
 	// OffsetClause represents OFFSET clause
@@ -161,8 +160,8 @@ type (
 
 	// SettingsClause represents SETTINGS clause
 	SettingsClause struct {
-		Settings string                  `parser:"'SETTINGS'"`
-		Values   []SettingsAssignment    `parser:"@@ (',' @@)*"`
+		Settings string               `parser:"'SETTINGS'"`
+		Values   []SettingsAssignment `parser:"@@ (',' @@)*"`
 	}
 
 	// SettingsAssignment represents key=value in SETTINGS
@@ -171,4 +170,3 @@ type (
 		Value Expression `parser:"'=' @@"`
 	}
 )
-

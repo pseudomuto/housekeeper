@@ -107,63 +107,18 @@ func CompareTableGrammars(current, target *parser.Grammar) ([]*TableDiff, error)
 
 	var diffs []*TableDiff
 
-	// Find tables to create (exist in target but not in current)
+	// Find tables to create or modify (exist in target but not in current)
 	for tableName, targetTable := range targetTables {
-		if currentTable, exists := currentTables[tableName]; !exists {
-			// Check if this might be a renamed table
-			renamedFrom := findRenamedTable(targetTable, currentTables, targetTables)
-			if renamedFrom != "" {
-				// This is a rename operation
-				diff := &TableDiff{
-					Type:         TableDiffRename,
-					TableName:    renamedFrom,
-					NewTableName: tableName,
-					Description:  fmt.Sprintf("Rename table %s to %s", renamedFrom, tableName),
-					Current:      currentTables[renamedFrom],
-					Target:       targetTable,
-				}
-				diff.UpSQL = generateRenameTableSQL(diff.Current, diff.Target, renamedFrom, tableName)
-				diff.DownSQL = generateRenameTableSQL(diff.Target, diff.Current, tableName, renamedFrom)
-				diffs = append(diffs, diff)
-
-				// Remove from currentTables to avoid processing as a drop
-				delete(currentTables, renamedFrom)
-			} else {
-				// This is a create operation
-				diff := &TableDiff{
-					Type:        TableDiffCreate,
-					TableName:   tableName,
-					Description: fmt.Sprintf("Create table %s", tableName),
-					Target:      targetTable,
-				}
-				diff.UpSQL = generateCreateTableSQL(targetTable)
-				diff.DownSQL = generateDropTableSQL(targetTable)
-				diffs = append(diffs, diff)
-			}
-		} else {
-			// Table exists in both - check for changes
-			if !tablesEqual(currentTable, targetTable) {
-				// Check if engine change is involved (not supported)
-				if currentTable.Engine != targetTable.Engine {
-					return nil, errors.Wrapf(ErrUnsupported,
-						"table engine change from %s to %s for table %s is not supported",
-						currentTable.Engine, targetTable.Engine, tableName)
-				}
-
-				// Generate column diffs
-				columnChanges := compareColumns(currentTable.Columns, targetTable.Columns)
-
-				diff := &TableDiff{
-					Type:          TableDiffAlter,
-					TableName:     tableName,
-					Description:   fmt.Sprintf("Alter table %s", tableName),
-					Current:       currentTable,
-					Target:        targetTable,
-					ColumnChanges: columnChanges,
-				}
-				diff.UpSQL = generateAlterTableSQL(currentTable, targetTable, columnChanges)
-				diff.DownSQL = generateAlterTableSQL(targetTable, currentTable, reverseColumnChanges(columnChanges))
-				diffs = append(diffs, diff)
+		currentTable, exists := currentTables[tableName]
+		diff, err := createTableDiff(tableName, currentTable, targetTable, currentTables, targetTables, exists)
+		if err != nil {
+			return nil, err
+		}
+		if diff != nil {
+			diffs = append(diffs, diff)
+			// Remove from currentTables if this was a rename to avoid processing as a drop
+			if diff.Type == TableDiffRename {
+				delete(currentTables, diff.TableName)
 			}
 		}
 	}
@@ -174,7 +129,7 @@ func CompareTableGrammars(current, target *parser.Grammar) ([]*TableDiff, error)
 			diff := &TableDiff{
 				Type:        TableDiffDrop,
 				TableName:   tableName,
-				Description: fmt.Sprintf("Drop table %s", tableName),
+				Description: "Drop table " + tableName,
 				Current:     currentTable,
 			}
 			diff.UpSQL = generateDropTableSQL(currentTable)
@@ -187,10 +142,13 @@ func CompareTableGrammars(current, target *parser.Grammar) ([]*TableDiff, error)
 }
 
 // extractTablesFromGrammar extracts table information from parsed grammar statements
+//
+//nolint:gocognit,funlen // Complex function needed for comprehensive table parsing
 func extractTablesFromGrammar(grammar *parser.Grammar) map[string]*TableInfo {
 	tables := make(map[string]*TableInfo)
 
 	for _, stmt := range grammar.Statements {
+		//nolint:nestif // Complex nested logic needed for comprehensive table extraction
 		if stmt.CreateTable != nil {
 			table := stmt.CreateTable
 			tableName := table.Name
@@ -360,7 +318,7 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 					ColumnName:  targetCol.Name,
 					Current:     &currentCol,
 					Target:      &targetCol,
-					Description: fmt.Sprintf("Modify column %s", targetCol.Name),
+					Description: "Modify column " + targetCol.Name,
 				})
 			}
 		} else {
@@ -369,7 +327,7 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 				Type:        ColumnDiffAdd,
 				ColumnName:  targetCol.Name,
 				Target:      &targetCol,
-				Description: fmt.Sprintf("Add column %s", targetCol.Name),
+				Description: "Add column " + targetCol.Name,
 			})
 		}
 	}
@@ -381,7 +339,7 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 				Type:        ColumnDiffDrop,
 				ColumnName:  currentCol.Name,
 				Current:     &currentCol,
-				Description: fmt.Sprintf("Drop column %s", currentCol.Name),
+				Description: "Drop column " + currentCol.Name,
 			})
 		}
 	}
@@ -399,14 +357,14 @@ func reverseColumnChanges(changes []ColumnDiff) []ColumnDiff {
 				Type:        ColumnDiffDrop,
 				ColumnName:  change.ColumnName,
 				Current:     change.Target,
-				Description: fmt.Sprintf("Drop column %s", change.ColumnName),
+				Description: "Drop column " + change.ColumnName,
 			})
 		case ColumnDiffDrop:
 			reversed = append(reversed, ColumnDiff{
 				Type:        ColumnDiffAdd,
 				ColumnName:  change.ColumnName,
 				Target:      change.Current,
-				Description: fmt.Sprintf("Add column %s", change.ColumnName),
+				Description: "Add column " + change.ColumnName,
 			})
 		case ColumnDiffModify:
 			reversed = append(reversed, ColumnDiff{
@@ -414,7 +372,7 @@ func reverseColumnChanges(changes []ColumnDiff) []ColumnDiff {
 				ColumnName:  change.ColumnName,
 				Current:     change.Target,
 				Target:      change.Current,
-				Description: fmt.Sprintf("Modify column %s", change.ColumnName),
+				Description: "Modify column " + change.ColumnName,
 			})
 		}
 	}
@@ -426,6 +384,14 @@ func reverseColumnChanges(changes []ColumnDiff) []ColumnDiff {
 func generateCreateTableSQL(table *TableInfo) string {
 	var sql strings.Builder
 
+	writeTableHeader(&sql, table)
+	writeTableColumns(&sql, table)
+	writeTableOptions(&sql, table)
+
+	return sql.String()
+}
+
+func writeTableHeader(sql *strings.Builder, table *TableInfo) {
 	sql.WriteString("CREATE ")
 	if table.OrReplace {
 		sql.WriteString("OR REPLACE ")
@@ -446,7 +412,9 @@ func generateCreateTableSQL(table *TableInfo) string {
 		sql.WriteString(" ON CLUSTER ")
 		sql.WriteString(table.Cluster)
 	}
+}
 
+func writeTableColumns(sql *strings.Builder, table *TableInfo) {
 	// Columns
 	sql.WriteString(" (\n")
 	for i, col := range table.Columns {
@@ -476,7 +444,9 @@ func generateCreateTableSQL(table *TableInfo) string {
 		}
 	}
 	sql.WriteString("\n)")
+}
 
+func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 	// Engine
 	if table.Engine != "" {
 		sql.WriteString("\nENGINE = ")
@@ -526,8 +496,6 @@ func generateCreateTableSQL(table *TableInfo) string {
 		sql.WriteString(table.Comment)
 		sql.WriteString("'")
 	}
-
-	return sql.String()
 }
 
 func generateDropTableSQL(table *TableInfo) string {
@@ -562,7 +530,7 @@ func generateRenameTableSQL(from, to *TableInfo, fromName, toName string) string
 	return sql.String()
 }
 
-func generateAlterTableSQL(current, target *TableInfo, columnChanges []ColumnDiff) string {
+func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string {
 	if len(columnChanges) == 0 {
 		return ""
 	}
@@ -709,6 +677,7 @@ func formatColumnDataType(dataType *parser.DataType) string {
 	if dataType.LowCardinality != nil {
 		return "LowCardinality(" + formatColumnDataType(dataType.LowCardinality.Type) + ")"
 	}
+	//nolint:nestif // Complex nested logic needed for data type formatting
 	if dataType.Simple != nil {
 		result := dataType.Simple.Name
 		if len(dataType.Simple.Parameters) > 0 {
@@ -761,4 +730,63 @@ func formatColumnCodec(codec *parser.CodecClause) string {
 		}
 	}
 	return result + ")"
+}
+
+func createTableDiff(tableName string, currentTable, targetTable *TableInfo, currentTables, targetTables map[string]*TableInfo, exists bool) (*TableDiff, error) {
+	if !exists {
+		// Check if this might be a renamed table
+		renamedFrom := findRenamedTable(targetTable, currentTables, targetTables)
+		if renamedFrom != "" {
+			// This is a rename operation
+			diff := &TableDiff{
+				Type:         TableDiffRename,
+				TableName:    renamedFrom,
+				NewTableName: tableName,
+				Description:  fmt.Sprintf("Rename table %s to %s", renamedFrom, tableName),
+				Current:      currentTables[renamedFrom],
+				Target:       targetTable,
+			}
+			diff.UpSQL = generateRenameTableSQL(diff.Current, diff.Target, renamedFrom, tableName)
+			diff.DownSQL = generateRenameTableSQL(diff.Target, diff.Current, tableName, renamedFrom)
+			return diff, nil
+		}
+
+		// This is a create operation
+		diff := &TableDiff{
+			Type:        TableDiffCreate,
+			TableName:   tableName,
+			Description: "Create table " + tableName,
+			Target:      targetTable,
+		}
+		diff.UpSQL = generateCreateTableSQL(targetTable)
+		diff.DownSQL = generateDropTableSQL(targetTable)
+		return diff, nil
+	}
+
+	// Table exists in both - check for changes
+	if tablesEqual(currentTable, targetTable) {
+		return nil, nil
+	}
+
+	// Check if engine change is involved (not supported)
+	if currentTable.Engine != targetTable.Engine {
+		return nil, errors.Wrapf(ErrUnsupported,
+			"table engine change from %s to %s for table %s is not supported",
+			currentTable.Engine, targetTable.Engine, tableName)
+	}
+
+	// Generate column diffs
+	columnChanges := compareColumns(currentTable.Columns, targetTable.Columns)
+
+	diff := &TableDiff{
+		Type:          TableDiffAlter,
+		TableName:     tableName,
+		Description:   "Alter table " + tableName,
+		Current:       currentTable,
+		Target:        targetTable,
+		ColumnChanges: columnChanges,
+	}
+	diff.UpSQL = generateAlterTableSQL(targetTable, columnChanges)
+	diff.DownSQL = generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges))
+	return diff, nil
 }

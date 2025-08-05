@@ -3,7 +3,6 @@ package migrator_test
 import (
 	"embed"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -90,74 +89,6 @@ func TestMigrationGeneration(t *testing.T) {
 			verifyMigrationResult(t, migration, testCase.ExpectedMigration, testName)
 		})
 	}
-}
-
-func updateMigrationTestCase(t *testing.T, testCase MigrationTestCase, current, target *parser.Grammar, yamlPath string) {
-	// Generate migration to extract expected results
-	migration, err := GenerateMigration(current, target, "test")
-	if err != nil {
-		if strings.Contains(err.Error(), "no differences found") {
-			testCase.ExpectedMigration.DiffCount = 0
-			testCase.ExpectedMigration.UpContains = []string{}
-			testCase.ExpectedMigration.DownContains = []string{}
-			testCase.ExpectedMigration.DiffTypes = []string{}
-		} else {
-			require.NoError(t, err, "Failed to generate migration for update")
-		}
-	} else {
-		// Extract diff information
-		diffs, err := CompareDatabaseGrammars(current, target)
-		require.NoError(t, err)
-
-		var diffTypes []string
-		for _, diff := range diffs {
-			diffTypes = append(diffTypes, string(diff.Type))
-		}
-
-		testCase.ExpectedMigration.DiffCount = len(diffs)
-		testCase.ExpectedMigration.DiffTypes = diffTypes
-
-		// Extract key phrases from UP migration
-		upLines := strings.Split(migration.Up, "\n")
-		var upContains []string
-		for _, line := range upLines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "CREATE DATABASE") ||
-				strings.HasPrefix(line, "ALTER DATABASE") ||
-				strings.HasPrefix(line, "DROP DATABASE") ||
-				strings.HasPrefix(line, "-- WARNING:") {
-				upContains = append(upContains, line)
-			}
-		}
-		testCase.ExpectedMigration.UpContains = upContains
-
-		// Extract key phrases from DOWN migration
-		downLines := strings.Split(migration.Down, "\n")
-		var downContains []string
-		for _, line := range downLines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "CREATE DATABASE") ||
-				strings.HasPrefix(line, "ALTER DATABASE") ||
-				strings.HasPrefix(line, "DROP DATABASE") ||
-				strings.HasPrefix(line, "-- WARNING:") {
-				downContains = append(downContains, line)
-			}
-		}
-		testCase.ExpectedMigration.DownContains = downContains
-	}
-
-	// Write updated YAML file
-	yamlData, err := yaml.Marshal(&testCase)
-	require.NoError(t, err, "Failed to marshal YAML")
-
-	// Convert embedded path to filesystem path
-	filePath := strings.Replace(yamlPath, "testdata/", "pkg/migrator/testdata/", 1)
-	fullPath := filepath.Join("/Users/pseudomuto/src/github.com/pseudomuto/housekeeper", filePath)
-
-	err = os.WriteFile(fullPath, yamlData, 0644)
-	require.NoError(t, err, "Failed to write YAML file: %s", fullPath)
-
-	t.Logf("Updated %s", yamlPath)
 }
 
 func verifyMigrationResult(t *testing.T, migration *Migration, expected ExpectedMigrationResult, testName string) {

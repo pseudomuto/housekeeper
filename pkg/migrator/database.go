@@ -19,10 +19,8 @@ const (
 	DatabaseDiffRename DatabaseDiffType = "RENAME"
 )
 
-var (
-	// ErrUnsupported is returned when an operation is not supported
-	ErrUnsupported = errors.New("unsupported operation")
-)
+// ErrUnsupported is returned when an operation is not supported
+var ErrUnsupported = errors.New("unsupported operation")
 
 type (
 	// DatabaseDiff represents a difference between current and target database states.
@@ -93,44 +91,15 @@ func CompareDatabaseGrammars(current, target *parser.Grammar) ([]*DatabaseDiff, 
 	renameDiffs, processedCurrent, processedTarget := detectDatabaseRenames(currentDBs, targetDBs)
 	diffs = append(diffs, renameDiffs...)
 
-	// Find databases to create
+	// Find databases to create or modify
 	for name, targetDB := range processedTarget {
 		currentDB, exists := processedCurrent[name]
-		if !exists {
-			// Database needs to be created
-			diff := &DatabaseDiff{
-				Type:         DatabaseDiffCreate,
-				DatabaseName: name,
-				Description:  fmt.Sprintf("Create database '%s'", name),
-				Target:       targetDB,
-				UpSQL:        generateCreateDatabaseSQL(targetDB),
-				DownSQL:      generateDropDatabaseSQL(targetDB),
-			}
+		diff, err := createDatabaseDiff(name, currentDB, targetDB, exists)
+		if err != nil {
+			return nil, err
+		}
+		if diff != nil {
 			diffs = append(diffs, diff)
-		} else {
-			// Database exists, check for modifications
-			if needsModification(currentDB, targetDB) {
-				upSQL, err := generateAlterDatabaseSQL(currentDB, targetDB)
-				if err != nil {
-					return nil, fmt.Errorf("failed to generate UP migration for database '%s': %w", name, err)
-				}
-
-				downSQL, err := generateAlterDatabaseSQL(targetDB, currentDB)
-				if err != nil {
-					return nil, fmt.Errorf("failed to generate DOWN migration for database '%s': %w", name, err)
-				}
-
-				diff := &DatabaseDiff{
-					Type:         DatabaseDiffAlter,
-					DatabaseName: name,
-					Description:  fmt.Sprintf("Alter database '%s'", name),
-					Current:      currentDB,
-					Target:       targetDB,
-					UpSQL:        upSQL,
-					DownSQL:      downSQL,
-				}
-				diffs = append(diffs, diff)
-			}
 		}
 	}
 
@@ -325,4 +294,43 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 	}
 
 	return strings.Join(statements, "\n"), nil
+}
+
+func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists bool) (*DatabaseDiff, error) {
+	if !exists {
+		// Database needs to be created
+		return &DatabaseDiff{
+			Type:         DatabaseDiffCreate,
+			DatabaseName: name,
+			Description:  fmt.Sprintf("Create database '%s'", name),
+			Target:       targetDB,
+			UpSQL:        generateCreateDatabaseSQL(targetDB),
+			DownSQL:      generateDropDatabaseSQL(targetDB),
+		}, nil
+	}
+
+	// Database exists, check for modifications
+	if !needsModification(currentDB, targetDB) {
+		return nil, nil
+	}
+
+	upSQL, err := generateAlterDatabaseSQL(currentDB, targetDB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate UP migration for database '%s': %w", name, err)
+	}
+
+	downSQL, err := generateAlterDatabaseSQL(targetDB, currentDB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate DOWN migration for database '%s': %w", name, err)
+	}
+
+	return &DatabaseDiff{
+		Type:         DatabaseDiffAlter,
+		DatabaseName: name,
+		Description:  fmt.Sprintf("Alter database '%s'", name),
+		Current:      currentDB,
+		Target:       targetDB,
+		UpSQL:        upSQL,
+		DownSQL:      downSQL,
+	}, nil
 }

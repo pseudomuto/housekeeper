@@ -8,19 +8,19 @@ type (
 	//   [TO [db.]table_name] [ENGINE = engine] [POPULATE]
 	//   AS SELECT ...
 	CreateViewStmt struct {
-		Create       string        `parser:"'CREATE'"`
-		OrReplace    bool          `parser:"@('OR' 'REPLACE')?"`
-		Materialized bool          `parser:"@'MATERIALIZED'?"`
-		View         string        `parser:"'VIEW'"`
-		IfNotExists  bool          `parser:"('IF' 'NOT' 'EXISTS')?"`
-		Database     *string       `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name         string        `parser:"@(Ident | BacktickIdent)"`
-		OnCluster    *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		To           *string       `parser:"('TO' @((Ident | BacktickIdent) ('.' (Ident | BacktickIdent))?))?"`
-		Engine       *ViewEngine   `parser:"@@?"`
-		Populate     bool          `parser:"@'POPULATE'?"`
+		Create       string           `parser:"'CREATE'"`
+		OrReplace    bool             `parser:"@('OR' 'REPLACE')?"`
+		Materialized bool             `parser:"@'MATERIALIZED'?"`
+		View         string           `parser:"'VIEW'"`
+		IfNotExists  bool             `parser:"('IF' 'NOT' 'EXISTS')?"`
+		Database     *string          `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name         string           `parser:"@(Ident | BacktickIdent)"`
+		OnCluster    *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		To           *string          `parser:"('TO' @((Ident | BacktickIdent) ('.' (Ident | BacktickIdent))?))?"`
+		Engine       *ViewEngine      `parser:"@@?"`
+		Populate     bool             `parser:"@'POPULATE'?"`
 		AsSelect     *SelectStatement `parser:"'AS' @@"`
-		Semicolon    bool          `parser:"';'"`
+		Semicolon    bool             `parser:"';'"`
 	}
 
 	// AttachViewStmt represents an ATTACH VIEW statement (for regular views only).
@@ -64,7 +64,6 @@ type (
 		Sync      bool    `parser:"'SYNC'?"`
 		Semicolon bool    `parser:"';'"`
 	}
-
 
 	// ViewEngine represents ENGINE = clause for materialized views.
 	// This captures everything from ENGINE = until the next major clause (POPULATE, AS, or ;).

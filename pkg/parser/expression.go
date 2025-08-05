@@ -146,14 +146,14 @@ type (
 
 	// FunctionCall represents function invocations
 	FunctionCall struct {
-		Name      string           `parser:"@(Ident | BacktickIdent)"`
-		Arguments []FunctionArg    `parser:"'(' (@@ (',' @@)*)? ')'"`
-		Over      *OverClause      `parser:"@@?"`
+		Name      string        `parser:"@(Ident | BacktickIdent)"`
+		Arguments []FunctionArg `parser:"'(' (@@ (',' @@)*)? ')'"`
+		Over      *OverClause   `parser:"@@?"`
 	}
 
 	// FunctionArg represents arguments in function calls (can be * or expression)
 	FunctionArg struct {
-		Star       *string    `parser:"@'*'"`
+		Star       *string     `parser:"@'*'"`
 		Expression *Expression `parser:"| @@"`
 	}
 
@@ -174,10 +174,10 @@ type (
 
 	// WindowFrame for window functions
 	WindowFrame struct {
-		Type      string     `parser:"@('ROWS' | 'RANGE')"`
-		Between   bool       `parser:"@'BETWEEN'?"`
-		Start     FrameBound `parser:"@@"`
-		End       *FrameBound `parser:"('AND' @@)?"`
+		Type    string      `parser:"@('ROWS' | 'RANGE')"`
+		Between bool        `parser:"@'BETWEEN'?"`
+		Start   FrameBound  `parser:"@@"`
+		End     *FrameBound `parser:"('AND' @@)?"`
 	}
 
 	// FrameBound represents window frame boundaries
@@ -244,9 +244,9 @@ type (
 
 	// Subquery represents a subquery expression
 	Subquery struct {
-		OpenParen    string           `parser:"'('"`
-		SelectStmt   SelectStatement  `parser:"@@"`
-		CloseParen   string           `parser:"')'"`
+		OpenParen  string          `parser:"'('"`
+		SelectStmt SelectStatement `parser:"@@"`
+		CloseParen string          `parser:"')'"`
 	}
 
 	// BetweenExpression handles BETWEEN operations (part of comparison)
@@ -316,6 +316,8 @@ func (n NotExpression) String() string {
 }
 
 // String returns the string representation of a ComparisonExpression including operators and IS NULL checks.
+//
+//nolint:nestif // Complex nested logic needed for expression string formatting
 func (c ComparisonExpression) String() string {
 	if c.Addition != nil {
 		result := c.Addition.String()
@@ -492,7 +494,6 @@ func (a FunctionArg) String() string {
 	return ""
 }
 
-
 func (t TupleExpression) String() string {
 	result := "("
 	for i, elem := range t.Elements {
@@ -596,6 +597,7 @@ func formatDataTypeForExpression(dataType DataType) string {
 	if dataType.LowCardinality != nil {
 		return "LowCardinality(" + formatDataTypeForExpression(*dataType.LowCardinality.Type) + ")"
 	}
+	//nolint:nestif // Complex nested logic needed for data type formatting in expressions
 	if dataType.Simple != nil {
 		result := dataType.Simple.Name
 		if len(dataType.Simple.Parameters) > 0 {

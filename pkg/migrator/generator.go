@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -56,6 +57,8 @@ type (
 //	target, _ := parser.ParseSQL(targetSQL)
 //
 //	migration, err := GenerateMigration(current, target, "update_analytics_schema")
+//
+//nolint:gocyclo,funlen,maintidx // Complex function handles multiple DDL statement types and migration ordering
 func GenerateMigration(current, target *parser.Grammar, name string) (*Migration, error) {
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := CompareDatabaseGrammars(current, target)
@@ -79,7 +82,7 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 	}
 
 	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 {
-		return nil, fmt.Errorf("no differences found")
+		return nil, errors.New("no differences found")
 	}
 
 	timestamp := time.Now()
@@ -94,8 +97,8 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 
 	// Process diffs in proper order: databases first, then tables, then views, then dictionaries
 	// Within each type: CREATE first, then ALTER/REPLACE, then DROP
-	var upStatements []string
-	var downStatements []string
+	upStatements := make([]string, 0, 50)   // Pre-allocate with estimated capacity
+	downStatements := make([]string, 0, 50) // Pre-allocate with estimated capacity
 
 	// Group database diffs by type for proper ordering
 	var dbCreateDiffs, dbAlterDiffs, dbRenameDiffs, dbDropDiffs []*DatabaseDiff
@@ -160,73 +163,73 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 	// UP migration: Databases first, then tables, then views, then dictionaries
 	// Database order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range dbCreateDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range dbAlterDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range dbRenameDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range dbDropDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
 	// Dictionary order: CREATE -> REPLACE -> RENAME -> DROP
 	for _, diff := range dictCreateDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range dictReplaceDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range dictRenameDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range dictDropDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
 	// Table order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range tableCreateDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range tableAlterDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range tableRenameDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range tableDropDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
 	// View order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range viewCreateDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range viewAlterDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range viewRenameDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 	for _, diff := range viewDropDiffs {
-		upStatements = append(upStatements, fmt.Sprintf("-- %s", diff.Description))
+		upStatements = append(upStatements, "-- "+diff.Description)
 		upStatements = append(upStatements, diff.UpSQL)
 	}
 
@@ -234,88 +237,88 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 	// View order: DROP <- RENAME <- ALTER <- CREATE
 	for i := len(viewDropDiffs) - 1; i >= 0; i-- {
 		diff := viewDropDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(viewRenameDiffs) - 1; i >= 0; i-- {
 		diff := viewRenameDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(viewAlterDiffs) - 1; i >= 0; i-- {
 		diff := viewAlterDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(viewCreateDiffs) - 1; i >= 0; i-- {
 		diff := viewCreateDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 
 	// Table order: DROP <- RENAME <- ALTER <- CREATE
 	for i := len(tableDropDiffs) - 1; i >= 0; i-- {
 		diff := tableDropDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(tableRenameDiffs) - 1; i >= 0; i-- {
 		diff := tableRenameDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(tableAlterDiffs) - 1; i >= 0; i-- {
 		diff := tableAlterDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(tableCreateDiffs) - 1; i >= 0; i-- {
 		diff := tableCreateDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 
 	// Dictionary order: DROP <- RENAME <- REPLACE <- CREATE
 	for i := len(dictDropDiffs) - 1; i >= 0; i-- {
 		diff := dictDropDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(dictRenameDiffs) - 1; i >= 0; i-- {
 		diff := dictRenameDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(dictReplaceDiffs) - 1; i >= 0; i-- {
 		diff := dictReplaceDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(dictCreateDiffs) - 1; i >= 0; i-- {
 		diff := dictCreateDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 
 	// Database order: DROP <- RENAME <- ALTER <- CREATE
 	for i := len(dbDropDiffs) - 1; i >= 0; i-- {
 		diff := dbDropDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(dbRenameDiffs) - 1; i >= 0; i-- {
 		diff := dbRenameDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(dbAlterDiffs) - 1; i >= 0; i-- {
 		diff := dbAlterDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 	for i := len(dbCreateDiffs) - 1; i >= 0; i-- {
 		diff := dbCreateDiffs[i]
-		downStatements = append(downStatements, fmt.Sprintf("-- Rollback: %s", diff.Description))
+		downStatements = append(downStatements, "-- Rollback: "+diff.Description)
 		downStatements = append(downStatements, diff.DownSQL)
 	}
 

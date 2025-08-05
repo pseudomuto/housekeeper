@@ -61,7 +61,7 @@ func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName
 
 	// Connect to ClickHouse
 	fmt.Printf("Connecting to ClickHouse at %s...\n", dsn)
-	client, err := clickhouse.NewClient(dsn)
+	client, err := clickhouse.NewClient(ctx, dsn)
 	if err != nil {
 		return fmt.Errorf("failed to connect to ClickHouse: %w", err)
 	}
@@ -106,7 +106,7 @@ func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName
 	}
 
 	// Create migrations directory if it doesn't exist
-	if err := os.MkdirAll(migrationsPath, 0755); err != nil {
+	if err := os.MkdirAll(migrationsPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create migrations directory: %w", err)
 	}
 
@@ -114,11 +114,11 @@ func runDiff(ctx context.Context, dsn, schemaPath, migrationsPath, migrationName
 	upFile := filepath.Join(migrationsPath, fmt.Sprintf("%s_%s.up.sql", migration.Version, migration.Name))
 	downFile := filepath.Join(migrationsPath, fmt.Sprintf("%s_%s.down.sql", migration.Version, migration.Name))
 
-	if err := os.WriteFile(upFile, []byte(migration.Up), 0644); err != nil {
+	if err := os.WriteFile(upFile, []byte(migration.Up), 0o600); err != nil {
 		return fmt.Errorf("failed to write up migration: %w", err)
 	}
 
-	if err := os.WriteFile(downFile, []byte(migration.Down), 0644); err != nil {
+	if err := os.WriteFile(downFile, []byte(migration.Down), 0o600); err != nil {
 		return fmt.Errorf("failed to write down migration: %w", err)
 	}
 

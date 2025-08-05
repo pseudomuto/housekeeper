@@ -1,5 +1,7 @@
 # Housekeeper
 
+[![CI](https://github.com/pseudomuto/housekeeper/workflows/CI/badge.svg)](https://github.com/pseudomuto/housekeeper/actions?query=workflow%3ACI)
+
 A modern command-line tool for managing ClickHouse schema migrations with comprehensive support for databases, dictionaries, views, and tables. Built with a robust participle-based parser for reliable DDL parsing and intelligent migration generation.
 
 ## Features
@@ -950,6 +952,10 @@ pkg/migrator/
 - **Error handling**: Fails fast with detailed error messages
 
 See the [CLAUDE.md](CLAUDE.md) file for comprehensive technical documentation.
+
+## Contributing
+
+We welcome contributions! Please see [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines on how to contribute to this project.
 
 ## Project Status
 

@@ -1,0 +1,53 @@
+version: 2
+
+project_name: gooey
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - skip: true
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}-{{ .Version }}-source"
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: "Enhancements"
+      order: 0
+    - title: "Bug fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+
+release:
+  footer: |
+    ## Version {{ .Tag }}
+
+    ### Go Install
+    ```bash
+    go install github.com/pseudomuto/gooey@{{ .Tag }}
+    ```
+
+    **Full Changelog**: https://github.com/pseudomuto/gooey/compare/{{ .PreviousTag }}...{{ .Tag }}
+
