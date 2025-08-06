@@ -60,9 +60,34 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 
 ## Installation
 
+### Binary Installation
+
 ```bash
 go get github.com/pseudomuto/housekeeper
 ```
+
+### Container Usage
+
+Housekeeper is available as a container image:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/pseudomuto/housekeeper:latest
+
+# Run with help
+docker run --rm ghcr.io/pseudomuto/housekeeper:latest --help
+
+# Run diff command with mounted schema directory
+docker run --rm \
+  -v $(pwd)/schema:/schema \
+  -v $(pwd)/migrations:/migrations \
+  ghcr.io/pseudomuto/housekeeper:latest \
+  diff --dsn host.docker.internal:9000 --schema /schema --migrations /migrations --name setup_schema
+
+# Use specific version
+docker run --rm ghcr.io/pseudomuto/housekeeper:v1.0.0 --version
+```
+
 
 ## Usage
 

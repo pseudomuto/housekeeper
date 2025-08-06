@@ -26,6 +26,7 @@ housekeeper/
 ## Code Style
 
 Follow the conventions in [CLAUDE.md](CLAUDE.md):
+
 - Use `goimports` for formatting
 - Order code elements: package, imports, const, var, type, functions
 - Use `github.com/pkg/errors` for error handling
@@ -67,10 +68,12 @@ go test -v -run TestParserWithTestdata -update ./pkg/parser
 #### Test Structure
 
 Each test consists of:
+
 - `.sql` file with DDL statements to parse
 - `.yaml` file with expected parsing results
 
 Example `testdata/example.yaml`:
+
 ```yaml
 databases:
   db_name:
@@ -83,11 +86,13 @@ databases:
 #### Adding Parser Tests
 
 1. Create a new SQL file in `pkg/parser/testdata/`:
+
 ```sql
 CREATE DATABASE test_db ENGINE = Atomic COMMENT 'Test database';
 ```
 
 2. Generate the YAML file using -update:
+
 ```bash
 go test -v -run TestParserWithTestdata/your_test.sql -update
 ```
@@ -123,6 +128,7 @@ go test -v -run TestMigrationGeneration -update-migration
 4. **Mock external dependencies** - Don't require a real ClickHouse instance for unit tests
 
 Example test structure:
+
 ```go
 func TestFeature(t *testing.T) {
     tests := []struct {
@@ -157,6 +163,88 @@ func TestFeature(t *testing.T) {
 }
 ```
 
+## Release Process
+
+Releases are automated through GitHub Actions when a new tag is pushed. The project follows semantic versioning (vX.Y.Z).
+
+### Prerequisites for Releases
+
+1. **GPG Signing**: Configure Git with your GPG key for signing tags:
+
+   ```bash
+   git config --global user.signingkey YOUR_GPG_KEY_ID
+   ```
+
+2. **Clean Working Directory**: Ensure no uncommitted changes:
+
+   ```bash
+   git status
+   ```
+
+3. **Task Runner**: Install [Task](https://taskfile.dev) for running release commands
+
+### Creating a Release
+
+#### Manual Release (Specific Version)
+
+To create a release with a specific version:
+
+```bash
+task tag TAG=v1.2.3
+```
+
+This command will:
+
+- Validate the tag format (must be vX.Y.Z)
+- Create a signed Git tag with message "Release vX.Y.Z"
+- Push the tag to GitHub
+- Trigger GitHub Actions to build and publish the release
+
+#### Automated Version Bumping
+
+For convenience, use these commands to automatically bump versions:
+
+- **Patch Release** (v1.2.3 → v1.2.4): `task tag:patch`
+- **Minor Release** (v1.2.3 → v1.3.0): `task tag:minor`
+- **Major Release** (v1.2.3 → v2.0.0): `task tag:major`
+
+### Testing Releases Locally
+
+Before creating an actual release, test the build process:
+
+```bash
+# Build binaries and Docker images locally
+task build
+
+# Check generated artifacts
+ls -la dist/
+
+# Test a Docker image
+docker run --rm ghcr.io/pseudomuto/housekeeper:0.0.1-next --version
+```
+
+### Release Artifacts
+
+Once a tag is pushed, GitHub Actions automatically:
+
+1. **Builds binaries** for multiple platforms:
+   - Linux (amd64, arm64)
+   - macOS (amd64, arm64)
+
+2. **Creates archives** containing:
+   - Binary executable
+   - README.md
+
+3. **Builds and pushes Docker images** to GitHub Container Registry:
+   - `ghcr.io/pseudomuto/housekeeper:vX.Y.Z` (specific version)
+   - `ghcr.io/pseudomuto/housekeeper:latest` (latest stable)
+
+4. **Generates release notes** with:
+   - Changelog grouped by type (Features, Bug Fixes, Others)
+   - Installation instructions
+   - Container pull commands
+   - Link to full changelog
+
 ## Submitting Changes
 
 1. Fork the repository
@@ -179,6 +267,7 @@ func TestFeature(t *testing.T) {
 ## Reporting Issues
 
 When reporting issues, please include:
+
 - ClickHouse version
 - Go version
 - Minimal reproduction steps
@@ -198,3 +287,4 @@ Areas where contributions are particularly welcome:
 ## Questions?
 
 Feel free to open an issue for discussion or clarification on any aspect of the project.
+
