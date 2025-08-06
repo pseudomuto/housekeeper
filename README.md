@@ -2,17 +2,22 @@
 
 [![CI](https://github.com/pseudomuto/housekeeper/workflows/CI/badge.svg)](https://github.com/pseudomuto/housekeeper/actions?query=workflow%3ACI)
 
-A modern command-line tool for managing ClickHouse schema migrations with comprehensive support for databases, dictionaries, views, and tables. Built with a robust participle-based parser for reliable DDL parsing and intelligent migration generation.
+A modern command-line tool for managing ClickHouse schema migrations with comprehensive support for databases, dictionaries, views, and tables. Built with a robust participle-based parser for reliable DDL parsing, intelligent migration generation, and SumFile-based integrity checking.
 
 ## Features
 
 - **Modern Parser**: Built with participle v2 for robust, maintainable ClickHouse DDL parsing
 - **Complete DDL Support**: Full support for databases, dictionaries, views, and table operations
 - **Complete Query Engine**: Full SELECT statement parsing with joins, subqueries, CTEs, and window functions
+- **Project Management**: Complete project initialization and schema compilation with import directives
+- **Migration File Generation**: Timestamped migration files with UTC format and automatic directory creation
+- **Migration Set Management**: Load, validate, and manage migration files with SumFile integrity checking
+- **SQL Formatting**: Professional SQL output with configurable styling, indentation, and ClickHouse-optimized backtick formatting
 - **Intelligent Migrations**: Smart comparison and migration generation with proper operation ordering
 - **Expression Engine**: Advanced expression parsing with proper operator precedence
 - **Cluster-Aware**: Full support for `ON CLUSTER` distributed DDL operations
 - **Comprehensive Testing**: Extensive test suite with testdata-driven approach
+- **Build Pipeline**: Automated multi-platform releases with Docker images
 
 ### Supported Operations
 
@@ -59,9 +64,34 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 
 ## Installation
 
+### Binary Installation
+
 ```bash
 go get github.com/pseudomuto/housekeeper
 ```
+
+### Container Usage
+
+Housekeeper is available as a container image:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/pseudomuto/housekeeper:latest
+
+# Run with help
+docker run --rm ghcr.io/pseudomuto/housekeeper:latest --help
+
+# Run diff command with mounted schema directory
+docker run --rm \
+  -v $(pwd)/schema:/schema \
+  -v $(pwd)/migrations:/migrations \
+  ghcr.io/pseudomuto/housekeeper:latest \
+  diff --dsn host.docker.internal:9000 --schema /schema --migrations /migrations --name setup_schema
+
+# Use specific version
+docker run --rm ghcr.io/pseudomuto/housekeeper:v1.0.0 --version
+```
+
 
 ## Usage
 
@@ -148,6 +178,86 @@ FROM analytics.events
 GROUP BY user_id;
 ```
 
+### Project Management
+
+Housekeeper provides a complete project management system for organizing your ClickHouse schemas:
+
+#### Initialize a New Project
+
+```bash
+# Create project directory
+mkdir my-clickhouse-project && cd my-clickhouse-project
+
+# Initialize project structure (idempotent)
+housekeeper init
+```
+
+This creates the following structure:
+```
+my-clickhouse-project/
+├── housekeeper.yaml        # Environment configuration
+├── db/
+│   ├── main.sql            # Main schema entrypoint
+│   ├── migrations/
+│   │   └── dev/            # Development migrations
+│   └── schemas/            # Organized schema files
+```
+
+#### Configuration File
+
+The `housekeeper.yaml` file defines environments and their schema entrypoints:
+
+```yaml
+environments:
+  - name: local
+    dev: clickhouse://localhost:9000/dev_db
+    url: clickhouse://localhost:9000/prod_db
+    entrypoint: db/main.sql
+  - name: staging
+    url: clickhouse://staging:9443/staging_db
+    entrypoint: db/staging.sql
+  - name: production
+    url: clickhouse://prod:9443/prod_db
+    entrypoint: db/production.sql
+```
+
+#### Schema Import System
+
+Use import directives to organize your schemas into modular files:
+
+**db/main.sql:**
+```sql
+-- Main schema file
+CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
+
+-- Import table definitions
+-- housekeeper:import schemas/analytics/tables/events.sql
+-- housekeeper:import schemas/analytics/tables/users.sql
+
+-- Import dictionary definitions
+-- housekeeper:import schemas/analytics/dictionaries/user_lookup.sql
+```
+
+**db/schemas/analytics/tables/events.sql:**
+```sql
+CREATE TABLE analytics.events (
+    id UUID DEFAULT generateUUIDv4(),
+    timestamp DateTime,
+    event_type LowCardinality(String),
+    user_id UInt64
+) ENGINE = MergeTree() ORDER BY timestamp;
+```
+
+#### Parse and Validate Schemas
+
+```bash
+# Parse schema for specific environment
+housekeeper parse --env production
+
+# Validate schema syntax
+housekeeper validate --env local
+```
+
 ### Generate Migrations
 
 Compare your schema definition with the current database state:
@@ -165,16 +275,15 @@ This will:
 
 ### Migration Files
 
-The tool generates timestamped migration files:
-- `20240101120000_setup_databases.up.sql` - Apply changes
-- `20240101120000_setup_databases.down.sql` - Rollback changes
+The tool generates timestamped migration files using UTC format:
+- `20240101120000_schema_update.sql` - Contains changes to apply
+- Down migrations are generated by swapping current and target schemas
 
-Example migration output:
+Example migration file content:
 
-**UP Migration:**
 ```sql
--- Schema migration: setup_databases
--- Generated at: 2024-01-01 12:00:00
+-- Schema migration generated at 2024-01-01 12:00:00 UTC
+-- Down migration: swap current and target schemas and regenerate
 
 -- Create database 'analytics'
 CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
@@ -562,6 +671,73 @@ See the `examples/` directory for comprehensive sample schema files demonstratin
 
 The parser can be used programmatically for schema analysis and custom tooling:
 
+### SQL Formatting
+
+The format package provides professional SQL formatting for ClickHouse DDL statements:
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "log"
+    
+    "github.com/pseudomuto/housekeeper/pkg/format"
+    "github.com/pseudomuto/housekeeper/pkg/parser"
+)
+
+func main() {
+    // Parse SQL statements
+    sql := `CREATE DATABASE analytics ENGINE = Atomic; CREATE TABLE analytics.events (id UUID, timestamp DateTime) ENGINE = MergeTree ORDER BY timestamp;`
+    
+    grammar, err := parser.ParseSQL(sql)
+    if err != nil {
+        log.Fatalf("Parse error: %v", err)
+    }
+    
+    // Format with custom options
+    formatter := format.New(format.FormatterOptions{
+        IndentSize:        2,
+        UppercaseKeywords: false,
+        AlignColumns:      true,
+    })
+    
+    var buf bytes.Buffer
+    err = formatter.Format(&buf, grammar.Statements...)
+    if err != nil {
+        log.Fatalf("Format error: %v", err)
+    }
+    
+    fmt.Println(buf.String())
+    // Output:
+    // create database `analytics` engine = Atomic();
+    //
+    // create table `analytics`.`events` (
+    //   `id`        UUID,
+    //   `timestamp` DateTime
+    // )
+    // engine = MergeTree()
+    // order by `timestamp`;
+    
+    // Or use the convenience function with defaults
+    var buf2 bytes.Buffer
+    err = format.Format(&buf2, format.Defaults, grammar.Statements...)
+    if err != nil {
+        log.Fatalf("Format error: %v", err)
+    }
+    
+    // Or format the entire grammar at once
+    var buf3 bytes.Buffer
+    err = format.FormatGrammar(&buf3, format.Defaults, grammar)
+    if err != nil {
+        log.Fatalf("Format error: %v", err)
+    }
+}
+```
+
+### Schema Analysis
+
 ```go
 package main
 
@@ -790,6 +966,136 @@ func main() {
 }
 ```
 
+### Timestamped Migration File Generation
+
+Generate timestamped migration files directly to disk using the migrator package:
+
+```go
+package main
+
+import (
+    "errors"
+    "fmt"
+    "log"
+    
+    "github.com/pseudomuto/housekeeper/pkg/migrator"
+    "github.com/pseudomuto/housekeeper/pkg/parser"
+)
+
+func main() {
+    // Define current and target schemas
+    currentSchema, err := parser.ParseSQL(`
+        CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Old comment';
+    `)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    targetSchema, err := parser.ParseSQL(`
+        CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Updated comment';
+        CREATE TABLE analytics.events (
+            id UInt64,
+            name String,
+            timestamp DateTime DEFAULT now()
+        ) ENGINE = MergeTree() ORDER BY timestamp;
+    `)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Generate timestamped migration file
+    filename, err := migrator.GenerateMigrationFile("/path/to/migrations", currentSchema, targetSchema)
+    if err != nil {
+        if errors.Is(err, migrator.ErrNoDiff) {
+            fmt.Println("No differences found between schemas")
+            return
+        }
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Generated migration: %s\n", filename)
+    // Output: Generated migration: 20240806143022_schema_update.sql
+
+    // Generate down migration by swapping parameters
+    downFilename, err := migrator.GenerateMigrationFile("/path/to/migrations", targetSchema, currentSchema)
+    if err != nil {
+        if errors.Is(err, migrator.ErrNoDiff) {
+            fmt.Println("No differences found for down migration")
+            return
+        }
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Generated down migration: %s\n", downFilename)
+    // Output: Generated down migration: 20240806143023_schema_update.sql
+}
+```
+
+### Migration Set Management
+
+Manage and validate migration files with integrity checking:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    
+    "github.com/pseudomuto/housekeeper/pkg/project"
+)
+
+func main() {
+    // Initialize project
+    proj := project.New("/path/to/project")
+    err := proj.Initialize()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Load migration set for environment
+    migrationSet, err := proj.LoadMigrationSet("production")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Access migration files (sorted lexicographically)
+    files := migrationSet.Files()
+    fmt.Printf("Found %d migration files:\n", len(files))
+    for i, file := range files {
+        fmt.Printf("%d. %s\n", i+1, file)
+    }
+
+    // Generate SumFile for integrity checking
+    sumFile, err := migrationSet.GenerateSumFile()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Generated SumFile with %d files\n", sumFile.Files())
+
+    // Validate migration set integrity
+    isValid, err := migrationSet.IsValid()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if isValid {
+        fmt.Println("✅ Migration set is valid - all files match SumFile")
+    } else {
+        fmt.Println("❌ Migration set validation failed - files have been modified")
+    }
+}
+```
+
+#### Migration File Features
+
+- **UTC Timestamps**: Files named using `yyyyMMddhhmmss` format for consistent ordering across time zones
+- **Automatic Directory Creation**: Migration directories are created automatically if they don't exist
+- **Down Migration Support**: Generate down migrations by swapping current and target schemas
+- **SumFile Validation**: SHA256-based integrity checking using reverse one-branch merkle tree
+- **Deterministic Ordering**: Files processed in lexicographical order for consistent hash generation
+
 ## Advanced Features
 
 ### Query Parsing
@@ -847,6 +1153,7 @@ Housekeeper is built with a modern, extensible architecture designed for reliabi
 - **Participle-based Parser**: Modern parsing using structured grammar rules instead of regex patterns
 - **Query Engine**: Complete SELECT statement parsing with joins, subqueries, CTEs, and window functions
 - **Expression Engine**: Comprehensive expression parsing with proper operator precedence
+- **SQL Formatter**: Professional SQL formatting with configurable styling and ClickHouse-optimized output
 - **Schema Comparison**: Intelligent difference detection between current and target schemas
 - **Migration Generator**: Creates executable up/down SQL migrations with proper operation ordering
 - **ClickHouse Client**: Connects and reads current schema state from live instances
@@ -953,6 +1260,61 @@ pkg/migrator/
 
 See the [CLAUDE.md](CLAUDE.md) file for comprehensive technical documentation.
 
+## Development
+
+### Build and Test
+
+The project uses [Task](https://taskfile.dev) for build automation:
+
+```bash
+# Install dependencies
+task update
+
+# Run tests
+task test
+
+# Run linter
+task lint
+
+# Build local snapshot (binaries + Docker images)
+task build
+```
+
+### Release Process
+
+Releases are automated through GitHub Actions using GoReleaser:
+
+- **Signed Tags**: Create signed Git tags for releases
+- **Multi-platform Builds**: Linux and macOS (amd64, arm64)
+- **Docker Images**: Automatically built and pushed to GitHub Container Registry
+- **GitHub Releases**: Generated with changelogs and artifacts
+
+Create a release:
+
+```bash
+# Patch release (v1.0.0 -> v1.0.1)
+task tag:patch
+
+# Minor release (v1.0.0 -> v1.1.0)
+task tag:minor
+
+# Major release (v1.0.0 -> v2.0.0)
+task tag:major
+
+# Specific version
+task tag TAG=v1.2.3
+```
+
+### Architecture
+
+Built with modern Go practices:
+
+- **Participle Parser**: Grammar-based parsing instead of regex
+- **Comprehensive Testing**: Testdata-driven tests with YAML expectations
+- **Clean Architecture**: Separated concerns across packages
+- **Error Handling**: Structured error handling with context
+- **Performance**: Stateless parser optimized for speed and memory usage
+
 ## Contributing
 
 We welcome contributions! Please see [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines on how to contribute to this project.
@@ -968,6 +1330,7 @@ Housekeeper provides a comprehensive solution for ClickHouse schema management w
 - **Complete Dictionary Operations**: Full lifecycle management with complex attributes and all ClickHouse features  
 - **Complete View Operations**: Regular and materialized views with ENGINE support and proper migration strategies
 - **Complete Query Engine**: Full SELECT statement parsing with CTEs, joins, window functions, and subqueries
+- **Professional SQL Formatting**: Configurable styling, proper indentation, backtick formatting, and column alignment
 - **Advanced Expression Engine**: Comprehensive expression parsing with proper operator precedence
 - **Intelligent Migrations**: Smart comparison algorithms with rename detection and proper operation ordering
 - **Robust Testing**: Extensive testdata-driven test suite with automatic YAML generation
@@ -977,6 +1340,7 @@ Housekeeper provides a comprehensive solution for ClickHouse schema management w
 
 - **Production Ready**: Battle-tested parser with comprehensive ClickHouse DDL support
 - **Maintainable**: Clear grammar rules instead of complex regex patterns
+- **Professional Output**: Clean, formatted SQL with consistent styling and ClickHouse best practices
 - **Extensible**: Easy to add new ClickHouse features as they emerge
 - **Reliable**: Extensive test coverage with both parsing and migration test suites
 - **Intelligent**: Rename detection avoids unnecessary DROP+CREATE operations

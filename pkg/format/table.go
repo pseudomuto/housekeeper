@@ -1,13 +1,14 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // CreateTable formats a CREATE TABLE statement with proper indentation and alignment
-func (f *Formatter) CreateTable(stmt *parser.CreateTableStmt) string {
+func (f *Formatter) createTable(w io.Writer, stmt *parser.CreateTableStmt) error {
 	lines := make([]string, 0, 10) // Approximate capacity for typical table
 
 	// Build the header line
@@ -84,11 +85,12 @@ func (f *Formatter) CreateTable(stmt *parser.CreateTableStmt) string {
 		lines = append(lines, f.keyword("COMMENT")+" "+*stmt.Comment)
 	}
 
-	return strings.Join(lines, "\n") + ";"
+	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+	return err
 }
 
 // AlterTable formats an ALTER TABLE statement
-func (f *Formatter) AlterTable(stmt *parser.AlterTableStmt) string {
+func (f *Formatter) alterTable(w io.Writer, stmt *parser.AlterTableStmt) error {
 	lines := make([]string, 0, len(stmt.Operations)+1) // Header + operations
 
 	// Header
@@ -114,11 +116,12 @@ func (f *Formatter) AlterTable(stmt *parser.AlterTableStmt) string {
 		lines = append(lines, opLine)
 	}
 
-	return strings.Join(lines, "\n") + ";"
+	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+	return err
 }
 
 // AttachTable formats an ATTACH TABLE statement
-func (f *Formatter) AttachTable(stmt *parser.AttachTableStmt) string {
+func (f *Formatter) attachTable(w io.Writer, stmt *parser.AttachTableStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH TABLE"))
@@ -133,11 +136,12 @@ func (f *Formatter) AttachTable(stmt *parser.AttachTableStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DetachTable formats a DETACH TABLE statement
-func (f *Formatter) DetachTable(stmt *parser.DetachTableStmt) string {
+func (f *Formatter) detachTable(w io.Writer, stmt *parser.DetachTableStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH TABLE"))
@@ -160,11 +164,12 @@ func (f *Formatter) DetachTable(stmt *parser.DetachTableStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DropTable formats a DROP TABLE statement
-func (f *Formatter) DropTable(stmt *parser.DropTableStmt) string {
+func (f *Formatter) dropTable(w io.Writer, stmt *parser.DropTableStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP TABLE"))
@@ -183,11 +188,12 @@ func (f *Formatter) DropTable(stmt *parser.DropTableStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // RenameTable formats a RENAME TABLE statement
-func (f *Formatter) RenameTable(stmt *parser.RenameTableStmt) string {
+func (f *Formatter) renameTable(w io.Writer, stmt *parser.RenameTableStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("RENAME TABLE"))
@@ -204,7 +210,8 @@ func (f *Formatter) RenameTable(stmt *parser.RenameTableStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // formatTableElements formats table elements with optional alignment

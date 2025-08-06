@@ -1,22 +1,25 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // SelectStatement formats a top-level SELECT statement
-func (f *Formatter) SelectStatement(stmt *parser.TopLevelSelectStatement) string {
+func (f *Formatter) selectStatement(w io.Writer, stmt *parser.TopLevelSelectStatement) error {
 	if stmt == nil {
-		return ""
+		return nil
 	}
 
 	result := f.formatSelectStatement(&stmt.SelectStatement)
 	if result != "" {
 		result += ";"
+		_, err := w.Write([]byte(result))
+		return err
 	}
-	return result
+	return nil
 }
 
 // formatSelectStatement formats a SELECT statement for views and subqueries

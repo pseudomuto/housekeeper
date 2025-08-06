@@ -123,35 +123,6 @@ var (
 	)
 )
 
-// GetLexer returns the ClickHouse lexer definition used by the parser.
-// This function is primarily useful for testing and debugging purposes,
-// allowing access to the underlying lexer configuration.
-//
-// The returned lexer includes rules for ClickHouse-specific tokens including:
-//   - Comments (single-line with -- and multi-line with /* */)
-//   - String literals with escape sequences
-//   - Backtick identifiers for reserved words and special characters
-//   - Numeric literals (integers and decimals)
-//   - Operators and punctuation
-//   - ClickHouse keywords and reserved words
-//
-// Example usage for testing:
-//
-//	lexer := parser.GetLexer()
-//	tokens, err := lexer.Tokenise("", "SELECT * FROM users WHERE active = 1")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	for _, token := range tokens {
-//	    fmt.Printf("Token: %s = %q\n", token.Type, token.Value)
-//	}
-//
-// This will output the tokenized representation of the SQL string, showing
-// how the lexer breaks down the input into individual tokens for parsing.
-func GetLexer() lexer.Definition {
-	return clickhouseLexer
-}
-
 type (
 	// Grammar defines the complete ClickHouse DDL grammar
 	Grammar struct {
@@ -184,6 +155,35 @@ type (
 		SelectStatement  *TopLevelSelectStatement `parser:"| @@"`
 	}
 )
+
+// GetLexer returns the ClickHouse lexer definition used by the parser.
+// This function is primarily useful for testing and debugging purposes,
+// allowing access to the underlying lexer configuration.
+//
+// The returned lexer includes rules for ClickHouse-specific tokens including:
+//   - Comments (single-line with -- and multi-line with /* */)
+//   - String literals with escape sequences
+//   - Backtick identifiers for reserved words and special characters
+//   - Numeric literals (integers and decimals)
+//   - Operators and punctuation
+//   - ClickHouse keywords and reserved words
+//
+// Example usage for testing:
+//
+//	lexer := parser.GetLexer()
+//	tokens, err := lexer.Tokenise("", "SELECT * FROM users WHERE active = 1")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	for _, token := range tokens {
+//	    fmt.Printf("Token: %s = %q\n", token.Type, token.Value)
+//	}
+//
+// This will output the tokenized representation of the SQL string, showing
+// how the lexer breaks down the input into individual tokens for parsing.
+func GetLexer() lexer.Definition {
+	return clickhouseLexer
+}
 
 // ParseSQL parses ClickHouse DDL statements from a string and returns the parsed Grammar.
 // This is the primary parsing function that converts SQL text into structured DDL statements.

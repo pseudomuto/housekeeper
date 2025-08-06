@@ -1,16 +1,16 @@
 package format_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
-	"github.com/pseudomuto/housekeeper/pkg/format"
+	. "github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestFormatter_SelectStatement(t *testing.T) {
+func TestFormatter_selectStatement(t *testing.T) {
 	tests := []struct {
 		name     string
 		sql      string
@@ -167,8 +167,6 @@ func TestFormatter_SelectStatement(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
@@ -176,13 +174,16 @@ func TestFormatter_SelectStatement(t *testing.T) {
 			require.Len(t, grammar.Statements, 1)
 			require.NotNil(t, grammar.Statements[0].SelectStatement)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			var buf bytes.Buffer
+			err = Format(&buf, Defaults, grammar.Statements[0])
+			require.NoError(t, err)
+			formatted := buf.String()
 			lines := strings.Split(formatted, "\n")
 
 			// Compare line by line for better error reporting
 			require.Len(t, lines, len(tt.expected), "Number of lines mismatch")
 			for i, expectedLine := range tt.expected {
-				assert.Equal(t, expectedLine, lines[i], "Line %d mismatch", i+1)
+				require.Equal(t, expectedLine, lines[i], "Line %d mismatch", i+1)
 			}
 		})
 	}
@@ -219,21 +220,22 @@ func TestFormatter_SelectInView(t *testing.T) {
 		},
 	}
 
-	formatter := format.NewDefault()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, grammar.Statements, 1)
 
-			formatted := formatter.Statement(grammar.Statements[0])
+			var buf bytes.Buffer
+			err = Format(&buf, Defaults, grammar.Statements[0])
+			require.NoError(t, err)
+			formatted := buf.String()
 			lines := strings.Split(formatted, "\n")
 
 			// Compare line by line for better error reporting
 			require.Len(t, lines, len(tt.expected), "Number of lines mismatch")
 			for i, expectedLine := range tt.expected {
-				assert.Equal(t, expectedLine, lines[i], "Line %d mismatch", i+1)
+				require.Equal(t, expectedLine, lines[i], "Line %d mismatch", i+1)
 			}
 		})
 	}

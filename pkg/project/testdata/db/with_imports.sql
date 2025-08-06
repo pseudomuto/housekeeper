@@ -1,0 +1,1 @@
+-- housekeeper:import schemas/imports_db/schema.sql

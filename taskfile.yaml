@@ -3,6 +3,7 @@ version: "3"
 vars:
   BIN_DIR: "bin"
   LINT_VERSION: 2.1.6
+  GORELEASER_VERSION: 2.5.0
 
 tasks:
   update:
@@ -11,6 +12,11 @@ tasks:
     silent: true
     cmds:
       - go mod tidy
+
+  run:
+    desc: Run the housekeeper cli (local build)
+    silent: true
+    cmd: go run ./cmd/housekeeper/main.go {{.CLI_ARGS}}
 
   lint:
     desc: Run golangci-lint on the codebase
@@ -23,9 +29,16 @@ tasks:
     silent: true
     cmd: go test ./... -cover
 
+  build:
+    desc: Build a local snapshot with goreleaser (including container images)
+    deps: [install:goreleaser]
+    silent: true
+    cmds:
+      - "{{.BIN_DIR}}/goreleaser release --snapshot --clean --skip=publish"
+
   tag:
-    desc: Create and push a new tag for release
-    prompt: This will create and push tag {{.TAG}}. Continue?
+    desc: Create and push a new signed tag for release
+    prompt: This will create, sign, and push tag {{.TAG}}. Continue?
     requires:
       vars: [TAG]
     preconditions:
@@ -36,9 +49,9 @@ tasks:
       - sh: '[[ "{{.TAG}}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
         msg: "TAG must be in format vX.Y.Z (e.g., v1.0.0)"
     cmds:
-      - git tag {{.TAG}}
+      - git tag -s {{.TAG}} -m "Release {{.TAG}}"
       - git push origin {{.TAG}}
-      - echo "Tag {{.TAG}} created and pushed. GitHub Actions will now build and release."
+      - echo "Signed tag {{.TAG}} created and pushed. GitHub Actions will now build and release."
 
   tag:patch:
     desc: Create and push a patch version tag (v0.0.X)
@@ -73,3 +86,18 @@ tasks:
     vars:
       URL: https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
     cmd: curl -sSfL {{.URL}} | sh -s -- -b {{.BIN_DIR}} v{{.LINT_VERSION}}
+
+  install:goreleaser:
+    internal: true
+    silent: true
+    status:
+      - test -f {{.BIN_DIR}}/goreleaser
+    vars:
+      URL: https://github.com/goreleaser/goreleaser/releases/download/nightly/goreleaser_Darwin_arm64.tar.gz
+      TMPDIR:
+        sh: mktemp -d
+    cmds:
+      - defer: rm -rf {{.TMPDIR}}
+      - curl -sSfL {{.URL}} | tar -xz -C {{.TMPDIR}}
+      - mv {{.TMPDIR}}/goreleaser {{.BIN_DIR}}/goreleaser
+      - chmod +x {{.BIN_DIR}}/goreleaser

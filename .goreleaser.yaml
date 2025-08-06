@@ -1,25 +1,64 @@
 version: 2
 
-project_name: gooey
+# Project metadata
+project_name: housekeeper
 
-before:
-  hooks:
-    - go mod tidy
-    - go test ./...
-
+# Build configuration
 builds:
-  - skip: true
+  - id: housekeeper
+    main: ./cmd/housekeeper
+    binary: housekeeper
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
 
-source:
-  enabled: true
-  name_template: "{{ .ProjectName }}-{{ .Version }}-source"
+# Archive configuration
+archives:
+  - id: default
+    ids:
+      - housekeeper
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE.txt
+      - README.md
 
+# Docker image configuration
+dockers:
+  - image_templates:
+      - "ghcr.io/pseudomuto/{{ .ProjectName }}:{{ .Version }}"
+      - "ghcr.io/pseudomuto/{{ .ProjectName }}:latest"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=ClickHouse schema migration tool"
+      - "--label=org.opencontainers.image.url=https://github.com/pseudomuto/{{ .ProjectName }}"
+      - "--label=org.opencontainers.image.source=https://github.com/pseudomuto/{{ .ProjectName }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=GPLv3"
+
+# Checksum configuration
 checksum:
   name_template: "checksums.txt"
 
+# Snapshot configuration
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
+# Changelog configuration
 changelog:
   sort: asc
   use: github
@@ -27,27 +66,43 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-      - "^chore"
-      - "merge conflict"
-      - Merge pull request
-      - Merge remote-tracking branch
-      - Merge branch
-      - go mod tidy
+      - "^ci:"
+      - "^build:"
+      - "^chore:"
   groups:
-    - title: "Enhancements"
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
       order: 0
-    - title: "Bug fixes"
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+    - title: Bug Fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
       order: 1
+    - title: Others
+      order: 999
 
+# Release configuration
 release:
-  footer: |
-    ## Version {{ .Tag }}
+  github:
+    owner: pseudomuto
+    name: housekeeper
+  draft: false
+  prerelease: auto
+  name_template: "Release {{ .Version }}"
+  header: |
+    ## ClickHouse Schema Migration Tool
 
-    ### Go Install
+    This release includes the `housekeeper` binary for managing ClickHouse schema migrations.
+
+    ### Container Image
+
+    Container image is available on GitHub Container Registry:
+
     ```bash
-    go install github.com/pseudomuto/gooey@{{ .Tag }}
+    docker pull ghcr.io/pseudomuto/housekeeper:{{ .Version }}
     ```
 
-    **Full Changelog**: https://github.com/pseudomuto/gooey/compare/{{ .PreviousTag }}...{{ .Tag }}
+    ### Installation
 
+    Download the appropriate binary for your platform from the assets below, or use the container image.
+
+  footer: |
+    **Full Changelog**: https://github.com/pseudomuto/housekeeper/compare/{{ .PreviousTag }}...{{ .Tag }}

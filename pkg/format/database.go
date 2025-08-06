@@ -1,13 +1,14 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // CreateDatabase formats a CREATE DATABASE statement
-func (f *Formatter) CreateDatabase(stmt *parser.CreateDatabaseStmt) string {
+func (f *Formatter) createDatabase(w io.Writer, stmt *parser.CreateDatabaseStmt) error {
 	var parts []string
 
 	// CREATE DATABASE
@@ -36,11 +37,12 @@ func (f *Formatter) CreateDatabase(stmt *parser.CreateDatabaseStmt) string {
 		parts = append(parts, f.keyword("COMMENT"), *stmt.Comment)
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // AlterDatabase formats an ALTER DATABASE statement
-func (f *Formatter) AlterDatabase(stmt *parser.AlterDatabaseStmt) string {
+func (f *Formatter) alterDatabase(w io.Writer, stmt *parser.AlterDatabaseStmt) error {
 	var parts []string
 
 	// ALTER DATABASE
@@ -56,11 +58,12 @@ func (f *Formatter) AlterDatabase(stmt *parser.AlterDatabaseStmt) string {
 		parts = append(parts, f.keyword("MODIFY COMMENT"), *stmt.Action.ModifyComment)
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // AttachDatabase formats an ATTACH DATABASE statement
-func (f *Formatter) AttachDatabase(stmt *parser.AttachDatabaseStmt) string {
+func (f *Formatter) attachDatabase(w io.Writer, stmt *parser.AttachDatabaseStmt) error {
 	var parts []string
 
 	// ATTACH DATABASE
@@ -84,11 +87,12 @@ func (f *Formatter) AttachDatabase(stmt *parser.AttachDatabaseStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DetachDatabase formats a DETACH DATABASE statement
-func (f *Formatter) DetachDatabase(stmt *parser.DetachDatabaseStmt) string {
+func (f *Formatter) detachDatabase(w io.Writer, stmt *parser.DetachDatabaseStmt) error {
 	var parts []string
 
 	// DETACH DATABASE
@@ -117,11 +121,12 @@ func (f *Formatter) DetachDatabase(stmt *parser.DetachDatabaseStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DropDatabase formats a DROP DATABASE statement
-func (f *Formatter) DropDatabase(stmt *parser.DropDatabaseStmt) string {
+func (f *Formatter) dropDatabase(w io.Writer, stmt *parser.DropDatabaseStmt) error {
 	var parts []string
 
 	// DROP DATABASE
@@ -145,11 +150,12 @@ func (f *Formatter) DropDatabase(stmt *parser.DropDatabaseStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // RenameDatabase formats a RENAME DATABASE statement
-func (f *Formatter) RenameDatabase(stmt *parser.RenameDatabaseStmt) string {
+func (f *Formatter) renameDatabase(w io.Writer, stmt *parser.RenameDatabaseStmt) error {
 	var parts []string
 
 	// RENAME DATABASE
@@ -167,7 +173,8 @@ func (f *Formatter) RenameDatabase(stmt *parser.RenameDatabaseStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // formatDatabaseEngine formats a database engine specification

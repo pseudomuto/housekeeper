@@ -1,13 +1,14 @@
 package format
 
 import (
+	"io"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // CreateDictionary formats a CREATE DICTIONARY statement
-func (f *Formatter) CreateDictionary(stmt *parser.CreateDictionaryStmt) string {
+func (f *Formatter) createDictionary(w io.Writer, stmt *parser.CreateDictionaryStmt) error {
 	var lines []string
 
 	// Build the header line
@@ -80,11 +81,12 @@ func (f *Formatter) CreateDictionary(stmt *parser.CreateDictionaryStmt) string {
 		lines = append(lines, f.keyword("COMMENT")+" "+*stmt.Comment)
 	}
 
-	return strings.Join(lines, "\n") + ";"
+	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+	return err
 }
 
 // AttachDictionary formats an ATTACH DICTIONARY statement
-func (f *Formatter) AttachDictionary(stmt *parser.AttachDictionaryStmt) string {
+func (f *Formatter) attachDictionary(w io.Writer, stmt *parser.AttachDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("ATTACH DICTIONARY"))
@@ -99,11 +101,12 @@ func (f *Formatter) AttachDictionary(stmt *parser.AttachDictionaryStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DetachDictionary formats a DETACH DICTIONARY statement
-func (f *Formatter) DetachDictionary(stmt *parser.DetachDictionaryStmt) string {
+func (f *Formatter) detachDictionary(w io.Writer, stmt *parser.DetachDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DETACH DICTIONARY"))
@@ -126,11 +129,12 @@ func (f *Formatter) DetachDictionary(stmt *parser.DetachDictionaryStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // DropDictionary formats a DROP DICTIONARY statement
-func (f *Formatter) DropDictionary(stmt *parser.DropDictionaryStmt) string {
+func (f *Formatter) dropDictionary(w io.Writer, stmt *parser.DropDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("DROP DICTIONARY"))
@@ -149,11 +153,12 @@ func (f *Formatter) DropDictionary(stmt *parser.DropDictionaryStmt) string {
 		parts = append(parts, f.keyword("SYNC"))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // RenameDictionary formats a RENAME DICTIONARY statement
-func (f *Formatter) RenameDictionary(stmt *parser.RenameDictionaryStmt) string {
+func (f *Formatter) renameDictionary(w io.Writer, stmt *parser.RenameDictionaryStmt) error {
 	var parts []string
 
 	parts = append(parts, f.keyword("RENAME DICTIONARY"))
@@ -170,7 +175,8 @@ func (f *Formatter) RenameDictionary(stmt *parser.RenameDictionaryStmt) string {
 		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	return strings.Join(parts, " ") + ";"
+	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+	return err
 }
 
 // formatDictionaryColumns formats dictionary column definitions
