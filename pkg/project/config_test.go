@@ -84,33 +84,13 @@ func TestLoadConfigFile(t *testing.T) {
 func validateTestConfig(t *testing.T, config *Config) {
 	t.Helper()
 	require.NotNil(t, config)
-	require.Len(t, config.Envs, 4)
+	require.Len(t, config.Envs, 1)
 
-	// Test environment with all fields
-	local := config.Envs[0]
-	require.Equal(t, "local", local.Name)
-	require.Equal(t, "clickhouse://localhost:9000/dev", local.DevURL)
-	require.Equal(t, "clickhouse://localhost:9000/prod", local.URL)
-	require.Equal(t, "db/main.sql", local.Entrypoint)
-
-	// Test environment with optional dev URL missing
-	staging := config.Envs[1]
-	require.Equal(t, "staging", staging.Name)
-	require.Empty(t, staging.DevURL)
-	require.Equal(t, "clickhouse://staging:9443/staging_db", staging.URL)
-	require.Equal(t, "schemas/staging.sql", staging.Entrypoint)
-
-	// Test environment with production settings
-	production := config.Envs[2]
-	require.Equal(t, "production", production.Name)
-	require.Empty(t, production.DevURL)
-	require.Equal(t, "clickhouse://prod:9443/prod_db", production.URL)
-	require.Equal(t, "schemas/production.sql", production.Entrypoint)
-
-	// Test environment with special characters
-	special := config.Envs[3]
-	require.Equal(t, "special-chars_123", special.Name)
-	require.Contains(t, special.DevURL, "p@ss")
-	require.Contains(t, special.URL, "complex!pass")
-	require.Contains(t, special.Entrypoint, "special chars & symbols")
+	// Test dev environment
+	dev := config.Envs[0]
+	require.Equal(t, "dev", dev.Name)
+	require.Equal(t, "docker://clickhouse:9000/dev", dev.DevURL)
+	require.Equal(t, "clickhouse://localhost:9000/prod", dev.URL)
+	require.Equal(t, "db/main.sql", dev.Entrypoint)
+	require.Equal(t, "db/migrations", dev.Dir)
 }

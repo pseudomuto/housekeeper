@@ -15,7 +15,7 @@
 --     housekeeper.sum (checksums for migrations)
 -- db/schemas/
 --   [DATABASE]
---     db.sql
+--     schema.sql
 --       -- housekeeper:import tables/[TABLE].sql
 --     dictionaries/
 --     tables/

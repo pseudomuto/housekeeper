@@ -41,36 +41,19 @@ import (
 //		}
 //	}
 func (p *Project) ParseSchema(env string) (*parser.Grammar, error) {
-	if p.config == nil {
-		return nil, errors.New("project not initialized - call Initialize() first")
-	}
-
-	var found *Env
-	for _, e := range p.config.Envs {
-		if strings.EqualFold(e.Name, env) {
-			found = e
+	var g *parser.Grammar
+	err := p.withEnv(env, func(e *Env) error {
+		var buf bytes.Buffer
+		if err := compileSchema(e.Entrypoint, &buf); err != nil {
+			return errors.Wrapf(err, "failed to load schema from: %s", e.Entrypoint)
 		}
-	}
 
-	if found == nil {
-		return nil, errors.Errorf("Env not found: %s", env)
-	}
+		var err error
+		g, err = parser.ParseSQL(buf.String())
+		return errors.Wrap(err, "failed to parse schema SQL")
+	})
 
-	// Save current directory and change to project root
-	pwd, _ := os.Getwd()
-	defer func() { _ = os.Chdir(pwd) }()
-
-	if err := os.Chdir(p.root); err != nil {
-		return nil, errors.Wrapf(err, "failed to change to project root: %s", p.root)
-	}
-
-	var buf bytes.Buffer
-	if err := compileSchema(found.Entrypoint, &buf); err != nil {
-		return nil, errors.Wrapf(err, "failed to load schema from: %s", found.Entrypoint)
-	}
-
-	g, err := parser.ParseSQL(buf.String())
-	return g, errors.Wrap(err, "failed to parse schema SQL")
+	return g, err
 }
 
 // compileSchema recursively compiles an Atlas schema file and its imports. It processes import directives (lines

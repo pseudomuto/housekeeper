@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing/fstest"
 
 	"github.com/pkg/errors"
@@ -136,4 +137,30 @@ func (p *Project) ensureDirectory() error {
 	}
 
 	return nil
+}
+
+func (p *Project) withEnv(env string, fn func(*Env) error) error {
+	if p.config == nil {
+		return errors.New("project not initialized - call Initialize() first")
+	}
+
+	var found *Env
+	for _, e := range p.config.Envs {
+		if strings.EqualFold(e.Name, env) {
+			found = e
+		}
+	}
+
+	if found == nil {
+		return errors.Errorf("Env not found: %s", env)
+	}
+
+	pwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(pwd) }()
+
+	if err := os.Chdir(p.root); err != nil {
+		return errors.Wrapf(err, "failed to change to project root: %s", p.root)
+	}
+
+	return fn(found)
 }

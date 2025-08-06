@@ -1,0 +1,1 @@
+CREATE DATABASE staging_db ENGINE = Atomic;

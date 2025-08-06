@@ -31,6 +31,9 @@ type (
 		// Entrypoint specifies the main SQL file that serves as the entry point for this environment's schema
 		Entrypoint string `yaml:"entrypoint"`
 
+		// Dir specifies the directory where migration files for this environment are stored
+		Dir string `yaml:"dir"`
+
 		// DevURL is the optional development database connection URL
 		// This is typically used for local development and testing scenarios
 		DevURL string `yaml:"dev"`
@@ -68,6 +71,7 @@ type (
 //	    dev: clickhouse://localhost:9000/dev
 //	    url: clickhouse://localhost:9000/prod
 //	    entrypoint: db/main.sql
+//	    dir: db/migrations/local
 //	`
 //
 //	config, err := schema.LoadConfig(strings.NewReader(yamlData))
