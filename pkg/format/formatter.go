@@ -118,6 +118,23 @@ var Defaults = FormatterOptions{
 //	//     `name` String
 //	// )
 //	// ENGINE = MergeTree();
+
+// New creates a new Formatter instance with the specified formatting options.
+// Use this when you need to format multiple statements with the same options.
+//
+// Example:
+//
+//	// Create formatter with custom options
+//	formatter := format.New(format.FormatterOptions{
+//		IndentSize:        4,
+//		UppercaseKeywords: true,
+//		AlignColumns:      true,
+//	})
+//
+//	// Format multiple statements
+//	var buf1, buf2 bytes.Buffer
+//	err := formatter.Format(&buf1, stmt1, stmt2)
+//	err = formatter.Format(&buf2, stmt3, stmt4)
 func New(options FormatterOptions) *Formatter {
 	return &Formatter{options: &options}
 }
