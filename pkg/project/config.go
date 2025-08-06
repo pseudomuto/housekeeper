@@ -1,4 +1,4 @@
-package schema
+package project
 
 import (
 	"io"

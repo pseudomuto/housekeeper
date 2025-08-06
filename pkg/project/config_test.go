@@ -1,4 +1,4 @@
-package schema_test
+package project_test
 
 import (
 	_ "embed"
@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/pseudomuto/housekeeper/pkg/schema"
+	. "github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/config.yaml
+//go:embed embed/housekeeper.yaml
 var testConfigYAML string
 
 func TestLoadConfig(t *testing.T) {

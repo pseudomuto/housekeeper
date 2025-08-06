@@ -9,11 +9,13 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 - **Modern Parser**: Built with participle v2 for robust, maintainable ClickHouse DDL parsing
 - **Complete DDL Support**: Full support for databases, dictionaries, views, and table operations
 - **Complete Query Engine**: Full SELECT statement parsing with joins, subqueries, CTEs, and window functions
+- **Project Management**: Complete project initialization and schema compilation with import directives
 - **SQL Formatting**: Professional SQL output with configurable styling, indentation, and ClickHouse-optimized backtick formatting
 - **Intelligent Migrations**: Smart comparison and migration generation with proper operation ordering
 - **Expression Engine**: Advanced expression parsing with proper operator precedence
 - **Cluster-Aware**: Full support for `ON CLUSTER` distributed DDL operations
 - **Comprehensive Testing**: Extensive test suite with testdata-driven approach
+- **Build Pipeline**: Automated multi-platform releases with Docker images
 
 ### Supported Operations
 
@@ -172,6 +174,86 @@ AS SELECT
     arrayMap(x -> x.1, mapItems(properties)) as property_keys
 FROM analytics.events
 GROUP BY user_id;
+```
+
+### Project Management
+
+Housekeeper provides a complete project management system for organizing your ClickHouse schemas:
+
+#### Initialize a New Project
+
+```bash
+# Create project directory
+mkdir my-clickhouse-project && cd my-clickhouse-project
+
+# Initialize project structure (idempotent)
+housekeeper init
+```
+
+This creates the following structure:
+```
+my-clickhouse-project/
+├── housekeeper.yaml        # Environment configuration
+├── db/
+│   ├── main.sql            # Main schema entrypoint
+│   ├── migrations/
+│   │   └── dev/            # Development migrations
+│   └── schemas/            # Organized schema files
+```
+
+#### Configuration File
+
+The `housekeeper.yaml` file defines environments and their schema entrypoints:
+
+```yaml
+environments:
+  - name: local
+    dev: clickhouse://localhost:9000/dev_db
+    url: clickhouse://localhost:9000/prod_db
+    entrypoint: db/main.sql
+  - name: staging
+    url: clickhouse://staging:9443/staging_db
+    entrypoint: db/staging.sql
+  - name: production
+    url: clickhouse://prod:9443/prod_db
+    entrypoint: db/production.sql
+```
+
+#### Schema Import System
+
+Use import directives to organize your schemas into modular files:
+
+**db/main.sql:**
+```sql
+-- Main schema file
+CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
+
+-- Import table definitions
+-- housekeeper:import schemas/analytics/tables/events.sql
+-- housekeeper:import schemas/analytics/tables/users.sql
+
+-- Import dictionary definitions
+-- housekeeper:import schemas/analytics/dictionaries/user_lookup.sql
+```
+
+**db/schemas/analytics/tables/events.sql:**
+```sql
+CREATE TABLE analytics.events (
+    id UUID DEFAULT generateUUIDv4(),
+    timestamp DateTime,
+    event_type LowCardinality(String),
+    user_id UInt64
+) ENGINE = MergeTree() ORDER BY timestamp;
+```
+
+#### Parse and Validate Schemas
+
+```bash
+# Parse schema for specific environment
+housekeeper parse --env production
+
+# Validate schema syntax
+housekeeper validate --env local
 ```
 
 ### Generate Migrations
@@ -1046,6 +1128,61 @@ pkg/migrator/
 - **Error handling**: Fails fast with detailed error messages
 
 See the [CLAUDE.md](CLAUDE.md) file for comprehensive technical documentation.
+
+## Development
+
+### Build and Test
+
+The project uses [Task](https://taskfile.dev) for build automation:
+
+```bash
+# Install dependencies
+task update
+
+# Run tests
+task test
+
+# Run linter
+task lint
+
+# Build local snapshot (binaries + Docker images)
+task build
+```
+
+### Release Process
+
+Releases are automated through GitHub Actions using GoReleaser:
+
+- **Signed Tags**: Create signed Git tags for releases
+- **Multi-platform Builds**: Linux and macOS (amd64, arm64)
+- **Docker Images**: Automatically built and pushed to GitHub Container Registry
+- **GitHub Releases**: Generated with changelogs and artifacts
+
+Create a release:
+
+```bash
+# Patch release (v1.0.0 -> v1.0.1)
+task tag:patch
+
+# Minor release (v1.0.0 -> v1.1.0)
+task tag:minor
+
+# Major release (v1.0.0 -> v2.0.0)
+task tag:major
+
+# Specific version
+task tag TAG=v1.2.3
+```
+
+### Architecture
+
+Built with modern Go practices:
+
+- **Participle Parser**: Grammar-based parsing instead of regex
+- **Comprehensive Testing**: Testdata-driven tests with YAML expectations
+- **Clean Architecture**: Separated concerns across packages
+- **Error Handling**: Structured error handling with context
+- **Performance**: Stateless parser optimized for speed and memory usage
 
 ## Contributing
 

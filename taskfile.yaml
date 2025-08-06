@@ -13,6 +13,11 @@ tasks:
     cmds:
       - go mod tidy
 
+  run:
+    desc: Run the housekeeper cli (local build)
+    silent: true
+    cmd: go run ./cmd/housekeeper/main.go {{.CLI_ARGS}}
+
   lint:
     desc: Run golangci-lint on the codebase
     deps: [install:golangci-lint]
