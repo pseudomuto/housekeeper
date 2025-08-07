@@ -10,6 +10,7 @@
 // Key features:
 //   - Complete ClickHouse DDL parser with expression and query support
 //   - Project management with schema compilation and import directives
+//   - Project bootstrapping from existing ClickHouse instances
 //   - Intelligent migration generation with rename detection
 //   - Professional SQL formatting with configurable styling
 //   - Multi-platform builds with Docker image support
@@ -22,11 +23,14 @@
 //	# Initialize a new project
 //	housekeeper init
 //
+//	# Bootstrap project from existing ClickHouse server
+//	housekeeper bootstrap --url localhost:9000
+//
+//	# Bootstrap with cluster support for distributed deployments
+//	housekeeper bootstrap --url localhost:9000 --cluster production_cluster
+//
 //	# Dump schema from ClickHouse instance
 //	housekeeper schema dump --url localhost:9000
-//
-//	# Dump schema with cluster support
-//	housekeeper schema dump --url localhost:9000 --cluster production_cluster
 //
 //	# Compile schema for specific environment
 //	housekeeper schema compile --env production

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -53,7 +54,7 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 
 	rows, err := client.conn.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query dictionaries: %w", err)
+		return nil, errors.Wrap(err, "failed to query dictionaries")
 	}
 	defer rows.Close()
 
@@ -61,7 +62,7 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 	for rows.Next() {
 		var database, name string
 		if err := rows.Scan(&database, &name); err != nil {
-			return nil, fmt.Errorf("failed to scan dictionary row: %w", err)
+			return nil, errors.Wrap(err, "failed to scan dictionary row")
 		}
 
 		// Use SHOW CREATE DICTIONARY to get the DDL
@@ -70,14 +71,14 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 
 		showRows, err := client.conn.Query(ctx, showQuery)
 		if err != nil {
-			return nil, fmt.Errorf("failed to show create dictionary %s: %w", fullName, err)
+			return nil, errors.Wrapf(err, "failed to show create dictionary %s", fullName)
 		}
 
 		if showRows.Next() {
 			var createQuery string
 			if err := showRows.Scan(&createQuery); err != nil {
 				showRows.Close()
-				return nil, fmt.Errorf("failed to scan show create result for dictionary %s: %w", fullName, err)
+				return nil, errors.Wrapf(err, "failed to scan show create result for dictionary %s", fullName)
 			}
 
 			// Clean up the CREATE statement
@@ -87,7 +88,7 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 			if err := validateDDLStatement(cleanedQuery); err != nil {
 				showRows.Close()
 				// Include the problematic query in the error for debugging
-				return nil, fmt.Errorf("generated invalid DDL for dictionary %s (query: %s): %w", fullName, cleanedQuery, err)
+				return nil, errors.Wrapf(err, "generated invalid DDL for dictionary %s (query: %s)", fullName, cleanedQuery)
 			}
 
 			statements = append(statements, cleanedQuery)
@@ -96,7 +97,7 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating dictionary rows: %w", err)
+		return nil, errors.Wrap(err, "error iterating dictionary rows")
 	}
 
 	// Parse all statements into a SQL structure
@@ -104,7 +105,7 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 
 	sqlResult, err := parser.ParseSQL(combinedSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse combined dictionary DDL: %w", err)
+		return nil, errors.Wrap(err, "failed to parse combined dictionary DDL")
 	}
 
 	return sqlResult, nil

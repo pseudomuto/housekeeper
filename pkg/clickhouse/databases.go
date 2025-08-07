@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -50,7 +51,7 @@ func extractDatabases(ctx context.Context, client *Client) (*parser.SQL, error) 
 
 	rows, err := client.conn.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query databases: %w", err)
+		return nil, errors.Wrap(err, "failed to query databases")
 	}
 	defer rows.Close()
 
@@ -60,7 +61,7 @@ func extractDatabases(ctx context.Context, client *Client) (*parser.SQL, error) 
 		var comment sql.NullString
 
 		if err := rows.Scan(&name, &engine, &comment); err != nil {
-			return nil, fmt.Errorf("failed to scan database row: %w", err)
+			return nil, errors.Wrap(err, "failed to scan database row")
 		}
 
 		// Generate CREATE DATABASE statement
@@ -68,14 +69,14 @@ func extractDatabases(ctx context.Context, client *Client) (*parser.SQL, error) 
 
 		// Validate the generated statement using our parser
 		if err := validateDDLStatement(ddl); err != nil {
-			return nil, fmt.Errorf("generated invalid DDL for database %s: %w", name, err)
+			return nil, errors.Wrapf(err, "generated invalid DDL for database %s", name)
 		}
 
 		statements = append(statements, ddl)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating database rows: %w", err)
+		return nil, errors.Wrap(err, "error iterating database rows")
 	}
 
 	// Parse all statements into a SQL structure
@@ -83,7 +84,7 @@ func extractDatabases(ctx context.Context, client *Client) (*parser.SQL, error) 
 
 	sqlResult, err := parser.ParseSQL(combinedSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse combined database DDL: %w", err)
+		return nil, errors.Wrap(err, "failed to parse combined database DDL")
 	}
 
 	return sqlResult, nil

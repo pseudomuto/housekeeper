@@ -2,8 +2,8 @@ package clickhouse
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -48,28 +48,28 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 	// Extract databases
 	databases, err := extractDatabases(ctx, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract databases: %w", err)
+		return nil, errors.Wrap(err, "failed to extract databases")
 	}
 	allStatements = append(allStatements, databases.Statements...)
 
 	// Extract tables
 	tables, err := extractTables(ctx, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract tables: %w", err)
+		return nil, errors.Wrap(err, "failed to extract tables")
 	}
 	allStatements = append(allStatements, tables.Statements...)
 
 	// Extract dictionaries
 	dictionaries, err := extractDictionaries(ctx, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract dictionaries: %w", err)
+		return nil, errors.Wrap(err, "failed to extract dictionaries")
 	}
 	allStatements = append(allStatements, dictionaries.Statements...)
 
 	// Extract views (after dictionaries since materialized views might depend on them)
 	views, err := extractViews(ctx, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract views: %w", err)
+		return nil, errors.Wrap(err, "failed to extract views")
 	}
 	allStatements = append(allStatements, views.Statements...)
 

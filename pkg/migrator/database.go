@@ -316,12 +316,12 @@ func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists b
 
 	upSQL, err := generateAlterDatabaseSQL(currentDB, targetDB)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate UP migration for database '%s': %w", name, err)
+		return nil, errors.Wrapf(err, "failed to generate UP migration for database '%s'", name)
 	}
 
 	downSQL, err := generateAlterDatabaseSQL(targetDB, currentDB)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate DOWN migration for database '%s': %w", name, err)
+		return nil, errors.Wrapf(err, "failed to generate DOWN migration for database '%s'", name)
 	}
 
 	return &DatabaseDiff{

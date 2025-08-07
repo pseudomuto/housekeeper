@@ -72,6 +72,7 @@ database state and generating appropriate migration files.`,
 			return ctx, nil
 		},
 		Commands: []*cli.Command{
+			bootstrap(),
 			initCmd(),
 			schema(),
 		},

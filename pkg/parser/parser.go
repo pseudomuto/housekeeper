@@ -1,12 +1,12 @@
 package parser
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -208,7 +208,7 @@ func GetLexer() lexer.Definition {
 func ParseSQL(sql string) (*SQL, error) {
 	sqlResult, err := parser.ParseString("", sql)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse SQL: %w", err)
+		return nil, errors.Wrap(err, "failed to parse SQL")
 	}
 
 	return sqlResult, nil
@@ -233,7 +233,7 @@ func ParseSQL(sql string) (*SQL, error) {
 func ParseSQLFromFile(path string) (*SQL, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read SQL file: %w", err)
+		return nil, errors.Wrap(err, "failed to read SQL file")
 	}
 
 	return ParseSQL(string(data))
@@ -270,7 +270,7 @@ func ParseSQLFromDirectory(dir string) (*SQL, error) {
 	for _, file := range files {
 		sqlResult, err := ParseSQLFromFile(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse %s: %w", file, err)
+			return nil, errors.Wrapf(err, "failed to parse %s", file)
 		}
 
 		// Combine all statements

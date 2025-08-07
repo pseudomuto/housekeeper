@@ -68,22 +68,22 @@ func GenerateMigration(current, target *parser.SQL, name string) (*Migration, er
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := CompareDatabaseGrammars(current, target)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compare database grammars: %w", err)
+		return nil, errors.Wrap(err, "failed to compare database grammars")
 	}
 
 	dictDiffs, err := CompareDictionaryGrammars(current, target)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compare dictionary grammars: %w", err)
+		return nil, errors.Wrap(err, "failed to compare dictionary grammars")
 	}
 
 	viewDiffs, err := CompareViewGrammars(current, target)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compare view grammars: %w", err)
+		return nil, errors.Wrap(err, "failed to compare view grammars")
 	}
 
 	tableDiffs, err := CompareTableGrammars(current, target)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compare table grammars: %w", err)
+		return nil, errors.Wrap(err, "failed to compare table grammars")
 	}
 
 	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 {

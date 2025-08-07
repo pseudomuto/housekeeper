@@ -2,9 +2,9 @@ package clickhouse
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -56,7 +56,7 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 
 	rows, err := client.conn.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query tables: %w", err)
+		return nil, errors.Wrap(err, "failed to query tables")
 	}
 	defer rows.Close()
 
@@ -64,7 +64,7 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 	for rows.Next() {
 		var createQuery string
 		if err := rows.Scan(&createQuery); err != nil {
-			return nil, fmt.Errorf("failed to scan table row: %w", err)
+			return nil, errors.Wrap(err, "failed to scan table row")
 		}
 
 		// Skip if the query is empty
@@ -83,14 +83,14 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 		// Validate the statement using our parser
 		if err := validateDDLStatement(cleanedQuery); err != nil {
 			// Include the problematic query in the error for debugging
-			return nil, fmt.Errorf("generated invalid DDL for table (query: %s): %w", cleanedQuery, err)
+			return nil, errors.Wrapf(err, "generated invalid DDL for table (query: %s)", cleanedQuery)
 		}
 
 		statements = append(statements, cleanedQuery)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating table rows: %w", err)
+		return nil, errors.Wrap(err, "error iterating table rows")
 	}
 
 	// Parse all statements into a SQL structure
@@ -98,7 +98,7 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 
 	sqlResult, err := parser.ParseSQL(combinedSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse combined table DDL: %w", err)
+		return nil, errors.Wrap(err, "failed to parse combined table DDL")
 	}
 
 	return sqlResult, nil
