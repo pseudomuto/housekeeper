@@ -49,6 +49,8 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
 		  AND engine NOT IN ('View', 'MaterializedView')  -- Views are handled separately
 		  AND is_temporary = 0
+		  AND name NOT LIKE '.inner_id.%'  -- Exclude internal materialized view tables
+		  AND name NOT LIKE '.inner.%'  -- Exclude other internal tables
 		ORDER BY database, name
 	`
 
@@ -65,12 +67,23 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 			return nil, fmt.Errorf("failed to scan table row: %w", err)
 		}
 
+		// Skip if the query is empty
+		if createQuery == "" {
+			continue
+		}
+
 		// Clean up the CREATE statement
 		cleanedQuery := cleanCreateStatement(createQuery)
 
+		// Skip dictionary definitions that might appear in system.tables
+		if strings.Contains(cleanedQuery, "CREATE DICTIONARY") {
+			continue
+		}
+
 		// Validate the statement using our parser
 		if err := validateDDLStatement(cleanedQuery); err != nil {
-			return nil, fmt.Errorf("generated invalid DDL for table: %w", err)
+			// Include the problematic query in the error for debugging
+			return nil, fmt.Errorf("generated invalid DDL for table (query: %s): %w", cleanedQuery, err)
 		}
 
 		statements = append(statements, cleanedQuery)

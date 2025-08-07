@@ -73,6 +73,43 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 	}
 	allStatements = append(allStatements, views.Statements...)
 
+	// Inject ON CLUSTER clauses if cluster is specified
+	if client.options.Cluster != "" {
+		allStatements = injectOnCluster(allStatements, client.options.Cluster)
+	}
+
 	// Combine all statements into a single SQL structure
 	return &parser.SQL{Statements: allStatements}, nil
+}
+
+// injectOnCluster adds ON CLUSTER clauses to all DDL statements when cluster is specified.
+// This addresses the limitation in ClickHouse where system tables don't include ON CLUSTER
+// information in dumped DDL statements. When running against a distributed ClickHouse cluster,
+// this ensures all extracted DDL can be properly applied to cluster deployments.
+//
+// The function handles:
+//   - CREATE DATABASE statements
+//   - CREATE TABLE statements
+//   - CREATE DICTIONARY statements
+//   - CREATE VIEW statements (both regular and materialized)
+//
+// Other statement types (ALTER, DROP, etc.) are left unchanged as they're not typically
+// part of schema extraction output.
+func injectOnCluster(statements []*parser.Statement, cluster string) []*parser.Statement {
+	clusterName := &cluster
+
+	for _, stmt := range statements {
+		switch {
+		case stmt.CreateDatabase != nil:
+			stmt.CreateDatabase.OnCluster = clusterName
+		case stmt.CreateTable != nil:
+			stmt.CreateTable.OnCluster = clusterName
+		case stmt.CreateDictionary != nil:
+			stmt.CreateDictionary.OnCluster = clusterName
+		case stmt.CreateView != nil:
+			stmt.CreateView.OnCluster = clusterName
+		}
+	}
+
+	return statements
 }

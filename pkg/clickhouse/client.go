@@ -5,22 +5,43 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 type (
+	// ClientOptions contains configuration options for the ClickHouse client
+	ClientOptions struct {
+		// Cluster specifies the cluster name to inject into ON CLUSTER clauses
+		// in dumped DDL statements. When set, all extracted DDL will include
+		// "ON CLUSTER <cluster_name>" to support distributed ClickHouse deployments.
+		Cluster string
+	}
+
 	// Client represents a ClickHouse database connection
 	Client struct {
-		conn driver.Conn
+		conn    driver.Conn
+		options ClientOptions
 	}
 )
 
-// NewClient creates a new ClickHouse client connection.
-// The DSN should be in the format "host:port" (e.g., "localhost:9000").
+// NewClient creates a new ClickHouse client connection using a DSN.
+// The DSN can be in various formats supported by ClickHouse, including:
+//   - Simple host:port format: "localhost:9000"
+//   - Full DSN: "clickhouse://username:password@host:port/database?param=value"
+//   - Native protocol: "tcp://host:port?username=default&password=&database=default"
 //
 // Example:
 //
-//	client, err := clickhouse.NewClient("localhost:9000")
+//	// Simple host:port format
+//	client, err := clickhouse.NewClient(ctx, "localhost:9000")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer client.Close()
+//
+//	// Full DSN with authentication and database
+//	client, err := clickhouse.NewClient(ctx, "clickhouse://user:pass@localhost:9000/analytics?dial_timeout=10s")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -46,18 +67,50 @@ type (
 //	    }
 //	}
 func NewClient(ctx context.Context, dsn string) (*Client, error) {
-	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{dsn},
-	})
+	return NewClientWithOptions(ctx, dsn, ClientOptions{})
+}
+
+// NewClientWithOptions creates a new ClickHouse client connection with custom options.
+// This provides additional configuration options beyond the basic DSN connection.
+//
+// Example:
+//
+//	// Client with cluster support for distributed deployments
+//	client, err := clickhouse.NewClientWithOptions(ctx, "localhost:9000", clickhouse.ClientOptions{
+//	    Cluster: "production_cluster",
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer client.Close()
+//
+//	// Dumped schema will include ON CLUSTER clauses
+//	schema, err := client.GetSchema(ctx)
+//	// All DDL statements will have "ON CLUSTER production_cluster"
+func NewClientWithOptions(ctx context.Context, dsn string, clientOpts ClientOptions) (*Client, error) {
+	// Try to parse as a full DSN first
+	options, err := clickhouse.ParseDSN(dsn)
 	if err != nil {
-		return nil, err
+		// If parsing fails, assume it's a simple host:port format
+		// and create options manually
+		options = &clickhouse.Options{
+			Addr: []string{dsn},
+		}
+	}
+
+	conn, err := clickhouse.Open(options)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open clickhouse connection")
 	}
 
 	if err := conn.Ping(ctx); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect to clickhouse server")
 	}
 
-	return &Client{conn: conn}, nil
+	return &Client{
+		conn:    conn,
+		options: clientOpts,
+	}, nil
 }
 
 // Close closes the ClickHouse connection and releases associated resources.
@@ -66,7 +119,7 @@ func NewClient(ctx context.Context, dsn string) (*Client, error) {
 //
 // Example:
 //
-//	client, err := clickhouse.NewClient("localhost:9000")
+//	client, err := clickhouse.NewClient(ctx, "localhost:9000")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -160,29 +213,124 @@ func (c *Client) GetSchema(ctx context.Context) (*parser.SQL, error) {
 }
 
 // GetTables retrieves all table definitions from the ClickHouse instance.
+// This method extracts complete CREATE TABLE statements for all non-system tables,
+// including column definitions, engine specifications, and table-level settings.
+// When the client is configured with a cluster, ON CLUSTER clauses are automatically
+// injected into all extracted DDL statements.
 //
-// Returns a *parser.SQL containing table CREATE statements.
+// The extraction excludes:
+//   - System tables and databases
+//   - Temporary tables
+//   - Internal materialized view tables (.inner.* and .inner_id.*)
+//
+// Example:
+//
+//	client, err := clickhouse.NewClientWithOptions(ctx, "localhost:9000", clickhouse.ClientOptions{
+//	    Cluster: "production",
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer client.Close()
+//
+//	tables, err := client.GetTables(ctx)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	// All table statements will include "ON CLUSTER production"
+//	for _, stmt := range tables.Statements {
+//	    if stmt.CreateTable != nil {
+//	        fmt.Printf("Table: %s\n", stmt.CreateTable.Name)
+//	    }
+//	}
+//
+// Returns a *parser.SQL containing validated table CREATE statements or an error if extraction fails.
 func (c *Client) GetTables(ctx context.Context) (*parser.SQL, error) {
 	return extractTables(ctx, c)
 }
 
 // GetViews retrieves all view definitions (both regular and materialized) from the ClickHouse instance.
+// This method extracts complete CREATE VIEW and CREATE MATERIALIZED VIEW statements,
+// including SELECT queries, engine specifications for materialized views, and population options.
+// When the client is configured with a cluster, ON CLUSTER clauses are automatically
+// injected into all extracted DDL statements.
 //
-// Returns a *parser.SQL containing view CREATE statements.
+// The extraction includes:
+//   - Regular views (CREATE VIEW statements)
+//   - Materialized views (CREATE MATERIALIZED VIEW statements)
+//   - Both ENGINE-based and TO table materialized views
+//
+// Example:
+//
+//	client, err := clickhouse.NewClient(ctx, "localhost:9000")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer client.Close()
+//
+//	views, err := client.GetViews(ctx)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	for _, stmt := range views.Statements {
+//	    if stmt.CreateView != nil {
+//	        viewType := "VIEW"
+//	        if stmt.CreateView.Materialized {
+//	            viewType = "MATERIALIZED VIEW"
+//	        }
+//	        fmt.Printf("%s: %s\n", viewType, stmt.CreateView.Name)
+//	    }
+//	}
+//
+// Returns a *parser.SQL containing validated view CREATE statements or an error if extraction fails.
 func (c *Client) GetViews(ctx context.Context) (*parser.SQL, error) {
 	return extractViews(ctx, c)
 }
 
 // GetDictionaries retrieves all dictionary definitions from the ClickHouse instance.
+// This method extracts complete CREATE DICTIONARY statements including column definitions,
+// source configurations, layout specifications, lifetime settings, and comments.
+// When the client is configured with a cluster, ON CLUSTER clauses are automatically
+// injected into all extracted DDL statements.
 //
-// Returns a *parser.SQL containing dictionary CREATE statements.
+// The extraction includes all dictionary features:
+//   - Column attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
+//   - Source configurations (MySQL, HTTP, ClickHouse, File, etc.)
+//   - Layout types (FLAT, HASHED, COMPLEX_KEY_HASHED, etc.)
+//   - Lifetime configurations (single values or MIN/MAX ranges)
+//   - Settings and comments
+//
+// Returns a *parser.SQL containing validated dictionary CREATE statements or an error if extraction fails.
 func (c *Client) GetDictionaries(ctx context.Context) (*parser.SQL, error) {
 	return extractDictionaries(ctx, c)
 }
 
 // GetDatabases retrieves all database definitions from the ClickHouse instance.
+// This method extracts complete CREATE DATABASE statements including engine specifications,
+// parameters, and comments. System databases are automatically excluded from the results.
+// When the client is configured with a cluster, ON CLUSTER clauses are automatically
+// injected into all extracted DDL statements.
 //
-// Returns a *parser.SQL containing database CREATE statements.
+// Example:
+//
+//	databases, err := client.GetDatabases(ctx)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	for _, stmt := range databases.Statements {
+//	    if stmt.CreateDatabase != nil {
+//	        fmt.Printf("Database: %s", stmt.CreateDatabase.Name)
+//	        if stmt.CreateDatabase.Engine != nil {
+//	            fmt.Printf(" (Engine: %s)", stmt.CreateDatabase.Engine.Name)
+//	        }
+//	        fmt.Println()
+//	    }
+//	}
+//
+// Returns a *parser.SQL containing validated database CREATE statements or an error if extraction fails.
 func (c *Client) GetDatabases(ctx context.Context) (*parser.SQL, error) {
 	return extractDatabases(ctx, c)
 }

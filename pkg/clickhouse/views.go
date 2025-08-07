@@ -68,11 +68,17 @@ func extractViews(ctx context.Context, client *Client) (*parser.SQL, error) {
 		}
 
 		// Clean up the CREATE statement
+		// ClickHouse returns CREATE VIEW name (col1 Type1, ...) AS SELECT
+		// but our parser expects CREATE VIEW name AS SELECT
 		cleanedQuery := cleanCreateStatement(createQuery)
+		openParen := strings.Index(cleanedQuery, "(")
+		asPos := strings.Index(cleanedQuery, "AS")
+		cleanedQuery = cleanedQuery[:openParen] + cleanedQuery[asPos:]
 
 		// Validate the statement using our parser
 		if err := validateDDLStatement(cleanedQuery); err != nil {
-			return nil, fmt.Errorf("generated invalid DDL for view: %w", err)
+			// Include the problematic query in the error for debugging
+			return nil, fmt.Errorf("generated invalid DDL for view (query: %s): %w", cleanedQuery, err)
 		}
 
 		statements = append(statements, cleanedQuery)

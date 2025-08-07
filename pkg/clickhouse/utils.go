@@ -12,6 +12,7 @@ func cleanCreateStatement(createQuery string) string {
 	if !strings.HasSuffix(cleaned, ";") {
 		cleaned += ";"
 	}
+
 	return cleaned
 }
 

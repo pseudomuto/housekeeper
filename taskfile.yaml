@@ -29,6 +29,11 @@ tasks:
     silent: true
     cmd: go test ./... -cover
 
+  test:short:
+    desc: Run the test suite (only fast tests)
+    silent: true
+    cmd: go test ./... -cover -short
+
   build:
     desc: Build a local snapshot with goreleaser (including container images)
     deps: [install:goreleaser]

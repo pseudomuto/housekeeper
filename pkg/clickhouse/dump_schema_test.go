@@ -1,55 +1,102 @@
 package clickhouse_test
 
+// This test validates the actual DumpSchema functionality against a real ClickHouse instance
+// using the testcontainers ClickHouse module. It validates all schema extraction methods and ordering.
+
 import (
+	"bytes"
+	"context"
+	"io"
+	"os"
 	"testing"
+	"time"
+
+	"github.com/docker/go-connections/nat"
+	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
+	"github.com/pseudomuto/housekeeper/pkg/format"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	clickhousemodule "github.com/testcontainers/testcontainers-go/modules/clickhouse"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"gotest.tools/v3/golden"
 )
 
-func TestClient_GetSchema(t *testing.T) {
+func TestDumpSchema(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode")
+		t.Skip("Skipping testcontainer tests in short mode")
 	}
 
-	t.Skip("Integration test - requires actual ClickHouse connection")
+	ctx := context.Background()
 
-	// Example of what integration tests would look like:
-	/*
-		ctx := context.Background()
-		client, err := clickhouse.NewClient(ctx, "localhost:9000")
-		require.NoError(t, err)
-		defer client.Close()
-
-		schema, err := client.GetSchema(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, schema)
-		require.NotEmpty(t, schema.Statements)
-
-		// Schema should contain different types of statements
-		var hasDatabase, hasTable, hasView, hasDictionary bool
-		for _, stmt := range schema.Statements {
-			if stmt.CreateDatabase != nil {
-				hasDatabase = true
-			}
-			if stmt.CreateTable != nil {
-				hasTable = true
-			}
-			if stmt.CreateView != nil {
-				hasView = true
-			}
-			if stmt.CreateDictionary != nil {
-				hasDictionary = true
+	// Start ClickHouse container with the ClickHouse module
+	container, err := clickhousemodule.Run(
+		ctx,
+		"clickhouse/clickhouse-server:25.6-alpine",
+		clickhousemodule.WithUsername("default"),
+		clickhousemodule.WithPassword(""),
+		clickhousemodule.WithDatabase("default"),
+		clickhousemodule.WithConfigFile("testdata/clickhouse.xml"),
+		clickhousemodule.WithInitScripts("testdata/sample_schema.sql"),
+		testcontainers.WithEnv(map[string]string{"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": "1"}),
+		testcontainers.WithWaitStrategyAndDeadline(
+			5*time.Minute,
+			wait.
+				NewHTTPStrategy("/").
+				WithPort(nat.Port("8123/tcp")).
+				WithStatusCodeMatcher(func(status int) bool {
+					return status == 200
+				}),
+		),
+	)
+	if err != nil {
+		// Dump the container logs on error (if available).
+		// NB: This is nice when a config/init script issue causes the process to die.
+		if container != nil {
+			logs, _ := container.Logs(ctx)
+			if logs != nil {
+				io.Copy(os.Stderr, logs) // nolint: errcheck
 			}
 		}
 
-		// Should at least have databases (default database is always present)
-		require.True(t, hasDatabase, "Schema should contain database statements")
+		require.FailNow(t, "failed to standup clickhouse")
+	}
+	defer func() { _ = container.Terminate(ctx) }()
 
-		// Verify all statements are valid and parseable
-		for _, stmt := range schema.Statements {
-			require.NotNil(t, stmt, "All statements should be non-nil")
-		}
-	*/
-}
+	// Get connection string
+	connectionHost, err := container.ConnectionHost(ctx)
+	require.NoError(t, err)
 
-func BenchmarkClient_GetSchema(b *testing.B) {
-	b.Skip("Benchmark test - requires actual ClickHouse connection")
+	// Create client using the connection host
+	client, err := clickhouse.NewClientWithOptions(ctx, connectionHost, clickhouse.ClientOptions{
+		Cluster: "test_cluster",
+	})
+	require.NoError(t, err)
+	defer client.Close()
+
+	// Test the main DumpSchema function via client.GetSchema()
+	// This tests the complete schema extraction functionality
+	schema, err := client.GetSchema(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, schema)
+
+	// Format the extracted schema for golden file comparison
+	var buf bytes.Buffer
+	err = format.FormatSQL(&buf, format.Defaults, schema)
+	require.NoError(t, err, "Failed to format extracted schema")
+
+	// Compare with golden file using gotest.tools/v3/golden
+	golden.Assert(t, buf.String(), "expected_schema.sql")
+
+	// Test individual extraction methods work without errors
+	_, err = client.GetDatabases(ctx)
+	require.NoError(t, err, "GetDatabases should work without errors")
+
+	_, err = client.GetTables(ctx)
+	require.NoError(t, err, "GetTables should work without errors")
+
+	_, err = client.GetViews(ctx)
+	require.NoError(t, err, "GetViews should work without errors")
+
+	_, err = client.GetDictionaries(ctx)
+	require.NoError(t, err, "GetDictionaries should work without errors")
 }

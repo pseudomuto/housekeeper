@@ -41,9 +41,11 @@ import (
 //
 // Returns a *parser.SQL containing dictionary CREATE statements or an error if extraction fails.
 func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, error) {
+	// First, get a list of all dictionaries (excluding system ones)
 	query := `
 		SELECT 
-			create_table_query
+			database, 
+			name
 		FROM system.dictionaries
 		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
 		ORDER BY database, name
@@ -57,20 +59,40 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 
 	var statements []string
 	for rows.Next() {
-		var createQuery string
-		if err := rows.Scan(&createQuery); err != nil {
+		var database, name string
+		if err := rows.Scan(&database, &name); err != nil {
 			return nil, fmt.Errorf("failed to scan dictionary row: %w", err)
 		}
 
-		// Clean up the CREATE statement
-		cleanedQuery := cleanCreateStatement(createQuery)
+		// Use SHOW CREATE DICTIONARY to get the DDL
+		fullName := fmt.Sprintf("`%s`.`%s`", database, name)
+		showQuery := "SHOW CREATE DICTIONARY " + fullName
 
-		// Validate the statement using our parser
-		if err := validateDDLStatement(cleanedQuery); err != nil {
-			return nil, fmt.Errorf("generated invalid DDL for dictionary: %w", err)
+		showRows, err := client.conn.Query(ctx, showQuery)
+		if err != nil {
+			return nil, fmt.Errorf("failed to show create dictionary %s: %w", fullName, err)
 		}
 
-		statements = append(statements, cleanedQuery)
+		if showRows.Next() {
+			var createQuery string
+			if err := showRows.Scan(&createQuery); err != nil {
+				showRows.Close()
+				return nil, fmt.Errorf("failed to scan show create result for dictionary %s: %w", fullName, err)
+			}
+
+			// Clean up the CREATE statement
+			cleanedQuery := cleanCreateStatement(createQuery)
+
+			// Validate the statement using our parser
+			if err := validateDDLStatement(cleanedQuery); err != nil {
+				showRows.Close()
+				// Include the problematic query in the error for debugging
+				return nil, fmt.Errorf("generated invalid DDL for dictionary %s (query: %s): %w", fullName, cleanedQuery, err)
+			}
+
+			statements = append(statements, cleanedQuery)
+		}
+		showRows.Close()
 	}
 
 	if err := rows.Err(); err != nil {

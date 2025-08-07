@@ -95,6 +95,30 @@ docker run --rm ghcr.io/pseudomuto/housekeeper:v1.0.0 --version
 
 ## Usage
 
+### Extract Existing Schema
+
+For existing ClickHouse instances, you can extract the current schema using the dump command:
+
+```bash
+# Dump schema from ClickHouse instance
+housekeeper schema dump --url localhost:9000
+
+# Dump schema with cluster support for distributed deployments
+housekeeper schema dump --url localhost:9000 --cluster production_cluster
+
+# Dump to file with authentication
+housekeeper schema dump \
+  --url "clickhouse://user:pass@host:9000/database" \
+  --cluster my_cluster \
+  --out current_schema.sql
+
+# Use environment variable for connection
+export CH_DATABASE_URL="clickhouse://user:pass@prod:9443/analytics"
+housekeeper schema dump --cluster production --out prod_schema.sql
+```
+
+The extracted schema will include all databases, tables, dictionaries, and views with proper formatting and ON CLUSTER clauses when specified.
+
 ### Define Your Schema
 
 Create SQL files in your schema directory with ClickHouse DDL statements:
@@ -248,15 +272,24 @@ CREATE TABLE analytics.events (
 ) ENGINE = MergeTree() ORDER BY timestamp;
 ```
 
-#### Parse and Validate Schemas
+#### Compile and Validate Schemas
 
 ```bash
-# Parse schema for specific environment
-housekeeper parse --env production
+# Compile schema for specific environment with import resolution
+housekeeper schema compile --env production
 
-# Validate schema syntax
-housekeeper validate --env local
+# Compile to file for deployment
+housekeeper schema compile --env production --out compiled_schema.sql
+
+# Compile development environment to stdout
+housekeeper schema compile --env local
 ```
+
+The compile command:
+- Processes all `-- housekeeper:import` directives recursively
+- Resolves relative paths from each file's location
+- Combines all SQL into a single output with proper ordering
+- Validates all DDL syntax through the robust parser
 
 ### Generate Migrations
 

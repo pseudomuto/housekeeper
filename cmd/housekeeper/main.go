@@ -4,7 +4,8 @@
 //
 // The tool supports complete ClickHouse DDL operations including databases,
 // tables, dictionaries, and views, with smart comparison algorithms and
-// professional SQL formatting.
+// professional SQL formatting. It includes full support for distributed
+// ClickHouse clusters with automatic ON CLUSTER clause injection.
 //
 // Key features:
 //   - Complete ClickHouse DDL parser with expression and query support
@@ -12,13 +13,25 @@
 //   - Intelligent migration generation with rename detection
 //   - Professional SQL formatting with configurable styling
 //   - Multi-platform builds with Docker image support
+//   - Distributed cluster support with ON CLUSTER injection
+//   - Schema dumping from live ClickHouse instances
+//   - Flexible DSN parsing for various connection formats
 //
 // Usage:
 //
 //	# Initialize a new project
 //	housekeeper init
 //
-//	# Generate migrations by comparing schema with database
+//	# Dump schema from ClickHouse instance
+//	housekeeper schema dump --url localhost:9000
+//
+//	# Dump schema with cluster support
+//	housekeeper schema dump --url localhost:9000 --cluster production_cluster
+//
+//	# Compile schema for specific environment
+//	housekeeper schema compile --env production
+//
+//	# Generate migrations by comparing schema with database (planned)
 //	housekeeper diff --dsn localhost:9000 --schema ./db --migrations ./migrations --name setup_schema
 //
 // For more information and examples, see: https://github.com/pseudomuto/housekeeper
