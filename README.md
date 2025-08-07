@@ -729,7 +729,7 @@ func main() {
     
     // Or format the entire grammar at once
     var buf3 bytes.Buffer
-    err = format.FormatGrammar(&buf3, format.Defaults, grammar)
+    err = format.FormatSQL(&buf3, format.Defaults, grammar)
     if err != nil {
         log.Fatalf("Format error: %v", err)
     }

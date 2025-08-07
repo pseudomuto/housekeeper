@@ -162,10 +162,10 @@ func Format(w io.Writer, opts FormatterOptions, statements ...*parser.Statement)
 	return New(opts).Format(w, statements...)
 }
 
-// FormatGrammar provides a convenient way to format all statements from a parsed grammar.
+// FormatSQL provides a convenient way to format all statements from a parsed SQL structure.
 //
 // This is equivalent to calling Format(w, opts, sqlResult.Statements...) but more concise
-// when you have a complete parsed grammar object.
+// when you have a complete parsed SQL object.
 //
 // Example:
 //
@@ -175,13 +175,13 @@ func Format(w io.Writer, opts FormatterOptions, statements ...*parser.Statement)
 //		"github.com/pseudomuto/housekeeper/pkg/parser"
 //	)
 //
-//	grammar, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
+//	sqlResult, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
 //	var buf bytes.Buffer
-//	err := format.FormatGrammar(&buf, format.Defaults, grammar)
+//	err := format.FormatSQL(&buf, format.Defaults, sqlResult)
 //	if err != nil {
 //		panic(err)
 //	}
-func FormatGrammar(w io.Writer, opts FormatterOptions, sql *parser.SQL) error {
+func FormatSQL(w io.Writer, opts FormatterOptions, sql *parser.SQL) error {
 	if sql == nil {
 		return nil
 	}
@@ -224,11 +224,11 @@ func (f *Formatter) Format(w io.Writer, statements ...*parser.Statement) error {
 	return nil
 }
 
-// FormatGrammar formats all statements from a parsed grammar using this formatter's configuration.
+// FormatSQL formats all statements from a parsed SQL structure using this formatter's configuration.
 //
 // This is equivalent to calling f.Format(w, sqlResult.Statements...) but more concise
-// when you have a complete parsed grammar object.
-func (f *Formatter) FormatGrammar(w io.Writer, sql *parser.SQL) error {
+// when you have a complete parsed SQL object.
+func (f *Formatter) FormatSQL(w io.Writer, sql *parser.SQL) error {
 	if sql == nil {
 		return nil
 	}

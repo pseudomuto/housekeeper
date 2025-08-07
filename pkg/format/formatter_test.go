@@ -135,7 +135,7 @@ func TestFormatter_EmptyInput(t *testing.T) {
 	require.Empty(t, buf3.String())
 }
 
-func TestFormatGrammar_Function(t *testing.T) {
+func TestFormatSQL_Function(t *testing.T) {
 	tests := []struct {
 		name     string
 		sql      string
@@ -164,7 +164,7 @@ func TestFormatGrammar_Function(t *testing.T) {
 			require.NoError(t, err)
 
 			var buf bytes.Buffer
-			err = FormatGrammar(&buf, Defaults, sqlResult)
+			err = FormatSQL(&buf, Defaults, sqlResult)
 			require.NoError(t, err)
 
 			require.Equal(t, tt.expected, buf.String())
@@ -172,7 +172,7 @@ func TestFormatGrammar_Function(t *testing.T) {
 	}
 }
 
-func TestFormatGrammar_Method(t *testing.T) {
+func TestFormatSQL_Method(t *testing.T) {
 	tests := []struct {
 		name     string
 		sql      string
@@ -197,7 +197,7 @@ func TestFormatGrammar_Method(t *testing.T) {
 			})
 
 			var buf bytes.Buffer
-			err = formatter.FormatGrammar(&buf, sqlResult)
+			err = formatter.FormatSQL(&buf, sqlResult)
 			require.NoError(t, err)
 
 			require.Equal(t, tt.expected, buf.String())
@@ -205,33 +205,33 @@ func TestFormatGrammar_Method(t *testing.T) {
 	}
 }
 
-func TestFormatGrammar_NilGrammar(t *testing.T) {
+func TestFormatSQL_NilGrammar(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Test function with nil grammar
-	err := FormatGrammar(&buf, Defaults, nil)
+	err := FormatSQL(&buf, Defaults, nil)
 	require.NoError(t, err)
 	require.Empty(t, buf.String())
 
 	// Test method with nil grammar
 	formatter := New(Defaults)
-	err = formatter.FormatGrammar(&buf, nil)
+	err = formatter.FormatSQL(&buf, nil)
 	require.NoError(t, err)
 	require.Empty(t, buf.String())
 }
 
-func TestFormatGrammar_EmptyGrammar(t *testing.T) {
+func TestFormatSQL_EmptyGrammar(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Test function with empty sqlResult
 	sqlResult := &parser.SQL{Statements: []*parser.Statement{}}
-	err := FormatGrammar(&buf, Defaults, sqlResult)
+	err := FormatSQL(&buf, Defaults, sqlResult)
 	require.NoError(t, err)
 	require.Empty(t, buf.String())
 
 	// Test method with empty sqlResult
 	formatter := New(Defaults)
-	err = formatter.FormatGrammar(&buf, sqlResult)
+	err = formatter.FormatSQL(&buf, sqlResult)
 	require.NoError(t, err)
 	require.Empty(t, buf.String())
 }

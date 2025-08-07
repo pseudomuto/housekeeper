@@ -31,10 +31,10 @@
 //	var buf bytes.Buffer
 //	err := format.Format(&buf, format.Defaults, statements...)
 //
-//	// Convenient grammar formatting
-//	grammar, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
+//	// Convenient SQL formatting
+//	sqlResult, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
 //	var buf bytes.Buffer
-//	err := format.FormatGrammar(&buf, format.Defaults, grammar)
+//	err := format.FormatSQL(&buf, format.Defaults, sqlResult)
 //
 // The formatter supports all ClickHouse DDL operations including databases,
 // tables, dictionaries, views, and SELECT statements with proper formatting

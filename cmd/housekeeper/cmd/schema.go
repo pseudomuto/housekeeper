@@ -110,7 +110,7 @@ func schemaParse() *cli.Command {
 				w = f
 			}
 
-			return format.FormatGrammar(w, format.Defaults, grammar)
+			return format.FormatSQL(w, format.Defaults, grammar)
 		},
 	}
 }
