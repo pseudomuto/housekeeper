@@ -57,28 +57,28 @@ func (f *Formatter) createTable(w io.Writer, stmt *parser.CreateTableStmt) error
 		lines = append(lines, f.keyword("ENGINE")+" = "+f.formatTableEngine(stmt.Engine))
 	}
 
-	if stmt.OrderBy != nil {
-		lines = append(lines, f.keyword("ORDER BY")+" "+f.formatExpression(&stmt.OrderBy.Expression))
+	if orderBy := stmt.GetOrderBy(); orderBy != nil {
+		lines = append(lines, f.keyword("ORDER BY")+" "+f.formatExpression(&orderBy.Expression))
 	}
 
-	if stmt.PartitionBy != nil {
-		lines = append(lines, f.keyword("PARTITION BY")+" "+f.formatExpression(&stmt.PartitionBy.Expression))
+	if partitionBy := stmt.GetPartitionBy(); partitionBy != nil {
+		lines = append(lines, f.keyword("PARTITION BY")+" "+f.formatExpression(&partitionBy.Expression))
 	}
 
-	if stmt.PrimaryKey != nil {
-		lines = append(lines, f.keyword("PRIMARY KEY")+" "+f.formatExpression(&stmt.PrimaryKey.Expression))
+	if primaryKey := stmt.GetPrimaryKey(); primaryKey != nil {
+		lines = append(lines, f.keyword("PRIMARY KEY")+" "+f.formatExpression(&primaryKey.Expression))
 	}
 
-	if stmt.SampleBy != nil {
-		lines = append(lines, f.keyword("SAMPLE BY")+" "+f.formatExpression(&stmt.SampleBy.Expression))
+	if sampleBy := stmt.GetSampleBy(); sampleBy != nil {
+		lines = append(lines, f.keyword("SAMPLE BY")+" "+f.formatExpression(&sampleBy.Expression))
 	}
 
-	if stmt.TTL != nil {
-		lines = append(lines, f.keyword("TTL")+" "+f.formatExpression(&stmt.TTL.Expression))
+	if ttl := stmt.GetTTL(); ttl != nil {
+		lines = append(lines, f.keyword("TTL")+" "+f.formatExpression(&ttl.Expression))
 	}
 
-	if stmt.Settings != nil && len(stmt.Settings.Settings) > 0 {
-		lines = append(lines, f.formatTableSettings(stmt.Settings))
+	if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
+		lines = append(lines, f.formatTableSettings(settings))
 	}
 
 	if stmt.Comment != nil {

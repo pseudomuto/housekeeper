@@ -174,27 +174,27 @@ func extractTablesFromGrammar(sql *parser.SQL) map[string]*TableInfo {
 			if table.Comment != nil {
 				tableInfo.Comment = removeQuotes(*table.Comment)
 			}
-			if table.OrderBy != nil {
-				tableInfo.OrderBy = table.OrderBy.Expression.String()
+			if orderBy := table.GetOrderBy(); orderBy != nil {
+				tableInfo.OrderBy = orderBy.Expression.String()
 			}
-			if table.PartitionBy != nil {
-				tableInfo.PartitionBy = table.PartitionBy.Expression.String()
+			if partitionBy := table.GetPartitionBy(); partitionBy != nil {
+				tableInfo.PartitionBy = partitionBy.Expression.String()
 			}
-			if table.PrimaryKey != nil {
-				tableInfo.PrimaryKey = table.PrimaryKey.Expression.String()
+			if primaryKey := table.GetPrimaryKey(); primaryKey != nil {
+				tableInfo.PrimaryKey = primaryKey.Expression.String()
 			}
-			if table.SampleBy != nil {
-				tableInfo.SampleBy = table.SampleBy.Expression.String()
+			if sampleBy := table.GetSampleBy(); sampleBy != nil {
+				tableInfo.SampleBy = sampleBy.Expression.String()
 			}
-			if table.TTL != nil {
-				tableInfo.TTL = table.TTL.Expression.String()
+			if ttl := table.GetTTL(); ttl != nil {
+				tableInfo.TTL = ttl.Expression.String()
 			}
-			if table.Settings != nil {
-				settings := make(map[string]string)
-				for _, setting := range table.Settings.Settings {
-					settings[setting.Name] = setting.Value
+			if settings := table.GetSettings(); settings != nil {
+				settingMap := make(map[string]string)
+				for _, setting := range settings.Settings {
+					settingMap[setting.Name] = setting.Value
 				}
-				tableInfo.Settings = settings
+				tableInfo.Settings = settingMap
 			}
 
 			// Process columns from table elements

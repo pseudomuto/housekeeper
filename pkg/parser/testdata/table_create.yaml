@@ -53,6 +53,49 @@ tables:
       settings:
         index_granularity: "8192"
         merge_with_ttl_timeout: "3600"
+    - name: events
+      database: analytics
+      cluster: production
+      operation: CREATE
+      or_replace: true
+      if_not_exists: true
+      engine: ReplicatedMergeTree('/clickhouse/tables/{shard}/events', '{replica}')
+      comment: User events table
+      columns:
+        - name: id
+          data_type: UInt64
+        - name: user_id
+          data_type: UInt64
+        - name: event_type
+          data_type: LowCardinality(String)
+        - name: timestamp
+          data_type: DateTime
+          default: DEFAULT expression
+        - name: data
+          data_type: Map(String, String)
+          default: DEFAULT expression
+        - name: metadata
+          data_type: Nullable(String)
+          codec: CODEC(ZSTD)
+        - name: tags
+          data_type: Array(String)
+          default: DEFAULT expression
+        - name: location
+          data_type: Tuple(lat Float64, lon Float64)
+        - name: settings
+          data_type: Nested(key String, value String)
+        - name: temp_data
+          data_type: String
+          ttl: expression
+          comment: Temporary data
+      order_by: expression
+      partition_by: expression
+      primary_key: expression
+      sample_by: expression
+      ttl: expression
+      settings:
+        index_granularity: "8192"
+        merge_with_ttl_timeout: "3600"
     - name: logs
       operation: CREATE
       engine: Log

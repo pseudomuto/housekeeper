@@ -21,23 +21,29 @@ type (
 	//   [SETTINGS name=value, ...]
 	//   [COMMENT 'comment']
 	CreateTableStmt struct {
-		Create      string               `parser:"'CREATE'"`
-		OrReplace   bool                 `parser:"@('OR' 'REPLACE')?"`
-		Table       string               `parser:"'TABLE'"`
-		IfNotExists bool                 `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database    *string              `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name        string               `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string              `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Elements    []TableElement       `parser:"'(' @@ (',' @@)* ')'"`
-		Engine      *TableEngine         `parser:"@@"`
-		OrderBy     *OrderByClause       `parser:"@@?"`
-		PartitionBy *PartitionByClause   `parser:"@@?"`
-		PrimaryKey  *PrimaryKeyClause    `parser:"@@?"`
-		SampleBy    *SampleByClause      `parser:"@@?"`
-		TTL         *TableTTLClause      `parser:"@@?"`
-		Settings    *TableSettingsClause `parser:"@@?"`
-		Comment     *string              `parser:"('COMMENT' @String)?"`
-		Semicolon   bool                 `parser:"';'"`
+		Create      string         `parser:"'CREATE'"`
+		OrReplace   bool           `parser:"@('OR' 'REPLACE')?"`
+		Table       string         `parser:"'TABLE'"`
+		IfNotExists bool           `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Database    *string        `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name        string         `parser:"@(Ident | BacktickIdent)"`
+		OnCluster   *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Elements    []TableElement `parser:"'(' @@ (',' @@)* ')'"`
+		Engine      *TableEngine   `parser:"@@"`
+		Clauses     []TableClause  `parser:"@@*"`
+		Comment     *string        `parser:"('COMMENT' @String)?"`
+		Semicolon   bool           `parser:"';'"`
+	}
+
+	// TableClause represents any clause that can appear after ENGINE in a CREATE TABLE statement
+	// This allows clauses to be specified in any order
+	TableClause struct {
+		OrderBy     *OrderByClause       `parser:"@@"`
+		PartitionBy *PartitionByClause   `parser:"| @@"`
+		PrimaryKey  *PrimaryKeyClause    `parser:"| @@"`
+		SampleBy    *SampleByClause      `parser:"| @@"`
+		TTL         *TableTTLClause      `parser:"| @@"`
+		Settings    *TableSettingsClause `parser:"| @@"`
 	}
 
 	// TableElement represents an element within table definition (column, index, constraint, or projection)
@@ -550,3 +556,66 @@ type (
 		Name     string `parser:"@(Ident | BacktickIdent)"`
 	}
 )
+
+// Convenience methods for CreateTableStmt to access clauses from the new flexible structure
+// These maintain backward compatibility with existing code
+
+// GetOrderBy returns the ORDER BY clause if present
+func (c *CreateTableStmt) GetOrderBy() *OrderByClause {
+	for _, clause := range c.Clauses {
+		if clause.OrderBy != nil {
+			return clause.OrderBy
+		}
+	}
+	return nil
+}
+
+// GetPartitionBy returns the PARTITION BY clause if present
+func (c *CreateTableStmt) GetPartitionBy() *PartitionByClause {
+	for _, clause := range c.Clauses {
+		if clause.PartitionBy != nil {
+			return clause.PartitionBy
+		}
+	}
+	return nil
+}
+
+// GetPrimaryKey returns the PRIMARY KEY clause if present
+func (c *CreateTableStmt) GetPrimaryKey() *PrimaryKeyClause {
+	for _, clause := range c.Clauses {
+		if clause.PrimaryKey != nil {
+			return clause.PrimaryKey
+		}
+	}
+	return nil
+}
+
+// GetSampleBy returns the SAMPLE BY clause if present
+func (c *CreateTableStmt) GetSampleBy() *SampleByClause {
+	for _, clause := range c.Clauses {
+		if clause.SampleBy != nil {
+			return clause.SampleBy
+		}
+	}
+	return nil
+}
+
+// GetTTL returns the TTL clause if present
+func (c *CreateTableStmt) GetTTL() *TableTTLClause {
+	for _, clause := range c.Clauses {
+		if clause.TTL != nil {
+			return clause.TTL
+		}
+	}
+	return nil
+}
+
+// GetSettings returns the SETTINGS clause if present
+func (c *CreateTableStmt) GetSettings() *TableSettingsClause {
+	for _, clause := range c.Clauses {
+		if clause.Settings != nil {
+			return clause.Settings
+		}
+	}
+	return nil
+}

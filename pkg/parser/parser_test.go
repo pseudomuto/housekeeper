@@ -489,27 +489,27 @@ func generateTestCaseFromGrammar(grammar *SQL) TestCase {
 			if table.Comment != nil {
 				expectedTable.Comment = removeQuotes(*table.Comment)
 			}
-			if table.OrderBy != nil {
+			if orderBy := table.GetOrderBy(); orderBy != nil {
 				expectedTable.OrderBy = "expression"
 			}
-			if table.PartitionBy != nil {
+			if partitionBy := table.GetPartitionBy(); partitionBy != nil {
 				expectedTable.PartitionBy = "expression"
 			}
-			if table.PrimaryKey != nil {
+			if primaryKey := table.GetPrimaryKey(); primaryKey != nil {
 				expectedTable.PrimaryKey = "expression"
 			}
-			if table.SampleBy != nil {
+			if sampleBy := table.GetSampleBy(); sampleBy != nil {
 				expectedTable.SampleBy = "expression"
 			}
-			if table.TTL != nil {
+			if ttl := table.GetTTL(); ttl != nil {
 				expectedTable.TTL = "expression"
 			}
-			if table.Settings != nil {
-				settings := make(map[string]string)
-				for _, setting := range table.Settings.Settings {
-					settings[setting.Name] = setting.Value
+			if settings := table.GetSettings(); settings != nil {
+				settingMap := make(map[string]string)
+				for _, setting := range settings.Settings {
+					settingMap[setting.Name] = setting.Value
 				}
-				expectedTable.Settings = settings
+				expectedTable.Settings = settingMap
 			}
 
 			// Process columns from table elements
