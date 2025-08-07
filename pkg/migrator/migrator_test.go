@@ -57,17 +57,17 @@ func TestMigrationGeneration(t *testing.T) {
 			require.NoError(t, err, "Failed to parse YAML file: %s", yamlFile)
 
 			// Parse current and target SQL
-			var currentGrammar, targetGrammar *parser.Grammar
+			var currentGrammar, targetGrammar *parser.SQL
 
 			if testCase.CurrentSQL == "" {
-				currentGrammar = &parser.Grammar{Statements: []*parser.Statement{}}
+				currentGrammar = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
 				currentGrammar, err = parser.ParseSQL(testCase.CurrentSQL)
 				require.NoError(t, err, "Failed to parse current SQL")
 			}
 
 			if testCase.TargetSQL == "" {
-				targetGrammar = &parser.Grammar{Statements: []*parser.Statement{}}
+				targetGrammar = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
 				targetGrammar, err = parser.ParseSQL(testCase.TargetSQL)
 				require.NoError(t, err, "Failed to parse target SQL")

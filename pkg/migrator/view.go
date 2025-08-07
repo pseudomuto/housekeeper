@@ -65,7 +65,7 @@ type (
 // - Uses RENAME TABLE for renames
 //
 // Returns a slice of ViewDiff structs representing all the differences found.
-func CompareViewGrammars(current, target *parser.Grammar) ([]*ViewDiff, error) {
+func CompareViewGrammars(current, target *parser.SQL) ([]*ViewDiff, error) {
 	// Extract views from both grammars
 	currentViews := extractViewsFromGrammar(current)
 	targetViews := extractViewsFromGrammar(target)
@@ -157,10 +157,10 @@ func CompareViewGrammars(current, target *parser.Grammar) ([]*ViewDiff, error) {
 }
 
 // extractViewsFromGrammar extracts all view information from a parsed grammar
-func extractViewsFromGrammar(grammar *parser.Grammar) map[string]*ViewInfo {
+func extractViewsFromGrammar(sql *parser.SQL) map[string]*ViewInfo {
 	views := make(map[string]*ViewInfo)
 
-	for _, stmt := range grammar.Statements {
+	for _, stmt := range sql.Statements {
 		if stmt.CreateView != nil {
 			view := &ViewInfo{
 				Name:         stmt.CreateView.Name,

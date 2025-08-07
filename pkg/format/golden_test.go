@@ -33,12 +33,12 @@ func TestGoldenFiles(t *testing.T) {
 			require.NoError(t, err, "Failed to read input file %s", inputFile)
 
 			// Parse the SQL
-			grammar, err := parser.ParseSQL(string(inputSQL))
+			sqlResult, err := parser.ParseSQL(string(inputSQL))
 			require.NoError(t, err, "Failed to parse SQL from %s", inputFile)
 
 			// Format all statements using the new API
 			var buf bytes.Buffer
-			err = Format(&buf, Defaults, grammar.Statements...)
+			err = Format(&buf, Defaults, sqlResult.Statements...)
 			require.NoError(t, err)
 			result := buf.String()
 

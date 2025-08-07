@@ -292,7 +292,7 @@ func (c *Client) validateDDLStatement(ddl string) error {
 //	}
 //
 // Returns a parsed Grammar containing all schema objects or an error if retrieval fails.
-func (c *Client) GetSchema(ctx context.Context) (*parser.Grammar, error) {
+func (c *Client) GetSchema(ctx context.Context) (*parser.SQL, error) {
 	var statements []string
 
 	// Get database statements
@@ -313,12 +313,12 @@ func (c *Client) GetSchema(ctx context.Context) (*parser.Grammar, error) {
 	combinedSQL := strings.Join(statements, "\n")
 
 	// Parse the combined SQL using our parser
-	grammar, err := parser.ParseSQL(combinedSQL)
+	sqlResult, err := parser.ParseSQL(combinedSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse generated DDL: %w", err)
 	}
 
-	return grammar, nil
+	return sqlResult, nil
 }
 
 // GetDatabasesOnly returns database-only schema information as a parsed Grammar.
@@ -347,7 +347,7 @@ func (c *Client) GetSchema(ctx context.Context) (*parser.Grammar, error) {
 //	}
 //
 // Returns a Grammar containing only database statements or an error if retrieval fails.
-func (c *Client) GetDatabasesOnly(ctx context.Context) (*parser.Grammar, error) {
+func (c *Client) GetDatabasesOnly(ctx context.Context) (*parser.SQL, error) {
 	statements, err := c.GetSchemaRecreationStatements(ctx)
 	if err != nil {
 		return nil, err
@@ -357,12 +357,12 @@ func (c *Client) GetDatabasesOnly(ctx context.Context) (*parser.Grammar, error) 
 	combinedSQL := strings.Join(statements, "\n")
 
 	// Parse the combined SQL using our parser
-	grammar, err := parser.ParseSQL(combinedSQL)
+	sqlResult, err := parser.ParseSQL(combinedSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse generated DDL: %w", err)
 	}
 
-	return grammar, nil
+	return sqlResult, nil
 }
 
 // getDictionaryRecreationStatements returns CREATE DICTIONARY statements to recreate all dictionaries

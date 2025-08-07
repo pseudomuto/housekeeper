@@ -1,78 +1,3 @@
-// Package parser contains a participle-based parser for ClickHouse DDL.
-//
-// This is a robust implementation using github.com/alecthomas/participle/v2
-// to replace regex-based parsing. It provides better maintainability,
-// error messages, and extensibility compared to regex approaches.
-//
-// Benefits of this participle approach:
-// - More maintainable than regex
-// - Better error messages
-// - Easier to extend with new SQL features
-// - More robust parsing of complex expressions
-//
-// Current status:
-// ✅ CREATE DATABASE - Fully implemented with all options:
-//    - IF NOT EXISTS
-//    - ON CLUSTER
-//    - ENGINE with parameters (supports string, number, identifier params)
-//    - COMMENT
-// ✅ ALTER DATABASE - Fully implemented with ClickHouse-supported operations:
-//    - MODIFY COMMENT
-//    - ON CLUSTER
-// ✅ ATTACH DATABASE - Fully implemented with all options:
-//    - IF NOT EXISTS
-//    - ENGINE with parameters (supports string, number, identifier params)
-//    - ON CLUSTER
-// ✅ DETACH DATABASE - Fully implemented with all options:
-//    - IF EXISTS
-//    - ON CLUSTER
-//    - PERMANENTLY
-//    - SYNC
-// ✅ DROP DATABASE - Fully implemented with all options:
-//    - IF EXISTS
-//    - ON CLUSTER
-//    - SYNC
-// ✅ CREATE DICTIONARY - Fully implemented with all ClickHouse features:
-//    - OR REPLACE clause
-//    - IF NOT EXISTS
-//    - ON CLUSTER
-//    - Complex column attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
-//    - Column defaults and expressions
-//    - All source types, layouts, lifetimes, and settings
-// ✅ ATTACH DICTIONARY - Fully implemented with all options
-// ✅ DETACH DICTIONARY - Fully implemented with all options
-// ✅ DROP DICTIONARY - Fully implemented with all options
-// ✅ RENAME DATABASE - Fully implemented with multi-database support and ON CLUSTER
-// ✅ RENAME DICTIONARY - Fully implemented with multi-dictionary support and ON CLUSTER
-// ✅ CREATE TABLE - Fully implemented with comprehensive support:
-//    - OR REPLACE clause
-//    - IF NOT EXISTS
-//    - ON CLUSTER
-//    - Complete column definitions using column.go types
-//    - INDEX definitions with all ClickHouse index types:
-//      • bloom_filter, minmax, hypothesis (simple types)
-//      • set(max_rows), tokenbf_v1(size, hashes, seed), ngrambf_v1(n, size, hashes, seed) (parametric types)
-//      • Support for backtick identifiers in index names and expressions
-//      • GRANULARITY specification
-//    - CONSTRAINT definitions with CHECK expressions
-//    - ENGINE clause with parameters
-//    - ORDER BY, PARTITION BY, PRIMARY KEY, SAMPLE BY
-//    - Table-level TTL and SETTINGS
-//    - COMMENT support
-// ✅ CREATE VIEW - Fully implemented with all options
-// ✅ CREATE MATERIALIZED VIEW - Fully implemented with all ClickHouse features:
-//    - OR REPLACE clause
-//    - IF NOT EXISTS
-//    - ON CLUSTER
-//    - TO table (for materialized views)
-//    - ENGINE specification
-//    - POPULATE option
-//    - AS SELECT clause
-// ✅ ATTACH VIEW/MATERIALIZED VIEW - Fully implemented
-// ✅ DETACH VIEW/MATERIALIZED VIEW - Fully implemented with all options
-// ✅ DROP VIEW/MATERIALIZED VIEW - Fully implemented with all options
-// ✅ RENAME VIEW/MATERIALIZED VIEW - Fully implemented with multi-view support
-
 package parser
 
 import (
@@ -101,7 +26,7 @@ var (
 	})
 
 	// parser is the participle parser instance for ClickHouse DDL
-	parser = participle.MustBuild[Grammar](
+	parser = participle.MustBuild[SQL](
 		participle.Lexer(clickhouseLexer),
 		participle.Elide("Comment", "MultilineComment", "Whitespace"),
 		participle.CaseInsensitive("CREATE", "ALTER", "ATTACH", "DETACH", "DROP", "RENAME", "DATABASE", "DICTIONARY",
@@ -124,8 +49,8 @@ var (
 )
 
 type (
-	// Grammar defines the complete ClickHouse DDL grammar
-	Grammar struct {
+	// SQL defines the complete ClickHouse DDL/DML SQL structure
+	SQL struct {
 		Statements []*Statement `parser:"@@*"`
 	}
 
@@ -185,7 +110,7 @@ func GetLexer() lexer.Definition {
 	return clickhouseLexer
 }
 
-// ParseSQL parses ClickHouse DDL statements from a string and returns the parsed Grammar.
+// ParseSQL parses ClickHouse DDL statements from a string and returns the parsed SQL structure.
 // This is the primary parsing function that converts SQL text into structured DDL statements.
 // It supports all implemented ClickHouse DDL operations including database creation,
 // modification, attachment, detachment, and deletion.
@@ -224,13 +149,13 @@ func GetLexer() lexer.Definition {
 //		RENAME TABLE analytics.old_view TO analytics.new_view;
 //	`
 //
-//	grammar, err := parser.ParseSQL(sql)
+//	sqlResult, err := parser.ParseSQL(sql)
 //	if err != nil {
 //		log.Fatalf("Parse error: %v", err)
 //	}
 //
 //	// Access parsed statements
-//	for _, stmt := range grammar.Statements {
+//	for _, stmt := range sqlResult.Statements {
 //		if stmt.CreateDatabase != nil {
 //			fmt.Printf("CREATE DATABASE: %s\n", stmt.CreateDatabase.Name)
 //		}
@@ -280,32 +205,32 @@ func GetLexer() lexer.Definition {
 //	}
 //
 // Returns an error if the SQL contains syntax errors or unsupported constructs.
-func ParseSQL(sql string) (*Grammar, error) {
-	grammar, err := parser.ParseString("", sql)
+func ParseSQL(sql string) (*SQL, error) {
+	sqlResult, err := parser.ParseString("", sql)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SQL: %w", err)
 	}
 
-	return grammar, nil
+	return sqlResult, nil
 }
 
-// ParseSQLFromFile parses ClickHouse DDL statements from a file and returns the parsed Grammar.
+// ParseSQLFromFile parses ClickHouse DDL statements from a file and returns the parsed SQL structure.
 // This is a convenience function that reads a file and calls ParseSQL on its contents.
 //
 // Example usage:
 //
-//	grammar, err := parser.ParseSQLFromFile("schema.sql")
+//	sqlResult, err := parser.ParseSQLFromFile("schema.sql")
 //	if err != nil {
 //		log.Fatalf("Failed to parse schema file: %v", err)
 //	}
 //
 //	// Process the parsed statements
-//	for _, stmt := range grammar.Statements {
+//	for _, stmt := range sqlResult.Statements {
 //		// Process each statement
 //	}
 //
 // Returns an error if the file cannot be read or contains invalid SQL.
-func ParseSQLFromFile(path string) (*Grammar, error) {
+func ParseSQLFromFile(path string) (*SQL, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SQL file: %w", err)
@@ -314,27 +239,27 @@ func ParseSQLFromFile(path string) (*Grammar, error) {
 	return ParseSQL(string(data))
 }
 
-// ParseSQLFromDirectory parses all .sql files in a directory and returns combined Grammar.
+// ParseSQLFromDirectory parses all .sql files in a directory and returns combined SQL structure.
 // This function is useful for projects that split their schema definitions across multiple files.
 // It automatically discovers all .sql files in the specified directory and combines their
-// parsed results into a unified grammar representation.
+// parsed results into a unified SQL representation.
 //
 // Example usage:
 //
-//	grammar, err := parser.ParseSQLFromDirectory("./schemas")
+//	sqlResult, err := parser.ParseSQLFromDirectory("./schemas")
 //	if err != nil {
 //		log.Fatalf("Failed to parse schema directory: %v", err)
 //	}
 //
-//	// The grammar now contains all statements from all .sql files in the directory
-//	fmt.Printf("Parsed %d statements from directory\n", len(grammar.Statements))
+//	// The sqlResult now contains all statements from all .sql files in the directory
+//	fmt.Printf("Parsed %d statements from directory\n", len(sqlResult.Statements))
 //
-//	for _, stmt := range grammar.Statements {
+//	for _, stmt := range sqlResult.Statements {
 //		// Process each statement
 //	}
 //
 // Returns an error if the directory cannot be read or any SQL file contains errors.
-func ParseSQLFromDirectory(dir string) (*Grammar, error) {
+func ParseSQLFromDirectory(dir string) (*SQL, error) {
 	var allStatements []*Statement
 
 	files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
@@ -343,16 +268,16 @@ func ParseSQLFromDirectory(dir string) (*Grammar, error) {
 	}
 
 	for _, file := range files {
-		grammar, err := ParseSQLFromFile(file)
+		sqlResult, err := ParseSQLFromFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse %s: %w", file, err)
 		}
 
 		// Combine all statements
-		allStatements = append(allStatements, grammar.Statements...)
+		allStatements = append(allStatements, sqlResult.Statements...)
 	}
 
-	return &Grammar{Statements: allStatements}, nil
+	return &SQL{Statements: allStatements}, nil
 }
 
 // parseBalancedParentheses parses content within balanced parentheses

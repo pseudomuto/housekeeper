@@ -99,14 +99,14 @@ var Defaults = FormatterOptions{
 //	})
 //
 //	// Parse SQL statement
-//	grammar, err := parser.ParseSQL("CREATE TABLE users (id UInt64, name String) ENGINE = MergeTree();")
+//	sqlResult, err := parser.ParseSQL("CREATE TABLE users (id UInt64, name String) ENGINE = MergeTree();")
 //	if err != nil {
 //		panic(err)
 //	}
 //
 //	// Format to buffer
 //	var buf bytes.Buffer
-//	err = formatter.Format(&buf, grammar.Statements...)
+//	err = formatter.Format(&buf, sqlResult.Statements...)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -154,7 +154,7 @@ func New(options FormatterOptions) *Formatter {
 //
 //	grammar, _ := parser.ParseSQL("CREATE DATABASE test;")
 //	var buf bytes.Buffer
-//	err := format.Format(&buf, format.Defaults, grammar.Statements...)
+//	err := format.Format(&buf, format.Defaults, sqlResult.Statements...)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -164,7 +164,7 @@ func Format(w io.Writer, opts FormatterOptions, statements ...*parser.Statement)
 
 // FormatGrammar provides a convenient way to format all statements from a parsed grammar.
 //
-// This is equivalent to calling Format(w, opts, grammar.Statements...) but more concise
+// This is equivalent to calling Format(w, opts, sqlResult.Statements...) but more concise
 // when you have a complete parsed grammar object.
 //
 // Example:
@@ -181,11 +181,11 @@ func Format(w io.Writer, opts FormatterOptions, statements ...*parser.Statement)
 //	if err != nil {
 //		panic(err)
 //	}
-func FormatGrammar(w io.Writer, opts FormatterOptions, grammar *parser.Grammar) error {
-	if grammar == nil {
+func FormatGrammar(w io.Writer, opts FormatterOptions, sql *parser.SQL) error {
+	if sql == nil {
 		return nil
 	}
-	return Format(w, opts, grammar.Statements...)
+	return Format(w, opts, sql.Statements...)
 }
 
 // Format writes formatted SQL statements to the provided writer.
@@ -226,13 +226,13 @@ func (f *Formatter) Format(w io.Writer, statements ...*parser.Statement) error {
 
 // FormatGrammar formats all statements from a parsed grammar using this formatter's configuration.
 //
-// This is equivalent to calling f.Format(w, grammar.Statements...) but more concise
+// This is equivalent to calling f.Format(w, sqlResult.Statements...) but more concise
 // when you have a complete parsed grammar object.
-func (f *Formatter) FormatGrammar(w io.Writer, grammar *parser.Grammar) error {
-	if grammar == nil {
+func (f *Formatter) FormatGrammar(w io.Writer, sql *parser.SQL) error {
+	if sql == nil {
 		return nil
 	}
-	return f.Format(w, grammar.Statements...)
+	return f.Format(w, sql.Statements...)
 }
 
 // statement formats a complete parser statement

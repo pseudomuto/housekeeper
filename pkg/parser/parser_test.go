@@ -187,7 +187,7 @@ func TestParserWithTestdata(t *testing.T) {
 // Processing statements in order to preserve the sequence from the SQL file
 //
 //nolint:gocognit,gocyclo,maintidx // Complex test case generation function handles all DDL statement types
-func generateTestCaseFromGrammar(grammar *Grammar) TestCase {
+func generateTestCaseFromGrammar(grammar *SQL) TestCase {
 	var expectedDatabases []ExpectedDatabase
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
@@ -797,7 +797,7 @@ func hasWindowFunction(expr *Expression) bool {
 	return false
 }
 
-func verifyGrammar(t *testing.T, actualGrammar *Grammar, expected TestCase, sqlFile string) {
+func verifyGrammar(t *testing.T, actualGrammar *SQL, expected TestCase, sqlFile string) {
 	// Use the same logic as generateTestCaseFromGrammar to extract actual results
 	actualTestCase := generateTestCaseFromGrammar(actualGrammar)
 

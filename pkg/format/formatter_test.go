@@ -19,11 +19,11 @@ func TestFormatter_Options(t *testing.T) {
 			AlignColumns:      true,
 		}
 
-		grammar, err := parser.ParseSQL(sql)
+		sqlResult, err := parser.ParseSQL(sql)
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		err = Format(&buf, options, grammar.Statements[0])
+		err = Format(&buf, options, sqlResult.Statements[0])
 		require.NoError(t, err)
 		formatted := buf.String()
 		require.Equal(t, "create database `test`;", formatted)
@@ -38,11 +38,11 @@ func TestFormatter_Options(t *testing.T) {
 			AlignColumns:      false,
 		}
 
-		grammar, err := parser.ParseSQL(sql)
+		sqlResult, err := parser.ParseSQL(sql)
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		err = Format(&buf, options, grammar.Statements[0])
+		err = Format(&buf, options, sqlResult.Statements[0])
 		require.NoError(t, err)
 		formatted := buf.String()
 		lines := []string{
@@ -65,11 +65,11 @@ func TestFormatter_Options(t *testing.T) {
 			AlignColumns:      false,
 		}
 
-		grammar, err := parser.ParseSQL(sql)
+		sqlResult, err := parser.ParseSQL(sql)
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		err = Format(&buf, options, grammar.Statements[0])
+		err = Format(&buf, options, sqlResult.Statements[0])
 		require.NoError(t, err)
 		formatted := buf.String()
 		// Should not have extra spaces for alignment
@@ -82,12 +82,12 @@ func TestFormatter_Grammar(t *testing.T) {
 	sql := `CREATE DATABASE test;
 			CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();`
 
-	grammar, err := parser.ParseSQL(sql)
+	sqlResult, err := parser.ParseSQL(sql)
 	require.NoError(t, err)
-	require.Len(t, grammar.Statements, 2)
+	require.Len(t, sqlResult.Statements, 2)
 
 	var buf bytes.Buffer
-	err = Format(&buf, Defaults, grammar.Statements...)
+	err = Format(&buf, Defaults, sqlResult.Statements...)
 	require.NoError(t, err)
 	formatted := buf.String()
 
@@ -97,19 +97,19 @@ func TestFormatter_Grammar(t *testing.T) {
 
 func TestFormatter_FormatFunction(t *testing.T) {
 	sql := "CREATE DATABASE test;"
-	grammar, err := parser.ParseSQL(sql)
+	sqlResult, err := parser.ParseSQL(sql)
 	require.NoError(t, err)
 
 	// Test Format function with single statement
 	var buf1 bytes.Buffer
-	err = Format(&buf1, Defaults, grammar.Statements[0])
+	err = Format(&buf1, Defaults, sqlResult.Statements[0])
 	require.NoError(t, err)
 	formatted1 := buf1.String()
 	require.Equal(t, "CREATE DATABASE `test`;", formatted1)
 
 	// Test Format function with multiple statements
 	var buf2 bytes.Buffer
-	err = Format(&buf2, Defaults, grammar.Statements...)
+	err = Format(&buf2, Defaults, sqlResult.Statements...)
 	require.NoError(t, err)
 	formatted2 := buf2.String()
 	require.Equal(t, "CREATE DATABASE `test`;", formatted2)
@@ -160,11 +160,11 @@ func TestFormatGrammar_Function(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			grammar, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 
 			var buf bytes.Buffer
-			err = FormatGrammar(&buf, Defaults, grammar)
+			err = FormatGrammar(&buf, Defaults, sqlResult)
 			require.NoError(t, err)
 
 			require.Equal(t, tt.expected, buf.String())
@@ -187,7 +187,7 @@ func TestFormatGrammar_Method(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			grammar, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
 
 			formatter := New(FormatterOptions{
@@ -197,7 +197,7 @@ func TestFormatGrammar_Method(t *testing.T) {
 			})
 
 			var buf bytes.Buffer
-			err = formatter.FormatGrammar(&buf, grammar)
+			err = formatter.FormatGrammar(&buf, sqlResult)
 			require.NoError(t, err)
 
 			require.Equal(t, tt.expected, buf.String())
@@ -223,15 +223,15 @@ func TestFormatGrammar_NilGrammar(t *testing.T) {
 func TestFormatGrammar_EmptyGrammar(t *testing.T) {
 	var buf bytes.Buffer
 
-	// Test function with empty grammar
-	grammar := &parser.Grammar{Statements: []*parser.Statement{}}
-	err := FormatGrammar(&buf, Defaults, grammar)
+	// Test function with empty sqlResult
+	sqlResult := &parser.SQL{Statements: []*parser.Statement{}}
+	err := FormatGrammar(&buf, Defaults, sqlResult)
 	require.NoError(t, err)
 	require.Empty(t, buf.String())
 
-	// Test method with empty grammar
+	// Test method with empty sqlResult
 	formatter := New(Defaults)
-	err = formatter.FormatGrammar(&buf, grammar)
+	err = formatter.FormatGrammar(&buf, sqlResult)
 	require.NoError(t, err)
 	require.Empty(t, buf.String())
 }

@@ -6,7 +6,7 @@
 //
 // Key features:
 //   - Simple connection management with DSN-based configuration
-//   - Retrieval of current database schemas as parser.Grammar structures
+//   - Retrieval of current database schemas as parser.SQL structures
 //   - Execution of migration SQL statements
 //   - Generation of CREATE DATABASE statements from current state
 //   - Filtering of system databases (INFORMATION_SCHEMA, information_schema, system)

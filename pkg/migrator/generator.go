@@ -64,7 +64,7 @@ type (
 //	migration, err := GenerateMigration(current, target, "update_analytics_schema")
 //
 //nolint:gocyclo,funlen,maintidx // Complex function handles multiple DDL statement types and migration ordering
-func GenerateMigration(current, target *parser.Grammar, name string) (*Migration, error) {
+func GenerateMigration(current, target *parser.SQL, name string) (*Migration, error) {
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := CompareDatabaseGrammars(current, target)
 	if err != nil {
@@ -361,7 +361,7 @@ func GenerateMigration(current, target *parser.Grammar, name string) (*Migration
 //
 //	// For down migration:
 //	downFilename, err := GenerateMigrationFile("/path/to/migrations", targetSchema, currentSchema)
-func GenerateMigrationFile(migrationDir string, current, target *parser.Grammar) (string, error) {
+func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (string, error) {
 	// Generate migration using existing function
 	migration, err := GenerateMigration(current, target, "schema_update")
 	if err != nil {

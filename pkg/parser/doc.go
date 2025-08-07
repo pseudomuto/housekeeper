@@ -59,7 +59,7 @@
 //	// Parse from directory (combines all .sql files)
 //	grammar, err := parser.ParseSQLFromDirectory("schemas/")
 //
-// The parser returns a Grammar struct containing all parsed statements,
+// The parser returns a SQL struct containing all parsed statements,
 // which can be used for schema analysis, migration generation, validation,
 // or any other DDL processing needs.
 package parser

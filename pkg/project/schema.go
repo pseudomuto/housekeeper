@@ -40,8 +40,8 @@ import (
 //			fmt.Printf("Found table: %s\n", stmt.CreateTable.Name)
 //		}
 //	}
-func (p *Project) ParseSchema(env string) (*parser.Grammar, error) {
-	var g *parser.Grammar
+func (p *Project) ParseSchema(env string) (*parser.SQL, error) {
+	var g *parser.SQL
 	err := p.withEnv(env, func(e *Env) error {
 		var buf bytes.Buffer
 		if err := compileSchema(e.Entrypoint, &buf); err != nil {

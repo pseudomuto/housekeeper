@@ -80,7 +80,7 @@ type (
 //
 // The function returns a slice of DatabaseDiff objects describing each change needed.
 // It returns an error if an unsupported operation is detected (e.g., engine or cluster changes).
-func CompareDatabaseGrammars(current, target *parser.Grammar) ([]*DatabaseDiff, error) {
+func CompareDatabaseGrammars(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 	var diffs []*DatabaseDiff
 
 	// Extract database information from both grammars
@@ -123,10 +123,10 @@ func CompareDatabaseGrammars(current, target *parser.Grammar) ([]*DatabaseDiff, 
 }
 
 // extractDatabaseInfo extracts database information from CREATE DATABASE statements in a grammar
-func extractDatabaseInfo(grammar *parser.Grammar) map[string]*DatabaseInfo {
+func extractDatabaseInfo(sql *parser.SQL) map[string]*DatabaseInfo {
 	databases := make(map[string]*DatabaseInfo)
 
-	for _, stmt := range grammar.Statements {
+	for _, stmt := range sql.Statements {
 		if stmt.CreateDatabase != nil {
 			db := stmt.CreateDatabase
 			info := &DatabaseInfo{

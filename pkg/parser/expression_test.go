@@ -1,31 +1,27 @@
 package parser_test
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/alecthomas/participle/v2"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
 
-// TestExpression is a wrapper to test expression parsing in isolation
-type TestExpression struct {
-	Expr parser.Expression `parser:"@@"`
-}
-
 func TestExpressionParsing(t *testing.T) {
-	// Create a parser specifically for testing expressions
-	exprParser := participle.MustBuild[TestExpression](
-		participle.Lexer(parser.GetLexer()),
-		participle.Elide("Comment", "MultilineComment", "Whitespace"),
-		participle.CaseInsensitive("AND", "OR", "NOT", "LIKE", "IN", "BETWEEN", "IS", "NULL",
-			"TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "AS",
-			"INTERVAL", "SECOND", "MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "QUARTER", "YEAR",
-			"EXTRACT", "FROM", "OVER", "PARTITION", "BY", "ORDER", "ROWS", "RANGE",
-			"UNBOUNDED", "PRECEDING", "CURRENT", "ROW", "FOLLOWING", "NULLS", "FIRST", "LAST",
-			"DESC", "ASC", "SELECT"),
-		participle.UseLookahead(4),
-	)
+	// Helper function to test expressions via ParseSQL
+	testExpression := func(expr string) error {
+		// Wrap expression in a minimal SQL statement for parsing
+		sql := fmt.Sprintf("CREATE TABLE test (col String DEFAULT %s) ENGINE = Memory();", expr)
+		_, err := parser.ParseSQL(sql)
+		if err != nil {
+			// Try alternative contexts for expressions that may not work in DEFAULT
+			// Try in WHERE clause
+			sql = fmt.Sprintf("CREATE VIEW test AS SELECT * FROM table WHERE %s;", expr)
+			_, err = parser.ParseSQL(sql)
+		}
+		return err
+	}
 
 	tests := []struct {
 		name  string
@@ -146,10 +142,9 @@ func TestExpressionParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := exprParser.ParseString("", tt.input)
+			err := testExpression(tt.input)
 			if tt.valid {
 				require.NoError(t, err, "Failed to parse: %s", tt.input)
-				require.NotNil(t, result)
 			} else {
 				require.Error(t, err, "Expected parse error for: %s", tt.input)
 			}
@@ -191,10 +186,10 @@ func TestExpressionInContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			grammar, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err, "Failed to parse SQL: %s", tt.sql)
-			require.NotNil(t, grammar)
-			require.NotEmpty(t, grammar.Statements)
+			require.NotNil(t, sqlResult)
+			require.NotEmpty(t, sqlResult.Statements)
 		})
 	}
 }

@@ -101,7 +101,7 @@ const (
 // - Proper ordering for migration generation
 //
 // Returns a slice of TableDiff objects representing all detected changes.
-func CompareTableGrammars(current, target *parser.Grammar) ([]*TableDiff, error) {
+func CompareTableGrammars(current, target *parser.SQL) ([]*TableDiff, error) {
 	currentTables := extractTablesFromGrammar(current)
 	targetTables := extractTablesFromGrammar(target)
 
@@ -144,10 +144,10 @@ func CompareTableGrammars(current, target *parser.Grammar) ([]*TableDiff, error)
 // extractTablesFromGrammar extracts table information from parsed grammar statements
 //
 //nolint:gocognit,funlen // Complex function needed for comprehensive table parsing
-func extractTablesFromGrammar(grammar *parser.Grammar) map[string]*TableInfo {
+func extractTablesFromGrammar(sql *parser.SQL) map[string]*TableInfo {
 	tables := make(map[string]*TableInfo)
 
-	for _, stmt := range grammar.Statements {
+	for _, stmt := range sql.Statements {
 		//nolint:nestif // Complex nested logic needed for comprehensive table extraction
 		if stmt.CreateTable != nil {
 			table := stmt.CreateTable

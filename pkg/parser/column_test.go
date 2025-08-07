@@ -1,37 +1,36 @@
 package parser_test
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer"
+	"github.com/pkg/errors"
 	. "github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
 
-// Test lexer and parser for column definitions
-var (
-	columnLexer = lexer.MustSimple([]lexer.SimpleRule{
-		{Name: "Comment", Pattern: `--[^\r\n]*`},
-		{Name: "String", Pattern: `'([^'\\]|\\.)*'`},
-		{Name: "BacktickIdent", Pattern: "`([^`\\\\]|\\\\.)*`"},
-		{Name: "Number", Pattern: `\d+(\.\d+)?`},
-		{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-		{Name: "Punct", Pattern: `[(),.;=+\-*/]`},
-		{Name: "Whitespace", Pattern: `\s+`},
-	})
-
-	columnParser = participle.MustBuild[Column](
-		participle.Lexer(columnLexer),
-		participle.Elide("Comment", "Whitespace"),
-		participle.CaseInsensitive("DEFAULT", "MATERIALIZED", "EPHEMERAL", "ALIAS", "CODEC", "TTL",
-			"COMMENT", "NULLABLE", "ARRAY", "TUPLE", "NESTED", "MAP", "LOWCARDINALITY",
-			"PRIMARY", "ORDER", "PARTITION", "SAMPLE", "SETTINGS", "ENGINE", "BY", "INTERVAL"),
-	)
-)
-
 //nolint:maintidx // Comprehensive test function covers all column parsing scenarios
 func TestColumnParsing(t *testing.T) {
+	// Helper function to parse a column definition via ParseSQL
+	parseColumn := func(colDef string) (*Column, error) {
+		// Wrap column definition in a CREATE TABLE statement
+		sql := fmt.Sprintf("CREATE TABLE test (%s) ENGINE = Memory();", colDef)
+		sqlResult, err := ParseSQL(sql)
+		if err != nil {
+			return nil, err
+		}
+
+		// Extract the column from the parsed statement
+		if len(sqlResult.Statements) > 0 &&
+			sqlResult.Statements[0].CreateTable != nil &&
+			len(sqlResult.Statements[0].CreateTable.Elements) > 0 &&
+			sqlResult.Statements[0].CreateTable.Elements[0].Column != nil {
+			return sqlResult.Statements[0].CreateTable.Elements[0].Column, nil
+		}
+
+		return nil, errors.New("no column found in parsed SQL")
+	}
+
 	tests := []struct {
 		name     string
 		input    string
@@ -276,7 +275,7 @@ func TestColumnParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			col, err := columnParser.ParseString("", tt.input)
+			col, err := parseColumn(tt.input)
 			require.NoError(t, err)
 			tt.validate(t, col)
 		})
@@ -284,6 +283,26 @@ func TestColumnParsing(t *testing.T) {
 }
 
 func TestComplexNestedTypes(t *testing.T) {
+	// Helper function to parse a column definition via ParseSQL
+	parseColumn := func(colDef string) (*Column, error) {
+		// Wrap column definition in a CREATE TABLE statement
+		sql := fmt.Sprintf("CREATE TABLE test (%s) ENGINE = Memory();", colDef)
+		sqlResult, err := ParseSQL(sql)
+		if err != nil {
+			return nil, err
+		}
+
+		// Extract the column from the parsed statement
+		if len(sqlResult.Statements) > 0 &&
+			sqlResult.Statements[0].CreateTable != nil &&
+			len(sqlResult.Statements[0].CreateTable.Elements) > 0 &&
+			sqlResult.Statements[0].CreateTable.Elements[0].Column != nil {
+			return sqlResult.Statements[0].CreateTable.Elements[0].Column, nil
+		}
+
+		return nil, errors.New("no column found in parsed SQL")
+	}
+
 	tests := []struct {
 		name  string
 		input string
@@ -316,7 +335,7 @@ func TestComplexNestedTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			col, err := columnParser.ParseString("", tt.input)
+			col, err := parseColumn(tt.input)
 			require.NoError(t, err, "Failed to parse: %s", tt.input)
 			require.NotNil(t, col)
 		})

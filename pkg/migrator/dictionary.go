@@ -81,7 +81,7 @@ type (
 //	// DownSQL: "RENAME DICTIONARY analytics.users TO analytics.old_users;"
 //
 // The function returns a slice of DictionaryDiff objects describing each change needed.
-func CompareDictionaryGrammars(current, target *parser.Grammar) ([]*DictionaryDiff, error) {
+func CompareDictionaryGrammars(current, target *parser.SQL) ([]*DictionaryDiff, error) {
 	var diffs []*DictionaryDiff
 
 	// Extract dictionary information from both grammars
@@ -144,10 +144,10 @@ func CompareDictionaryGrammars(current, target *parser.Grammar) ([]*DictionaryDi
 }
 
 // extractDictionaryInfo extracts dictionary information from CREATE DICTIONARY statements in a grammar
-func extractDictionaryInfo(grammar *parser.Grammar) map[string]*DictionaryInfo {
+func extractDictionaryInfo(sql *parser.SQL) map[string]*DictionaryInfo {
 	dictionaries := make(map[string]*DictionaryInfo)
 
-	for _, stmt := range grammar.Statements {
+	for _, stmt := range sql.Statements {
 		if stmt.CreateDictionary != nil {
 			dict := stmt.CreateDictionary
 			info := &DictionaryInfo{

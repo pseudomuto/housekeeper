@@ -57,12 +57,12 @@ func TestFormatter_Table(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			grammar, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
-			require.Len(t, grammar.Statements, 1)
+			require.Len(t, sqlResult.Statements, 1)
 
 			var buf bytes.Buffer
-			err = Format(&buf, Defaults, grammar.Statements[0])
+			err = Format(&buf, Defaults, sqlResult.Statements[0])
 			require.NoError(t, err)
 			formatted := buf.String()
 			lines := strings.Split(formatted, "\n")
@@ -174,12 +174,12 @@ func TestFormatter_alterTable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			grammar, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseSQL(tt.sql)
 			require.NoError(t, err)
-			require.Len(t, grammar.Statements, 1)
+			require.Len(t, sqlResult.Statements, 1)
 
 			var buf bytes.Buffer
-			err = Format(&buf, Defaults, grammar.Statements[0])
+			err = Format(&buf, Defaults, sqlResult.Statements[0])
 			require.NoError(t, err)
 			formatted := buf.String()
 			lines := strings.Split(formatted, "\n")
