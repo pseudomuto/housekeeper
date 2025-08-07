@@ -18,20 +18,26 @@ type (
 	//   [SETTINGS(setting1 = value1 [, setting2 = value2, ...])]
 	//   [COMMENT 'comment']
 	CreateDictionaryStmt struct {
-		Create      string                `parser:"'CREATE'"`
-		OrReplace   bool                  `parser:"@('OR' 'REPLACE')?"`
-		Dictionary  string                `parser:"'DICTIONARY'"`
-		IfNotExists *string               `parser:"(@'IF' 'NOT' 'EXISTS')?"`
-		Database    *string               `parser:"((@(Ident | BacktickIdent) '.')?"`
-		Name        string                `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Columns     []*DictionaryColumn   `parser:"'(' @@* ')'"`
-		PrimaryKey  *DictionaryPrimaryKey `parser:"@@?"`
-		Source      *DictionarySource     `parser:"@@"`
-		Layout      *DictionaryLayout     `parser:"@@"`
-		Lifetime    *DictionaryLifetime   `parser:"@@?"`
-		Settings    *DictionarySettings   `parser:"@@?"`
-		Comment     *string               `parser:"('COMMENT' @String)? ';'"`
+		Create      string              `parser:"'CREATE'"`
+		OrReplace   bool                `parser:"@('OR' 'REPLACE')?"`
+		Dictionary  string              `parser:"'DICTIONARY'"`
+		IfNotExists *string             `parser:"(@'IF' 'NOT' 'EXISTS')?"`
+		Database    *string             `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name        string              `parser:"@(Ident | BacktickIdent))"`
+		OnCluster   *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Columns     []*DictionaryColumn `parser:"'(' @@* ')'"`
+		Clauses     []DictionaryClause  `parser:"@@*"`
+		Comment     *string             `parser:"('COMMENT' @String)? ';'"`
+	}
+
+	// DictionaryClause represents any clause that can appear after columns in a CREATE DICTIONARY statement
+	// This allows clauses to be specified in any order
+	DictionaryClause struct {
+		PrimaryKey *DictionaryPrimaryKey `parser:"@@"`
+		Source     *DictionarySource     `parser:"| @@"`
+		Layout     *DictionaryLayout     `parser:"| @@"`
+		Lifetime   *DictionaryLifetime   `parser:"| @@"`
+		Settings   *DictionarySettings   `parser:"| @@"`
 	}
 
 	// DictionaryColumn represents a column definition in dictionary
@@ -162,3 +168,56 @@ type (
 		ToName       string  `parser:"@(Ident | BacktickIdent))"`
 	}
 )
+
+// Convenience methods for CreateDictionaryStmt to access clauses from the new flexible structure
+// These maintain backward compatibility with existing code
+
+// GetPrimaryKey returns the PRIMARY KEY clause if present
+func (c *CreateDictionaryStmt) GetPrimaryKey() *DictionaryPrimaryKey {
+	for _, clause := range c.Clauses {
+		if clause.PrimaryKey != nil {
+			return clause.PrimaryKey
+		}
+	}
+	return nil
+}
+
+// GetSource returns the SOURCE clause if present
+func (c *CreateDictionaryStmt) GetSource() *DictionarySource {
+	for _, clause := range c.Clauses {
+		if clause.Source != nil {
+			return clause.Source
+		}
+	}
+	return nil
+}
+
+// GetLayout returns the LAYOUT clause if present
+func (c *CreateDictionaryStmt) GetLayout() *DictionaryLayout {
+	for _, clause := range c.Clauses {
+		if clause.Layout != nil {
+			return clause.Layout
+		}
+	}
+	return nil
+}
+
+// GetLifetime returns the LIFETIME clause if present
+func (c *CreateDictionaryStmt) GetLifetime() *DictionaryLifetime {
+	for _, clause := range c.Clauses {
+		if clause.Lifetime != nil {
+			return clause.Lifetime
+		}
+	}
+	return nil
+}
+
+// GetSettings returns the SETTINGS clause if present
+func (c *CreateDictionaryStmt) GetSettings() *DictionarySettings {
+	for _, clause := range c.Clauses {
+		if clause.Settings != nil {
+			return clause.Settings
+		}
+	}
+	return nil
+}

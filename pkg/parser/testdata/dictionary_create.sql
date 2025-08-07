@@ -64,3 +64,16 @@ PRIMARY KEY `user-id`
 SOURCE(HTTP(url 'http://api.example.com/orders'))
 LAYOUT(HASHED())
 LIFETIME(3600);
+
+-- Dictionary with reordered clauses (LAYOUT before SOURCE)
+CREATE DICTIONARY reordered_dict
+(
+    id UInt64,
+    name String
+)
+LAYOUT(FLAT())
+SOURCE(HTTP(url 'http://localhost/data.json' format 'JSONEachRow'))
+PRIMARY KEY id
+LIFETIME(MIN 300 MAX 3600)
+SETTINGS(max_threads = 2)
+COMMENT 'Dictionary with flexible clause ordering';

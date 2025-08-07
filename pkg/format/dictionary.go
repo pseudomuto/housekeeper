@@ -48,32 +48,32 @@ func (f *Formatter) createDictionary(w io.Writer, stmt *parser.CreateDictionaryS
 	lines = append(lines, ")")
 
 	// PRIMARY KEY
-	if stmt.PrimaryKey != nil {
+	if primaryKey := stmt.GetPrimaryKey(); primaryKey != nil {
 		var keys []string
-		for _, key := range stmt.PrimaryKey.Keys {
+		for _, key := range primaryKey.Keys {
 			keys = append(keys, f.identifier(key))
 		}
 		lines = append(lines, f.keyword("PRIMARY KEY")+" "+strings.Join(keys, ", "))
 	}
 
 	// SOURCE
-	if stmt.Source != nil {
-		lines = append(lines, f.formatDictionarySource(stmt.Source))
+	if source := stmt.GetSource(); source != nil {
+		lines = append(lines, f.formatDictionarySource(source))
 	}
 
 	// LAYOUT
-	if stmt.Layout != nil {
-		lines = append(lines, f.formatDictionaryLayout(stmt.Layout))
+	if layout := stmt.GetLayout(); layout != nil {
+		lines = append(lines, f.formatDictionaryLayout(layout))
 	}
 
 	// LIFETIME
-	if stmt.Lifetime != nil {
-		lines = append(lines, f.formatDictionaryLifetime(stmt.Lifetime))
+	if lifetime := stmt.GetLifetime(); lifetime != nil {
+		lines = append(lines, f.formatDictionaryLifetime(lifetime))
 	}
 
 	// SETTINGS
-	if stmt.Settings != nil && len(stmt.Settings.Settings) > 0 {
-		lines = append(lines, f.formatDictionarySettings(stmt.Settings))
+	if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
+		lines = append(lines, f.formatDictionarySettings(settings))
 	}
 
 	// COMMENT

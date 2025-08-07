@@ -16,3 +16,6 @@ dictionaries:
     - name: '`order-lookup`'
       database: '`user-dict`'
       operation: CREATE
+    - name: reordered_dict
+      comment: Dictionary with flexible clause ordering
+      operation: CREATE

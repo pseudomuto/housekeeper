@@ -290,27 +290,27 @@ func dictionaryStatementsEqual(current, target *parser.CreateDictionaryStmt) boo
 	}
 
 	// Compare primary key
-	if !dictionaryPrimaryKeyEqual(current.PrimaryKey, target.PrimaryKey) {
+	if !dictionaryPrimaryKeyEqual(current.GetPrimaryKey(), target.GetPrimaryKey()) {
 		return false
 	}
 
 	// Compare source
-	if !dictionarySourceEqual(current.Source, target.Source) {
+	if !dictionarySourceEqual(current.GetSource(), target.GetSource()) {
 		return false
 	}
 
 	// Compare layout
-	if !dictionaryLayoutEqual(current.Layout, target.Layout) {
+	if !dictionaryLayoutEqual(current.GetLayout(), target.GetLayout()) {
 		return false
 	}
 
 	// Compare lifetime
-	if !dictionaryLifetimeEqual(current.Lifetime, target.Lifetime) {
+	if !dictionaryLifetimeEqual(current.GetLifetime(), target.GetLifetime()) {
 		return false
 	}
 
 	// Compare settings
-	if !dictionarySettingsEqual(current.Settings, target.Settings) {
+	if !dictionarySettingsEqual(current.GetSettings(), target.GetSettings()) {
 		return false
 	}
 
@@ -593,8 +593,8 @@ func buildDictionaryColumns(parts []string, stmt *parser.CreateDictionaryStmt) [
 	}
 
 	// PRIMARY KEY
-	if stmt.PrimaryKey != nil {
-		parts = append(parts, "PRIMARY KEY", strings.Join(stmt.PrimaryKey.Keys, ", "))
+	if primaryKey := stmt.GetPrimaryKey(); primaryKey != nil {
+		parts = append(parts, "PRIMARY KEY", strings.Join(primaryKey.Keys, ", "))
 	}
 
 	return parts
@@ -602,29 +602,29 @@ func buildDictionaryColumns(parts []string, stmt *parser.CreateDictionaryStmt) [
 
 func buildDictionaryOptions(parts []string, stmt *parser.CreateDictionaryStmt) []string {
 	// SOURCE
-	if stmt.Source != nil {
-		parts = append(parts, buildSourceClause(stmt.Source))
+	if source := stmt.GetSource(); source != nil {
+		parts = append(parts, buildSourceClause(source))
 	}
 
 	// LAYOUT
-	if stmt.Layout != nil {
-		parts = append(parts, buildLayoutClause(stmt.Layout))
+	if layout := stmt.GetLayout(); layout != nil {
+		parts = append(parts, buildLayoutClause(layout))
 	}
 
 	// LIFETIME
-	if stmt.Lifetime != nil {
-		if stmt.Lifetime.Single != nil {
-			parts = append(parts, "LIFETIME("+*stmt.Lifetime.Single+")")
-		} else if stmt.Lifetime.MinMax != nil {
-			min, max := getMinMaxValues(stmt.Lifetime.MinMax)
+	if lifetime := stmt.GetLifetime(); lifetime != nil {
+		if lifetime.Single != nil {
+			parts = append(parts, "LIFETIME("+*lifetime.Single+")")
+		} else if lifetime.MinMax != nil {
+			min, max := getMinMaxValues(lifetime.MinMax)
 			parts = append(parts, "LIFETIME(MIN "+min+" MAX "+max+")")
 		}
 	}
 
 	// SETTINGS
-	if stmt.Settings != nil && len(stmt.Settings.Settings) > 0 {
+	if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
 		var settingStrs []string
-		for _, setting := range stmt.Settings.Settings {
+		for _, setting := range settings.Settings {
 			settingStrs = append(settingStrs, setting.Name+"="+setting.Value)
 		}
 		parts = append(parts, "SETTINGS("+strings.Join(settingStrs, ", ")+")")
