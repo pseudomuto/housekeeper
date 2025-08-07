@@ -307,12 +307,16 @@ func (f *Formatter) indent(level int) string {
 // qualifiedName formats a database-qualified name with backticks
 func (f *Formatter) qualifiedName(database *string, name string) string {
 	if database != nil && *database != "" {
-		return "`" + *database + "`.`" + name + "`"
+		return f.identifier(*database) + "." + f.identifier(name)
 	}
-	return "`" + name + "`"
+	return f.identifier(name)
 }
 
 // identifier formats a single identifier with backticks
 func (f *Formatter) identifier(name string) string {
+	// Don't double-backtick identifiers that are already backticked
+	if len(name) >= 2 && name[0] == '`' && name[len(name)-1] == '`' {
+		return name
+	}
 	return "`" + name + "`"
 }
