@@ -58,18 +58,18 @@ database state and generating appropriate migration files.`,
 				},
 			},
 		},
-		Before: func(ctx context.Context, cmd *cli.Command) error {
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			_, err := os.Stat(filepath.Join(cmd.String("dir"), "housekeeper.yaml"))
 			if os.IsNotExist(err) {
-				return nil
+				return ctx, nil
 			}
 
 			if err != nil {
-				return err
+				return ctx, err
 			}
 
 			currentProject = project.New(cmd.String("dir"))
-			return nil
+			return ctx, nil
 		},
 		Commands: []*cli.Command{
 			initCmd(),

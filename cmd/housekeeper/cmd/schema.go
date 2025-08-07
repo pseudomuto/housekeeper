@@ -37,12 +37,12 @@ func schema() *cli.Command {
 		Commands: []*cli.Command{
 			schemaParse(),
 		},
-		Before: func(ctx context.Context, cmd *cli.Command) error {
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			if currentProject == nil {
-				return errors.Errorf("not a housekeeper project. Dir: %s", cmd.String("dir"))
+				return ctx, errors.Errorf("not a housekeeper project. Dir: %s", cmd.String("dir"))
 			}
 
-			return nil
+			return ctx, nil
 		},
 	}
 }
