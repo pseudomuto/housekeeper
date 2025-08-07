@@ -2,9 +2,6 @@ package clickhouse
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -15,14 +12,6 @@ type (
 	// Client represents a ClickHouse database connection
 	Client struct {
 		conn driver.Conn
-	}
-
-	// DatabaseInfo holds information about a database needed to recreate it
-	DatabaseInfo struct {
-		Name      string
-		Engine    string
-		Comment   string
-		OnCluster string
 	}
 )
 
@@ -88,25 +77,6 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) listDatabases(ctx context.Context) ([]string, error) {
-	rows, err := c.conn.Query(ctx, "SHOW DATABASES")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var databases []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		databases = append(databases, name)
-	}
-
-	return databases, nil
-}
-
 // ExecuteMigration executes a migration SQL script against the ClickHouse database.
 // The SQL can contain multiple DDL statements separated by semicolons, including
 // database and dictionary operations such as CREATE, ALTER, DROP, and RENAME.
@@ -134,153 +104,46 @@ func (c *Client) ExecuteMigration(ctx context.Context, sql string) error {
 	return c.conn.Exec(ctx, sql)
 }
 
-// GetSchemaRecreationStatements returns DDL statements necessary to recreate all databases.
-// This method focuses exclusively on database operations (CREATE DATABASE statements)
-// and excludes dictionaries, tables, and other objects.
-//
-// The returned statements can be executed to recreate the database portion of the
-// schema from scratch. System databases (system, information_schema) are automatically
-// excluded from the results.
-//
-// Each generated statement is validated using the internal parser to ensure correctness
-// before being returned.
-//
-// Example:
-//
-//	statements, err := client.GetSchemaRecreationStatements(ctx)
-//	if err != nil {
-//		log.Fatalf("Failed to get database statements: %v", err)
-//	}
-//
-//	for _, stmt := range statements {
-//		fmt.Println(stmt)
-//		// Output: CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';
-//		//         CREATE DATABASE logs ON CLUSTER production ENGINE = Memory;
-//	}
-//
-// Returns a slice of SQL DDL statements or an error if schema retrieval fails.
-func (c *Client) GetSchemaRecreationStatements(ctx context.Context) ([]string, error) {
-	statements := make([]string, 0, 100) // Pre-allocate with estimated capacity
-
-	databases, err := c.listDatabases(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list databases: %w", err)
-	}
-
-	for _, dbName := range databases {
-		// Skip system databases
-		if dbName == "system" || dbName == "information_schema" || dbName == "INFORMATION_SCHEMA" {
-			continue
-		}
-
-		// Get database details
-		dbInfo, err := c.getDatabaseInfo(ctx, dbName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get database info for %s: %w", dbName, err)
-		}
-
-		// Generate CREATE DATABASE statement
-		createStmt := c.generateCreateDatabaseStatement(dbInfo)
-
-		// Validate the generated statement using our parser
-		if err := c.validateDDLStatement(createStmt); err != nil {
-			return nil, fmt.Errorf("generated invalid DDL for database %s: %w", dbName, err)
-		}
-
-		statements = append(statements, createStmt)
-	}
-
-	return statements, nil
-}
-
-// getDatabaseInfo retrieves database metadata from ClickHouse system tables
-func (c *Client) getDatabaseInfo(ctx context.Context, dbName string) (*DatabaseInfo, error) {
-	query := `
-		SELECT 
-			name,
-			engine,
-			comment,
-			CASE 
-				WHEN create_table_query LIKE '%ON CLUSTER%' 
-				THEN extractBetween(create_table_query, 'ON CLUSTER ', ' ')
-				ELSE ''
-			END as cluster
-		FROM system.databases 
-		WHERE name = ?
-	`
-
-	var info DatabaseInfo
-	var comment sql.NullString
-
-	err := c.conn.QueryRow(ctx, query, dbName).Scan(
-		&info.Name,
-		&info.Engine,
-		&comment,
-		&info.OnCluster,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if comment.Valid {
-		info.Comment = comment.String
-	}
-
-	return &info, nil
-}
-
-// generateCreateDatabaseStatement creates a CREATE DATABASE DDL statement from database info
-func (c *Client) generateCreateDatabaseStatement(info *DatabaseInfo) string {
-	var parts []string
-
-	parts = append(parts, "CREATE DATABASE", info.Name)
-
-	if info.OnCluster != "" {
-		parts = append(parts, "ON CLUSTER", info.OnCluster)
-	}
-
-	if info.Engine != "" && info.Engine != "Atomic" {
-		// Only specify engine if it's not the default Atomic engine
-		parts = append(parts, "ENGINE =", info.Engine)
-	}
-
-	if info.Comment != "" {
-		parts = append(parts, "COMMENT", fmt.Sprintf("'%s'", strings.ReplaceAll(info.Comment, "'", "\\'")))
-	}
-
-	return strings.Join(parts, " ") + ";"
-}
-
-// validateDDLStatement ensures the generated DDL statement is valid by parsing it
-func (c *Client) validateDDLStatement(ddl string) error {
-	_, err := parser.ParseSQL(ddl)
-	return err
-}
-
-// GetSchema returns complete schema information including databases and dictionaries.
+// GetSchema returns complete schema information including databases, tables, views, and dictionaries.
 // This is the primary method for retrieving the current ClickHouse schema state,
-// including all databases and dictionaries, parsed into a structured Grammar object.
+// including all schema objects, parsed into a structured SQL object.
 //
-// The method performs the following operations:
-//  1. Retrieves all non-system databases using GetSchemaRecreationStatements
-//  2. Retrieves all dictionary definitions from system.dictionaries
-//  3. Combines and parses all DDL statements into a unified Grammar
-//  4. Returns the parsed Grammar for use in migration generation
+// This method uses dedicated extraction functions for comprehensive schema extraction,
+// providing better performance and more complete schema information than the legacy
+// database+dictionary-only approach.
 //
-// System databases and dictionaries are automatically excluded from results.
+// System objects are automatically excluded from results.
 // All returned DDL statements are validated by the parser before being included.
 //
 // Example:
 //
-//	grammar, err := client.GetSchema(ctx)
+//	schema, err := client.GetSchema(ctx)
 //	if err != nil {
 //		log.Fatalf("Failed to get schema: %v", err)
 //	}
 //
-//	// Process databases
-//	for _, stmt := range grammar.Statements {
+//	// Process all schema objects
+//	for _, stmt := range schema.Statements {
 //		if stmt.CreateDatabase != nil {
 //			fmt.Printf("Database: %s\n", stmt.CreateDatabase.Name)
+//		}
+//		if stmt.CreateTable != nil {
+//			name := stmt.CreateTable.Name
+//			if stmt.CreateTable.Database != nil {
+//				name = *stmt.CreateTable.Database + "." + name
+//			}
+//			fmt.Printf("Table: %s\n", name)
+//		}
+//		if stmt.CreateView != nil {
+//			viewType := "VIEW"
+//			if stmt.CreateView.Materialized {
+//				viewType = "MATERIALIZED VIEW"
+//			}
+//			name := stmt.CreateView.Name
+//			if stmt.CreateView.Database != nil {
+//				name = *stmt.CreateView.Database + "." + name
+//			}
+//			fmt.Printf("%s: %s\n", viewType, name)
 //		}
 //		if stmt.CreateDictionary != nil {
 //			name := stmt.CreateDictionary.Name
@@ -291,124 +154,35 @@ func (c *Client) validateDDLStatement(ddl string) error {
 //		}
 //	}
 //
-// Returns a parsed Grammar containing all schema objects or an error if retrieval fails.
+// Returns a parsed SQL containing all schema objects or an error if retrieval fails.
 func (c *Client) GetSchema(ctx context.Context) (*parser.SQL, error) {
-	var statements []string
-
-	// Get database statements
-	dbStatements, err := c.GetSchemaRecreationStatements(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get database statements: %w", err)
-	}
-	statements = append(statements, dbStatements...)
-
-	// Get dictionary statements
-	dictStatements, err := c.getDictionaryRecreationStatements(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dictionary statements: %w", err)
-	}
-	statements = append(statements, dictStatements...)
-
-	// Combine all statements into a single SQL string
-	combinedSQL := strings.Join(statements, "\n")
-
-	// Parse the combined SQL using our parser
-	sqlResult, err := parser.ParseSQL(combinedSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse generated DDL: %w", err)
-	}
-
-	return sqlResult, nil
+	return DumpSchema(ctx, c)
 }
 
-// GetDatabasesOnly returns database-only schema information as a parsed Grammar.
-// This method focuses exclusively on database operations, excluding dictionaries,
-// tables, and other database objects. It's useful when you only need to work with
-// database-level schema changes.
+// GetTables retrieves all table definitions from the ClickHouse instance.
 //
-// The method retrieves database DDL statements using GetSchemaRecreationStatements
-// and parses them into a Grammar object containing only database operations.
-// System databases are automatically excluded.
-//
-// Example:
-//
-//	grammar, err := client.GetDatabasesOnly(ctx)
-//	if err != nil {
-//		log.Fatalf("Failed to get databases: %v", err)
-//	}
-//
-//	// Process only database statements
-//	for _, stmt := range grammar.Statements {
-//		if stmt.CreateDatabase != nil {
-//			fmt.Printf("Database: %s (Engine: %s)\n",
-//				stmt.CreateDatabase.Name,
-//				stmt.CreateDatabase.Engine.Name)
-//		}
-//	}
-//
-// Returns a Grammar containing only database statements or an error if retrieval fails.
-func (c *Client) GetDatabasesOnly(ctx context.Context) (*parser.SQL, error) {
-	statements, err := c.GetSchemaRecreationStatements(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Combine all statements into a single SQL string
-	combinedSQL := strings.Join(statements, "\n")
-
-	// Parse the combined SQL using our parser
-	sqlResult, err := parser.ParseSQL(combinedSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse generated DDL: %w", err)
-	}
-
-	return sqlResult, nil
+// Returns a *parser.SQL containing table CREATE statements.
+func (c *Client) GetTables(ctx context.Context) (*parser.SQL, error) {
+	return extractTables(ctx, c)
 }
 
-// getDictionaryRecreationStatements returns CREATE DICTIONARY statements to recreate all dictionaries
-func (c *Client) getDictionaryRecreationStatements(ctx context.Context) ([]string, error) {
-	var statements []string
+// GetViews retrieves all view definitions (both regular and materialized) from the ClickHouse instance.
+//
+// Returns a *parser.SQL containing view CREATE statements.
+func (c *Client) GetViews(ctx context.Context) (*parser.SQL, error) {
+	return extractViews(ctx, c)
+}
 
-	// Query system.dictionaries to get all dictionary information
-	query := `
-		SELECT 
-			database,
-			name,
-			create_table_query
-		FROM system.dictionaries
-		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
-		ORDER BY database, name
-	`
+// GetDictionaries retrieves all dictionary definitions from the ClickHouse instance.
+//
+// Returns a *parser.SQL containing dictionary CREATE statements.
+func (c *Client) GetDictionaries(ctx context.Context) (*parser.SQL, error) {
+	return extractDictionaries(ctx, c)
+}
 
-	rows, err := c.conn.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query dictionaries: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var database, name, createQuery string
-		if err := rows.Scan(&database, &name, &createQuery); err != nil {
-			return nil, fmt.Errorf("failed to scan dictionary row: %w", err)
-		}
-
-		// Clean up the CREATE statement - remove IF NOT EXISTS and ensure it ends with semicolon
-		cleanedQuery := strings.TrimSpace(createQuery)
-		if !strings.HasSuffix(cleanedQuery, ";") {
-			cleanedQuery += ";"
-		}
-
-		// Validate the generated statement using our parser
-		if err := c.validateDDLStatement(cleanedQuery); err != nil {
-			return nil, fmt.Errorf("generated invalid DDL for dictionary %s.%s: %w", database, name, err)
-		}
-
-		statements = append(statements, cleanedQuery)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating dictionary rows: %w", err)
-	}
-
-	return statements, nil
+// GetDatabases retrieves all database definitions from the ClickHouse instance.
+//
+// Returns a *parser.SQL containing database CREATE statements.
+func (c *Client) GetDatabases(ctx context.Context) (*parser.SQL, error) {
+	return extractDatabases(ctx, c)
 }
