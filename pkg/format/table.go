@@ -268,24 +268,24 @@ func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 	// Instead they use Nullable(T) data types
 
 	// Default value
-	if col.Default != nil {
-		parts = append(parts, f.keyword(col.Default.Type))
-		parts = append(parts, f.formatExpression(&col.Default.Expression))
+	if defaultClause := col.GetDefault(); defaultClause != nil {
+		parts = append(parts, f.keyword(defaultClause.Type))
+		parts = append(parts, f.formatExpression(&defaultClause.Expression))
 	}
 
 	// Codec
-	if col.Codec != nil {
-		parts = append(parts, f.formatCodec(col.Codec))
+	if codecClause := col.GetCodec(); codecClause != nil {
+		parts = append(parts, f.formatCodec(codecClause))
 	}
 
 	// TTL
-	if col.TTL != nil {
-		parts = append(parts, f.keyword("TTL"), f.formatExpression(&col.TTL.Expression))
+	if ttlClause := col.GetTTL(); ttlClause != nil {
+		parts = append(parts, f.keyword("TTL"), f.formatExpression(&ttlClause.Expression))
 	}
 
 	// Comment
-	if col.Comment != nil {
-		parts = append(parts, f.keyword("COMMENT"), *col.Comment)
+	if comment := col.GetComment(); comment != nil {
+		parts = append(parts, f.keyword("COMMENT"), *comment)
 	}
 
 	return strings.Join(parts, " ")
@@ -331,7 +331,9 @@ func (f *Formatter) formatTableEngine(engine *parser.TableEngine) string {
 	if len(engine.Parameters) > 0 {
 		var params []string
 		for _, param := range engine.Parameters {
-			if param.String != nil {
+			if param.Expression != nil {
+				params = append(params, f.formatEngineParameter(param.Expression))
+			} else if param.String != nil {
 				params = append(params, *param.String)
 			} else if param.Number != nil {
 				params = append(params, *param.Number)
@@ -343,6 +345,46 @@ func (f *Formatter) formatTableEngine(engine *parser.TableEngine) string {
 	}
 	result += ")"
 	return result
+}
+
+// formatEngineParameter formats an expression in engine parameters with special handling for simple identifiers
+func (f *Formatter) formatEngineParameter(expr *parser.Expression) string {
+	// Check if this is a simple identifier that should be backticked
+	if isSimpleIdentifier(expr) {
+		identifier := getSimpleIdentifierName(expr)
+		return f.identifier(identifier)
+	}
+	// Otherwise format as regular expression
+	return f.formatExpression(expr)
+}
+
+// isSimpleIdentifier checks if an expression is just a simple identifier (no dots, functions, etc.)
+func isSimpleIdentifier(expr *parser.Expression) bool {
+	if expr == nil || expr.Or == nil || expr.Or.And == nil || expr.Or.And.Not == nil {
+		return false
+	}
+
+	comparison := expr.Or.And.Not.Comparison
+	if comparison == nil || comparison.Addition == nil || comparison.Addition.Multiplication == nil {
+		return false
+	}
+
+	unary := comparison.Addition.Multiplication.Unary
+	if unary == nil || unary.Primary == nil || unary.Primary.Identifier == nil {
+		return false
+	}
+
+	// Check if it's a simple identifier (no database or table qualifiers)
+	identifier := unary.Primary.Identifier
+	return identifier.Database == nil && identifier.Table == nil && identifier.Name != ""
+}
+
+// getSimpleIdentifierName extracts the identifier name from a simple identifier expression
+func getSimpleIdentifierName(expr *parser.Expression) string {
+	if !isSimpleIdentifier(expr) {
+		return ""
+	}
+	return expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Identifier.Name
 }
 
 // formatTableSettings formats the SETTINGS clause

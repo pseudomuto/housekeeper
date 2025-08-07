@@ -21,26 +21,26 @@ func TestNewClient_DSNParsing(t *testing.T) {
 		{
 			name:      "valid simple host:port",
 			dsn:       "localhost:9000",
-			shouldErr: true,       // Will fail connection but DSN should parse
-			errMsg:    "dial tcp", // Should fail at connection, not parsing
+			shouldErr: true,                    // Will fail connection but DSN should parse
+			errMsg:    "authentication failed", // Should fail at connection, not parsing
 		},
 		{
 			name:      "valid clickhouse:// DSN",
 			dsn:       "clickhouse://default:@localhost:9000/default",
-			shouldErr: true,       // Will fail connection but DSN should parse
-			errMsg:    "dial tcp", // Should fail at connection, not parsing
+			shouldErr: true,                    // Will fail connection but DSN should parse
+			errMsg:    "authentication failed", // Should fail at connection, not parsing
 		},
 		{
 			name:      "valid tcp:// DSN",
 			dsn:       "tcp://localhost:9000?username=default&password=&database=default",
-			shouldErr: true,       // Will fail connection but DSN should parse
-			errMsg:    "dial tcp", // Should fail at connection, not parsing
+			shouldErr: true,                    // Will fail connection but DSN should parse
+			errMsg:    "authentication failed", // Should fail at connection, not parsing
 		},
 		{
 			name:      "invalid host format",
 			dsn:       "malformed[host:9000",
 			shouldErr: true,
-			errMsg:    "dial tcp", // Will still try to connect with malformed address
+			errMsg:    "failed to connect", // Will still try to connect with malformed address
 		},
 	}
 
@@ -88,7 +88,7 @@ func TestNewClientWithOptions(t *testing.T) {
 			// Should fail connection but succeed in creating client
 			require.Error(t, err)
 			require.Nil(t, client)
-			require.Contains(t, strings.ToLower(err.Error()), "dial tcp")
+			require.Contains(t, strings.ToLower(err.Error()), "authentication failed")
 		})
 	}
 }

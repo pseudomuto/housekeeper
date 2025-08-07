@@ -279,13 +279,7 @@ func buildEngineString(engine *parser.ViewEngine) string {
 	if len(engine.Parameters) > 0 {
 		var params []string
 		for _, param := range engine.Parameters {
-			if param.String != nil {
-				params = append(params, *param.String)
-			} else if param.Number != nil {
-				params = append(params, *param.Number)
-			} else if param.Ident != nil {
-				params = append(params, *param.Ident)
-			}
+			params = append(params, param.Value())
 		}
 		result += "(" + strings.Join(params, ", ") + ")"
 	} else {

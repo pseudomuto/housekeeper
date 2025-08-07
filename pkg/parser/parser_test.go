@@ -385,7 +385,9 @@ func generateTestCaseFromGrammar(grammar *SQL) TestCase {
 					engineStr += "("
 					var params []string
 					for _, param := range view.Engine.Parameters {
-						if param.String != nil {
+						if param.Expression != nil {
+							params = append(params, param.Expression.String())
+						} else if param.String != nil {
 							params = append(params, *param.String)
 						} else if param.Number != nil {
 							params = append(params, *param.Number)
@@ -523,17 +525,17 @@ func generateTestCaseFromGrammar(grammar *SQL) TestCase {
 					Name:     col.Name,
 					DataType: formatDataType(col.DataType),
 				}
-				if col.Default != nil {
-					expectedCol.Default = col.Default.Type + " expression"
+				if defaultClause := col.GetDefault(); defaultClause != nil {
+					expectedCol.Default = defaultClause.Type + " expression"
 				}
-				if col.Codec != nil {
-					expectedCol.Codec = formatCodec(col.Codec)
+				if codecClause := col.GetCodec(); codecClause != nil {
+					expectedCol.Codec = formatCodec(codecClause)
 				}
-				if col.TTL != nil {
+				if ttlClause := col.GetTTL(); ttlClause != nil {
 					expectedCol.TTL = "expression"
 				}
-				if col.Comment != nil {
-					expectedCol.Comment = removeQuotes(*col.Comment)
+				if comment := col.GetComment(); comment != nil {
+					expectedCol.Comment = removeQuotes(*comment)
 				}
 				columns = append(columns, expectedCol)
 			}
@@ -939,13 +941,7 @@ func formatTableEngine(engine *TableEngine) string {
 			if i > 0 {
 				result += ", "
 			}
-			if param.String != nil {
-				result += *param.String
-			} else if param.Number != nil {
-				result += *param.Number
-			} else if param.Ident != nil {
-				result += *param.Ident
-			}
+			result += param.Value()
 		}
 		result += ")"
 	}

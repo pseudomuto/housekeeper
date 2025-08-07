@@ -6,12 +6,18 @@ type (
 	// such as DEFAULT values, MATERIALIZED expressions, ALIAS definitions,
 	// compression CODECs, TTL settings, and comments.
 	Column struct {
-		Name     string         `parser:"@(Ident | BacktickIdent)"`
-		DataType *DataType      `parser:"@@"`
-		Default  *DefaultClause `parser:"@@?"`
-		Codec    *CodecClause   `parser:"@@?"`
-		TTL      *TTLClause     `parser:"@@?"`
-		Comment  *string        `parser:"('COMMENT' @String)?"`
+		Name       string            `parser:"@(Ident | BacktickIdent)"`
+		DataType   *DataType         `parser:"@@"`
+		Attributes []ColumnAttribute `parser:"@@*"`
+	}
+
+	// ColumnAttribute represents any attribute that can appear after the data type
+	// This allows attributes to be specified in any order
+	ColumnAttribute struct {
+		Default *DefaultClause `parser:"@@"`
+		Codec   *CodecClause   `parser:"| @@"`
+		TTL     *TTLClause     `parser:"| @@"`
+		Comment *string        `parser:"| ('COMMENT' @String)"`
 	}
 
 	// DataType represents any ClickHouse data type including primitives,
@@ -130,3 +136,43 @@ type (
 		Expression Expression `parser:"@@"`
 	}
 )
+
+// GetDefault returns the default clause for the column, if present
+func (c *Column) GetDefault() *DefaultClause {
+	for _, attr := range c.Attributes {
+		if attr.Default != nil {
+			return attr.Default
+		}
+	}
+	return nil
+}
+
+// GetCodec returns the codec clause for the column, if present
+func (c *Column) GetCodec() *CodecClause {
+	for _, attr := range c.Attributes {
+		if attr.Codec != nil {
+			return attr.Codec
+		}
+	}
+	return nil
+}
+
+// GetTTL returns the TTL clause for the column, if present
+func (c *Column) GetTTL() *TTLClause {
+	for _, attr := range c.Attributes {
+		if attr.TTL != nil {
+			return attr.TTL
+		}
+	}
+	return nil
+}
+
+// GetComment returns the comment for the column, if present
+func (c *Column) GetComment() *string {
+	for _, attr := range c.Attributes {
+		if attr.Comment != nil {
+			return attr.Comment
+		}
+	}
+	return nil
+}

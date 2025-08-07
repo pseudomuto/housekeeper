@@ -155,12 +155,12 @@ func (f *Formatter) formatViewEngine(engine *parser.ViewEngine) string {
 		engineStr += "("
 		var params []string
 		for _, param := range engine.Parameters {
-			if param.String != nil {
-				params = append(params, *param.String)
-			} else if param.Number != nil {
-				params = append(params, *param.Number)
+			if param.Expression != nil {
+				params = append(params, f.formatEngineParameter(param.Expression))
 			} else if param.Ident != nil {
 				params = append(params, f.identifier(*param.Ident))
+			} else {
+				params = append(params, *param.String)
 			}
 		}
 		engineStr += strings.Join(params, ", ")

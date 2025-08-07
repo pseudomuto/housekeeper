@@ -52,9 +52,10 @@ func TestColumnParsing(t *testing.T) {
 				require.Equal(t, "name", col.Name)
 				require.NotNil(t, col.DataType.Simple)
 				require.Equal(t, "String", col.DataType.Simple.Name)
-				require.NotNil(t, col.Default)
-				require.Equal(t, "DEFAULT", col.Default.Type)
-				require.NotNil(t, col.Default.Expression.Or)
+				defaultClause := col.GetDefault()
+				require.NotNil(t, defaultClause)
+				require.Equal(t, "DEFAULT", defaultClause.Type)
+				require.NotNil(t, defaultClause.Expression.Or)
 			},
 		},
 		{
@@ -62,10 +63,11 @@ func TestColumnParsing(t *testing.T) {
 			input: "data String CODEC(ZSTD)",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "data", col.Name)
-				require.NotNil(t, col.Codec)
-				require.Len(t, col.Codec.Codecs, 1)
-				require.Equal(t, "ZSTD", col.Codec.Codecs[0].Name)
-				require.Empty(t, col.Codec.Codecs[0].Parameters)
+				codecClause := col.GetCodec()
+				require.NotNil(t, codecClause)
+				require.Len(t, codecClause.Codecs, 1)
+				require.Equal(t, "ZSTD", codecClause.Codecs[0].Name)
+				require.Empty(t, codecClause.Codecs[0].Parameters)
 			},
 		},
 		{
@@ -73,12 +75,13 @@ func TestColumnParsing(t *testing.T) {
 			input: "data String CODEC(Delta, ZSTD)",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "data", col.Name)
-				require.NotNil(t, col.Codec)
-				require.Len(t, col.Codec.Codecs, 2)
-				require.Equal(t, "Delta", col.Codec.Codecs[0].Name)
-				require.Equal(t, "ZSTD", col.Codec.Codecs[1].Name)
-				require.Empty(t, col.Codec.Codecs[0].Parameters)
-				require.Empty(t, col.Codec.Codecs[1].Parameters)
+				codecClause := col.GetCodec()
+				require.NotNil(t, codecClause)
+				require.Len(t, codecClause.Codecs, 2)
+				require.Equal(t, "Delta", codecClause.Codecs[0].Name)
+				require.Equal(t, "ZSTD", codecClause.Codecs[1].Name)
+				require.Empty(t, codecClause.Codecs[0].Parameters)
+				require.Empty(t, codecClause.Codecs[1].Parameters)
 			},
 		},
 		{
@@ -86,8 +89,9 @@ func TestColumnParsing(t *testing.T) {
 			input: "age UInt8 COMMENT 'User age'",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "age", col.Name)
-				require.NotNil(t, col.Comment)
-				require.Equal(t, "'User age'", *col.Comment)
+				comment := col.GetComment()
+				require.NotNil(t, comment)
+				require.Equal(t, "'User age'", *comment)
 			},
 		},
 		{
@@ -218,9 +222,10 @@ func TestColumnParsing(t *testing.T) {
 			input: "full_name String MATERIALIZED concat(first_name, ' ', last_name)",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "full_name", col.Name)
-				require.NotNil(t, col.Default)
-				require.Equal(t, "MATERIALIZED", col.Default.Type)
-				require.NotNil(t, col.Default.Expression.Or)
+				defaultClause := col.GetDefault()
+				require.NotNil(t, defaultClause)
+				require.Equal(t, "MATERIALIZED", defaultClause.Type)
+				require.NotNil(t, defaultClause.Expression.Or)
 			},
 		},
 		{
@@ -228,8 +233,9 @@ func TestColumnParsing(t *testing.T) {
 			input: "age_in_days UInt32 ALIAS dateDiff('day', birth_date, today())",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "age_in_days", col.Name)
-				require.NotNil(t, col.Default)
-				require.Equal(t, "ALIAS", col.Default.Type)
+				defaultClause := col.GetDefault()
+				require.NotNil(t, defaultClause)
+				require.Equal(t, "ALIAS", defaultClause.Type)
 			},
 		},
 		{
@@ -237,8 +243,9 @@ func TestColumnParsing(t *testing.T) {
 			input: "temp_data String TTL created_at + days(1)",
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "temp_data", col.Name)
-				require.NotNil(t, col.TTL)
-				require.NotNil(t, col.TTL.Expression.Or)
+				ttlClause := col.GetTTL()
+				require.NotNil(t, ttlClause)
+				require.NotNil(t, ttlClause.Expression.Or)
 			},
 		},
 		{
@@ -247,10 +254,10 @@ func TestColumnParsing(t *testing.T) {
 			validate: func(t *testing.T, col *Column) {
 				require.Equal(t, "data", col.Name)
 				require.NotNil(t, col.DataType.Nullable)
-				require.NotNil(t, col.Default)
-				require.NotNil(t, col.Codec)
-				require.NotNil(t, col.TTL)
-				require.NotNil(t, col.Comment)
+				require.NotNil(t, col.GetDefault())
+				require.NotNil(t, col.GetCodec())
+				require.NotNil(t, col.GetTTL())
+				require.NotNil(t, col.GetComment())
 			},
 		},
 		{

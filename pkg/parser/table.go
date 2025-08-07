@@ -149,9 +149,10 @@ type (
 
 	// EngineParameter represents a parameter in an ENGINE clause
 	EngineParameter struct {
-		String *string `parser:"@String"`
-		Number *string `parser:"| @Number"`
-		Ident  *string `parser:"| @(Ident | BacktickIdent)"`
+		Expression *Expression `parser:"@@"`
+		String     *string     `parser:"| @String"`
+		Number     *string     `parser:"| @Number"`
+		Ident      *string     `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// OrderByClause represents ORDER BY expression
@@ -618,4 +619,18 @@ func (c *CreateTableStmt) GetSettings() *TableSettingsClause {
 		}
 	}
 	return nil
+}
+
+// Value returns the string representation of the engine parameter
+func (p *EngineParameter) Value() string {
+	if p.Expression != nil {
+		return p.Expression.String()
+	} else if p.String != nil {
+		return *p.String
+	} else if p.Number != nil {
+		return *p.Number
+	} else if p.Ident != nil {
+		return *p.Ident
+	}
+	return ""
 }

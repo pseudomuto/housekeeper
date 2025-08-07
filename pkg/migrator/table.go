@@ -208,17 +208,17 @@ func extractTablesFromGrammar(sql *parser.SQL) map[string]*TableInfo {
 					Name:     col.Name,
 					DataType: formatColumnDataType(col.DataType),
 				}
-				if col.Default != nil {
-					columnInfo.Default = col.Default.Type + " " + col.Default.Expression.String()
+				if defaultClause := col.GetDefault(); defaultClause != nil {
+					columnInfo.Default = defaultClause.Type + " " + defaultClause.Expression.String()
 				}
-				if col.Codec != nil {
-					columnInfo.Codec = formatColumnCodec(col.Codec)
+				if codecClause := col.GetCodec(); codecClause != nil {
+					columnInfo.Codec = formatColumnCodec(codecClause)
 				}
-				if col.TTL != nil {
-					columnInfo.TTL = col.TTL.Expression.String()
+				if ttlClause := col.GetTTL(); ttlClause != nil {
+					columnInfo.TTL = ttlClause.Expression.String()
 				}
-				if col.Comment != nil {
-					columnInfo.Comment = removeQuotes(*col.Comment)
+				if comment := col.GetComment(); comment != nil {
+					columnInfo.Comment = removeQuotes(*comment)
 				}
 				columns = append(columns, columnInfo)
 			}
@@ -623,13 +623,7 @@ func formatTableEngine(engine *parser.TableEngine) string {
 			if i > 0 {
 				result += ", "
 			}
-			if param.String != nil {
-				result += *param.String
-			} else if param.Number != nil {
-				result += *param.Number
-			} else if param.Ident != nil {
-				result += *param.Ident
-			}
+			result += param.Value()
 		}
 		result += ")"
 	}

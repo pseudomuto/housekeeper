@@ -61,12 +61,12 @@ func initCmd() *cli.Command {
 // combines project initialization with schema extraction and organization.
 //
 // The bootstrap process:
-//   1. Initializes a standard housekeeper project structure
-//   2. Connects to the specified ClickHouse server
-//   3. Extracts all schema objects (databases, tables, dictionaries, views)
-//   4. Organizes the schema into a structured project layout
-//   5. Creates individual SQL files for each database object
-//   6. Generates import directives for modular schema management
+//  1. Initializes a standard housekeeper project structure
+//  2. Connects to the specified ClickHouse server
+//  3. Extracts all schema objects (databases, tables, dictionaries, views)
+//  4. Organizes the schema into a structured project layout
+//  5. Creates individual SQL files for each database object
+//  6. Generates import directives for modular schema management
 //
 // The resulting project structure:
 //   - housekeeper.yaml: Configuration file
