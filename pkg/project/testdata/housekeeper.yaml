@@ -1,13 +1,6 @@
-environments:
-  - name: test
-    url: clickhouse://localhost:9000/test_db
-    entrypoint: db/main.sql
-    dir: db/migrations/test
-  - name: staging
-    url: clickhouse://staging:9443/staging_db
-    entrypoint: db/staging.sql
-    dir: db/migrations/staging
-  - name: imports
-    url: clickhouse://localhost:9000/imports_db
-    entrypoint: db/with_imports.sql
-    dir: db/migrations/imports
+clickhouse:
+  version: "25.7"
+  config_dir: "db/config.d"
+  cluster: "cluster"
+entrypoint: db/main.sql
+dir: db/migrations/test

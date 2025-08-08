@@ -34,11 +34,11 @@ func TestProjectParseSchema(t *testing.T) {
 	t.Run("parses simple schema without imports", func(t *testing.T) {
 		p := setupTestProject(t)
 
-		grammar, err := p.ParseSchema("test")
+		grammar, err := p.ParseSchema()
 		require.NoError(t, err)
 		require.NotNil(t, grammar)
 
-		// Verify parsed content
+		// Verify parsed content (using the main.sql entrypoint)
 		require.Len(t, grammar.Statements, 3) // 1 database + 2 tables
 
 		// Check first statement is CREATE DATABASE
@@ -51,9 +51,24 @@ func TestProjectParseSchema(t *testing.T) {
 	})
 
 	t.Run("parses schema with imports", func(t *testing.T) {
-		p := setupTestProject(t)
+		// Create a custom project to test import functionality
+		tmpDir := t.TempDir()
 
-		grammar, err := p.ParseSchema("imports")
+		// Create config pointing to a schema with imports
+		configContent := `clickhouse:
+  version: "25.7"
+  config_dir: "db/config.d"
+  cluster: "cluster"
+entrypoint: db/with_imports.sql
+dir: db/migrations`
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms))
+		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(project.InitOptions{}))
+
+		grammar, err := p.ParseSchema()
 		require.NoError(t, err)
 		require.NotNil(t, grammar)
 
@@ -72,10 +87,25 @@ func TestProjectParseSchema(t *testing.T) {
 		require.Equal(t, "products", grammar.Statements[2].CreateTable.Name)
 	})
 
-	t.Run("parses different environment", func(t *testing.T) {
-		p := setupTestProject(t)
+	t.Run("parses different schema file", func(t *testing.T) {
+		// Create a custom project to test a different schema file
+		tmpDir := t.TempDir()
 
-		grammar, err := p.ParseSchema("staging")
+		// Create config pointing to staging schema
+		configContent := `clickhouse:
+  version: "25.7"
+  config_dir: "db/config.d"  
+  cluster: "cluster"
+entrypoint: db/staging.sql
+dir: db/migrations`
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms))
+		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(project.InitOptions{}))
+
+		grammar, err := p.ParseSchema()
 		require.NoError(t, err)
 		require.NotNil(t, grammar)
 
@@ -90,22 +120,31 @@ func TestProjectParseSchema(t *testing.T) {
 		require.Equal(t, "events", grammar.Statements[1].CreateTable.Name)
 	})
 
-	t.Run("returns error for non-existent environment", func(t *testing.T) {
-		p := setupTestProject(t)
+	t.Run("returns error for invalid configuration", func(t *testing.T) {
+		// Create project with empty config
+		tmpDir := t.TempDir()
 
-		_, err := p.ParseSchema("nonexistent")
+		configContent := `clickhouse:
+  version: "25.7"
+entrypoint: ""
+dir: ""`
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms))
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(project.InitOptions{}))
+
+		_, err := p.ParseSchema()
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "Env not found: nonexistent")
+		require.Contains(t, err.Error(), "failed to load schema from")
 	})
 
 	t.Run("returns error for non-existent file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create config with non-existent entrypoint
-		configContent := `environments:
-  - name: missing
-    url: clickhouse://localhost:9000/test
-    entrypoint: nonexistent/file.sql`
+		configContent := `entrypoint: nonexistent/file.sql
+dir: db/migrations`
 
 		err := os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms)
 		require.NoError(t, err)
@@ -114,23 +153,25 @@ func TestProjectParseSchema(t *testing.T) {
 		err = p.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		_, err = p.ParseSchema("missing")
+		_, err = p.ParseSchema()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to load schema from")
 	})
 
-	t.Run("handles case insensitive environment names", func(t *testing.T) {
+	t.Run("can parse schema multiple times", func(t *testing.T) {
 		p := setupTestProject(t)
 
-		// Test with different cases
-		_, err := p.ParseSchema("TEST")
+		// Test that we can parse the same schema multiple times
+		grammar1, err := p.ParseSchema()
 		require.NoError(t, err)
+		require.NotNil(t, grammar1)
 
-		_, err = p.ParseSchema("Test")
+		grammar2, err := p.ParseSchema()
 		require.NoError(t, err)
+		require.NotNil(t, grammar2)
 
-		_, err = p.ParseSchema("STAGING")
-		require.NoError(t, err)
+		// Should get the same results
+		require.Len(t, grammar2.Statements, len(grammar1.Statements))
 	})
 
 	t.Run("returns error when project is not initialized", func(t *testing.T) {
@@ -138,7 +179,7 @@ func TestProjectParseSchema(t *testing.T) {
 		p := project.New(tmpDir)
 
 		// Don't initialize - config will be nil
-		_, err := p.ParseSchema("test")
+		_, err := p.ParseSchema()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "project not initialized")
 	})

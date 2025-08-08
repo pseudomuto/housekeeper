@@ -38,47 +38,31 @@ type (
 		Cluster string `yaml:"cluster,omitempty"`
 	}
 
-	// Config represents the complete schema configuration containing multiple environments.
-	//
-	// Each configuration file can define multiple database environments with their
-	// schema entry points and migration directories. This allows for flexible
-	// deployment scenarios across development, staging, and production environments.
+	// Config represents the project configuration for ClickHouse schema management.
 	Config struct {
 		// ClickHouse contains ClickHouse-specific configuration settings
 		ClickHouse ClickHouse `yaml:"clickhouse"`
 
-		// Envs contains the list of configured database environments
-		Envs []*Env `yaml:"environments"`
-	}
-
-	// Env represents a single database environment configuration.
-	//
-	// Each environment defines the schema entry point and migration directory
-	// for that specific environment.
-	Env struct {
-		// Name is the unique identifier for this environment (e.g., "local", "staging", "production")
-		Name string `yaml:"name"`
-
-		// Entrypoint specifies the main SQL file that serves as the entry point for this environment's schema
+		// Entrypoint specifies the main SQL file that serves as the entry point for the schema
 		Entrypoint string `yaml:"entrypoint"`
 
-		// Dir specifies the directory where migration files for this environment are stored
+		// Dir specifies the directory where migration files are stored
 		Dir string `yaml:"dir"`
 	}
 )
 
 // LoadConfig parses a schema configuration from the provided io.Reader.
 //
-// The function expects YAML-formatted configuration data that defines database
-// environments with their schema entry points and migration directories. It uses
-// a streaming YAML decoder to handle potentially large configuration files
-// efficiently. If no ClickHouse version is specified, it defaults to DefaultClickHouseVersion.
+// The function expects YAML-formatted configuration data that defines the project
+// schema entry point and migration directory. It uses a streaming YAML decoder
+// to handle configuration files efficiently. If no ClickHouse version is specified,
+// it defaults to DefaultClickHouseVersion.
 //
 // Parameters:
 //   - r: An io.Reader containing YAML configuration data
 //
 // Returns:
-//   - *Config: Successfully parsed configuration with all environments
+//   - *Config: Successfully parsed configuration
 //   - error: Any parsing or validation errors encountered
 //
 // Example:
@@ -89,10 +73,8 @@ type (
 //	)
 //
 //	yamlData := `
-//	environments:
-//	  - name: local
-//	    entrypoint: db/main.sql
-//	    dir: db/migrations/local
+//	entrypoint: db/main.sql
+//	dir: db/migrations
 //	`
 //
 //	config, err := project.LoadConfig(strings.NewReader(yamlData))
@@ -100,7 +82,7 @@ type (
 //		panic(err)
 //	}
 //
-//	fmt.Printf("Loaded %d environments\n", len(config.Envs))
+//	fmt.Printf("Schema entrypoint: %s\n", config.Entrypoint)
 func LoadConfig(r io.Reader) (*Config, error) {
 	var cfg Config
 	if err := yaml.NewDecoder(r).Decode(&cfg); err != nil {
@@ -131,10 +113,7 @@ func LoadConfig(r io.Reader) (*Config, error) {
 //		log.Fatal("Failed to load config:", err)
 //	}
 //
-//	// Access environment configurations
-//	for _, env := range config.Envs {
-//		fmt.Printf("Environment: %s (entrypoint: %s)\n", env.Name, env.Entrypoint)
-//	}
+//	fmt.Printf("Entrypoint: %s, Migration dir: %s\n", config.Entrypoint, config.Dir)
 func LoadConfigFile(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {

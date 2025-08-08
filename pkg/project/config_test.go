@@ -33,11 +33,10 @@ func TestLoadConfig(t *testing.T) {
 		require.Nil(t, config)
 		require.Contains(t, err.Error(), "failed to unmarshal schema config")
 
-		// Valid YAML with no environments key
+		// Valid YAML with no project fields
 		config, err = LoadConfig(strings.NewReader("other_key: value"))
 		require.NoError(t, err)
 		require.NotNil(t, config)
-		require.Empty(t, config.Envs)
 		require.Equal(t, DefaultClickHouseVersion, config.ClickHouse.Version)
 		require.Equal(t, DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
 		require.Equal(t, DefaultClickHouseCluster, config.ClickHouse.Cluster)
@@ -90,13 +89,8 @@ func validateTestConfig(t *testing.T, config *Config) {
 	require.Equal(t, "25.7", config.ClickHouse.Version)
 	require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
 	require.Equal(t, "cluster", config.ClickHouse.Cluster)
-	require.Len(t, config.Envs, 1)
-
-	// Test dev environment
-	dev := config.Envs[0]
-	require.Equal(t, "dev", dev.Name)
-	require.Equal(t, "db/main.sql", dev.Entrypoint)
-	require.Equal(t, "db/migrations", dev.Dir)
+	require.Equal(t, "db/main.sql", config.Entrypoint)
+	require.Equal(t, "db/migrations", config.Dir)
 }
 
 func TestLoadConfig_ClickHouseDefaults(t *testing.T) {
@@ -106,10 +100,8 @@ clickhouse:
   version: "24.8"
   config_dir: "custom/config"
   cluster: "production"
-environments:
-  - name: test
-    entrypoint: test.sql
-    dir: migrations
+entrypoint: test.sql
+dir: migrations
 `
 		config, err := LoadConfig(strings.NewReader(yamlData))
 		require.NoError(t, err)
@@ -124,10 +116,8 @@ clickhouse:
   version: ""
   config_dir: ""
   cluster: ""
-environments:
-  - name: test
-    entrypoint: test.sql
-    dir: migrations
+entrypoint: test.sql
+dir: migrations
 `
 		config, err := LoadConfig(strings.NewReader(yamlData))
 		require.NoError(t, err)
@@ -141,10 +131,8 @@ environments:
 
 	t.Run("sets default values when not specified", func(t *testing.T) {
 		yamlData := `
-environments:
-  - name: test
-    entrypoint: test.sql
-    dir: migrations
+entrypoint: test.sql
+dir: migrations
 `
 		config, err := LoadConfig(strings.NewReader(yamlData))
 		require.NoError(t, err)
@@ -158,10 +146,8 @@ environments:
 
 	t.Run("sets defaults when clickhouse section missing", func(t *testing.T) {
 		yamlData := `
-environments:
-  - name: test
-    entrypoint: test.sql
-    dir: migrations
+entrypoint: test.sql
+dir: migrations
 `
 		config, err := LoadConfig(strings.NewReader(yamlData))
 		require.NoError(t, err)

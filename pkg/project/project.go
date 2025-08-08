@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing/fstest"
 
 	"github.com/pkg/errors"
@@ -19,12 +18,11 @@ var (
 	defaultHouseKeeper []byte
 
 	image = fstest.MapFS{
-		"db":                {Mode: os.ModeDir | 0o755},
-		"db/migrations":     {Mode: os.ModeDir | 0o755},
-		"db/migrations/dev": {Mode: os.ModeDir | 0o755},
-		"db/schemas":        {Mode: os.ModeDir | 0o755},
-		"db/main.sql":       {Data: defaultMainSQL},
-		"housekeeper.yaml":  {Data: defaultHouseKeeper},
+		"db":               {Mode: os.ModeDir | 0o755},
+		"db/migrations":    {Mode: os.ModeDir | 0o755},
+		"db/schemas":       {Mode: os.ModeDir | 0o755},
+		"db/main.sql":      {Data: defaultMainSQL},
+		"housekeeper.yaml": {Data: defaultHouseKeeper},
 	}
 )
 
@@ -55,8 +53,8 @@ type (
 //		log.Fatal(err)
 //	}
 //
-//	// Parse schema for a specific environment
-//	grammar, err := project.ParseSchema("production")
+//	// Parse project schema
+//	grammar, err := project.ParseSchema()
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -80,7 +78,7 @@ func New(path string) *Project {
 //	}
 //
 //	// Project is now ready for schema parsing
-//	grammar, err := project.ParseSchema("development")
+//	grammar, err := project.ParseSchema()
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}
@@ -200,20 +198,9 @@ func (p *Project) ensureDirectory() error {
 	return nil
 }
 
-func (p *Project) withEnv(env string, fn func(*Env) error) error {
+func (p *Project) withConfig(fn func(*Config) error) error {
 	if p.config == nil {
 		return errors.New("project not initialized - call Initialize() first")
-	}
-
-	var found *Env
-	for _, e := range p.config.Envs {
-		if strings.EqualFold(e.Name, env) {
-			found = e
-		}
-	}
-
-	if found == nil {
-		return errors.Errorf("Env not found: %s", env)
 	}
 
 	pwd, _ := os.Getwd()
@@ -223,5 +210,5 @@ func (p *Project) withEnv(env string, fn func(*Env) error) error {
 		return errors.Wrapf(err, "failed to change to project root: %s", p.root)
 	}
 
-	return fn(found)
+	return fn(p.config)
 }

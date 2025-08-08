@@ -79,14 +79,11 @@ func (ms *MigrationSet) IsValid() (bool, error) {
 	return ms.sum.TotalHash == generatedSum.TotalHash, nil
 }
 
-// LoadMigrationSet loads all migration files for the specified environment from disk.
+// LoadMigrationSet loads all migration files from the project migrations directory.
 // It creates a MigrationSet containing all .sql files found in the migrations directory
-// for the environment, along with any SumFile for integrity checking.
+// defined in the configuration, along with any SumFile for integrity checking.
 //
-// The env parameter is case-insensitive and must match an environment name
-// defined in the housekeeper.yaml configuration file. Migration files are sorted
-// lexicographically to ensure consistent ordering.
-//
+// Migration files are sorted lexicographically to ensure consistent ordering.
 // This method also loads the SumFile (if present) which contains SHA256 hashes
 // of all migration files for integrity validation. The SumFile can be used to
 // detect if any migration files have been modified since the last hash generation.
@@ -98,8 +95,8 @@ func (ms *MigrationSet) IsValid() (bool, error) {
 //		log.Fatal(err)
 //	}
 //
-//	// Load migration set for production environment
-//	migrationSet, err := project.LoadMigrationSet("production")
+//	// Load migration set
+//	migrationSet, err := project.LoadMigrationSet()
 //	if err != nil {
 //		log.Fatal("Failed to load migration set:", err)
 //	}
@@ -116,19 +113,19 @@ func (ms *MigrationSet) IsValid() (bool, error) {
 //
 //	// Process migration files
 //	for _, file := range migrationSet.Files() {
-//		fmt.Printf("Migration: %s\n", file.Name())
+//		fmt.Printf("Migration: %s\n", file)
 //	}
-func (p *Project) LoadMigrationSet(env string) (*MigrationSet, error) {
+func (p *Project) LoadMigrationSet() (*MigrationSet, error) {
 	var ms *MigrationSet
-	err := p.withEnv(env, func(e *Env) error {
+	err := p.withConfig(func(cfg *Config) error {
 		ms = &MigrationSet{}
 
 		// Get absolute path to migrations directory
-		migrationsDir := filepath.Join(p.root, e.Dir)
+		migrationsDir := filepath.Join(p.root, cfg.Dir)
 
-		entries, err := os.ReadDir(e.Dir)
+		entries, err := os.ReadDir(cfg.Dir)
 		if err != nil {
-			return errors.Wrapf(err, "failed to read dir: %s", e.Dir)
+			return errors.Wrapf(err, "failed to read dir: %s", cfg.Dir)
 		}
 
 		for _, entry := range entries {
@@ -137,7 +134,7 @@ func (p *Project) LoadMigrationSet(env string) (*MigrationSet, error) {
 			}
 
 			if strings.EqualFold(entry.Name(), sumFileName) {
-				sumPath := filepath.Join(e.Dir, entry.Name())
+				sumPath := filepath.Join(cfg.Dir, entry.Name())
 				file, err := os.Open(sumPath)
 				if err != nil {
 					return errors.Wrapf(err, "failed to open sum file: %s", sumPath)

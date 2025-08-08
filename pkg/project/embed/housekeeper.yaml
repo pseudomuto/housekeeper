@@ -3,7 +3,5 @@ clickhouse:
   config_dir: "db/config.d"
   cluster: "cluster"
 
-environments:
-  - name: dev
-    entrypoint: db/main.sql
-    dir: db/migrations
+entrypoint: db/main.sql
+dir: db/migrations

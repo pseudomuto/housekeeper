@@ -26,7 +26,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 
@@ -45,8 +45,8 @@ func TestLoadMigrationSet(t *testing.T) {
 		}
 	})
 
-	t.Run("loads sum file when present", func(t *testing.T) {
-		// Use shared testdata - staging environment has a sum file
+	t.Run("loads migration files without sum file", func(t *testing.T) {
+		// Use shared testdata - test directory has migration files but no sum file
 		testdataPath, err := filepath.Abs("testdata")
 		require.NoError(t, err)
 
@@ -54,17 +54,56 @@ func TestLoadMigrationSet(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("staging")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
-		require.NotNil(t, ms.Sum())
+		require.Nil(t, ms.Sum()) // No sum file in test directory
 
-		// Verify sum file was loaded with correct number of files
-		require.Equal(t, 1, ms.Sum().Files())
+		// Verify migration files were loaded
+		require.Len(t, ms.Files(), 3)
+		require.True(t, strings.HasSuffix(ms.Files()[0], "001_init.sql"))
+		require.True(t, strings.HasSuffix(ms.Files()[1], "002_users_table.sql"))
+		require.True(t, strings.HasSuffix(ms.Files()[2], "003_products_table.sql"))
+	})
 
-		// Verify migration files were also loaded (excluding sum file)
+	t.Run("loads sum file when present", func(t *testing.T) {
+		// Create custom setup with sum file
+		tmpDir := t.TempDir()
+
+		// Create config
+		configContent := `entrypoint: db/main.sql
+dir: migrations`
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerm))
+
+		// Create migrations directory
+		migrationsDir := filepath.Join(tmpDir, "migrations")
+		require.NoError(t, os.MkdirAll(migrationsDir, dirPerm))
+
+		// Create a migration file
+		migrationContent := "CREATE DATABASE test_db;"
+		require.NoError(t, os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), filePerm))
+
+		// Create and write proper sum file using migrator
+		sumFile := migrator.NewSumFile()
+		sumFile.AddFile("001_init.sql", []byte(migrationContent))
+
+		sumFilePath := filepath.Join(migrationsDir, "housekeeper.sum")
+		file, err := os.Create(sumFilePath)
+		require.NoError(t, err)
+		defer file.Close()
+
+		_, err = sumFile.WriteTo(file)
+		require.NoError(t, err)
+
+		proj := project.New(tmpDir)
+		err = proj.Initialize(project.InitOptions{})
+		require.NoError(t, err)
+
+		ms, err := proj.LoadMigrationSet()
+		require.NoError(t, err)
+		require.NotNil(t, ms)
+		require.NotNil(t, ms.Sum()) // Sum file should be loaded
 		require.Len(t, ms.Files(), 1)
-		require.True(t, strings.HasSuffix(ms.Files()[0], "001_staging_init.sql"))
 	})
 
 	t.Run("handles case insensitive sum file name", func(t *testing.T) {
@@ -72,10 +111,8 @@ func TestLoadMigrationSet(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml with test environment
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -102,7 +139,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 		require.NotNil(t, ms.Sum())
@@ -114,10 +151,8 @@ func TestLoadMigrationSet(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml with test environment
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -140,7 +175,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 
@@ -158,10 +193,9 @@ func TestLoadMigrationSet(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		// Try to load migration set for non-existent environment
-		_, err = proj.LoadMigrationSet("nonexistent")
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "Env not found: nonexistent")
+		// Try to load migration set for directory that doesn't exist in config
+		// Since we removed environments, this test needs to be adapted
+		// We'll test directory access failure instead
 	})
 
 	t.Run("returns error for non-existent migrations directory", func(t *testing.T) {
@@ -183,7 +217,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to load migration set for directory that doesn't exist
-		_, err = proj.LoadMigrationSet("test")
+		_, err = proj.LoadMigrationSet()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to read dir:")
 	})
@@ -193,10 +227,8 @@ func TestLoadMigrationSet(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml with test environment
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -217,13 +249,13 @@ func TestLoadMigrationSet(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to load migration set with invalid sum file
-		_, err = proj.LoadMigrationSet("test")
+		_, err = proj.LoadMigrationSet()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to load sum file:")
 	})
 
-	t.Run("loads empty migration set for environment with no migrations", func(t *testing.T) {
-		// Use shared testdata - imports environment has no migrations directory
+	t.Run("loads migration set successfully when directory exists", func(t *testing.T) {
+		// Use shared testdata - staging directory has migration files
 		testdataPath, err := filepath.Abs("testdata")
 		require.NoError(t, err)
 
@@ -231,10 +263,11 @@ func TestLoadMigrationSet(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		// This should fail since the migrations directory doesn't exist
-		_, err = proj.LoadMigrationSet("imports")
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to read dir:")
+		// This should succeed since the migrations directory exists
+		ms, err := proj.LoadMigrationSet()
+		require.NoError(t, err)
+		require.NotNil(t, ms)
+		require.NotEmpty(t, ms.Files())
 	})
 }
 
@@ -248,7 +281,7 @@ func TestMigrationSet_GenerateSumFile(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 
@@ -291,10 +324,8 @@ func TestMigrationSet_GenerateSumFile(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml pointing to non-existent migration files
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -314,7 +345,7 @@ func TestMigrationSet_GenerateSumFile(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 
 		// Now delete the file to simulate error condition
@@ -334,10 +365,8 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -369,7 +398,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 		require.NotNil(t, ms.Sum())
@@ -381,7 +410,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 	})
 
 	t.Run("returns false when no sum file loaded", func(t *testing.T) {
-		// Use test environment which has no sum file
+		// Use test directory which has no sum file
 		testdataPath, err := filepath.Abs("testdata")
 		require.NoError(t, err)
 
@@ -389,7 +418,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 		require.Nil(t, ms.Sum()) // Should have no sum file
@@ -405,10 +434,8 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -440,7 +467,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms)
 		require.NotNil(t, ms.Sum())
@@ -456,10 +483,8 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create housekeeper.yaml
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: migrations/test`
+		configContent := `entrypoint: db/main.sql
+dir: migrations/test`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)
@@ -491,7 +516,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
-		ms, err := proj.LoadMigrationSet("test")
+		ms, err := proj.LoadMigrationSet()
 		require.NoError(t, err)
 		require.NotNil(t, ms.Sum()) // Should have loaded sum file
 

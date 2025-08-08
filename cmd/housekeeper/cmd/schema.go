@@ -19,15 +19,15 @@ import (
 // project is detected, the command will fail with an error.
 //
 // Available subcommands:
-//   - compile: Compile and format schema for a specific environment
+//   - compile: Compile and format the project schema
 //
 // Example usage:
 //
-//	# Compile schema for development environment
-//	housekeeper schema compile --env dev
+//	# Compile project schema
+//	housekeeper schema compile
 //
 //	# Compile and save to file
-//	housekeeper schema compile --env production --out compiled.sql
+//	housekeeper schema compile --out compiled.sql
 //
 // The command automatically validates project structure before executing
 // any subcommands.
@@ -135,46 +135,37 @@ func schemaDump() *cli.Command {
 }
 
 // schemaParse returns a CLI command that compiles and formats schema files
-// for a specific environment. The command processes schema files with import
+// for the project. The command processes schema files with import
 // directives, resolves dependencies, and outputs formatted ClickHouse DDL.
 //
 // The compilation process:
-//  1. Reads the main schema file for the specified environment
+//  1. Reads the main schema file defined in project configuration
 //  2. Processes -- housekeeper:import directives recursively
 //  3. Parses all ClickHouse DDL statements
 //  4. Formats the output with professional styling
 //  5. Outputs to stdout or specified file
-//
-// Required flags:
-//   - --env, -e: Environment name to compile (must exist in project config)
 //
 // Optional flags:
 //   - --out, -o: Output file path (defaults to stdout)
 //
 // Example usage:
 //
-//	# Compile development environment to stdout
-//	housekeeper schema compile --env dev
+//	# Compile project schema to stdout
+//	housekeeper schema compile
 //
-//	# Compile production environment to file
-//	housekeeper schema compile --env production --out prod-schema.sql
+//	# Compile project schema to file
+//	housekeeper schema compile --out schema.sql
 //
 //	# Compile with custom project directory
-//	housekeeper --dir /path/to/project schema compile --env staging
+//	housekeeper --dir /path/to/project schema compile
 //
-// The command validates that the specified environment exists in the project
-// configuration and that all imported schema files are accessible.
+// The command validates that the project is properly initialized and that
+// all imported schema files are accessible.
 func schemaParse() *cli.Command {
 	return &cli.Command{
 		Name:  "compile",
-		Usage: "Compile the schema for the specified environment",
+		Usage: "Compile the project schema",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "env",
-				Aliases:  []string{"e"},
-				Usage:    "The environment to compile for",
-				Required: true,
-			},
 			&cli.StringFlag{
 				Name:    "out",
 				Aliases: []string{"o"},
@@ -189,7 +180,7 @@ func schemaParse() *cli.Command {
 			return ctx, nil
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			sql, err := currentProject.ParseSchema(cmd.String("env"))
+			sql, err := currentProject.ParseSchema()
 			if err != nil {
 				return err
 			}

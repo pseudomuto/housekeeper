@@ -13,13 +13,10 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
-// ParseSchema compiles and parses the schema for the specified environment.
-// It processes the entrypoint file defined in the project configuration for the
-// given environment, recursively resolving any import directives (-- housekeeper:import)
+// ParseSchema compiles and parses the schema defined in the project configuration.
+// It processes the entrypoint file defined in the project configuration,
+// recursively resolving any import directives (-- housekeeper:import)
 // and returns a parsed grammar containing all DDL statements.
-//
-// The env parameter is case-insensitive and must match an environment name
-// defined in the housekeeper.yaml configuration file.
 //
 // Example:
 //
@@ -28,8 +25,8 @@ import (
 //		log.Fatal(err)
 //	}
 //
-//	// Parse production environment schema
-//	grammar, err := project.ParseSchema("production")
+//	// Parse project schema
+//	grammar, err := project.ParseSchema()
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}
@@ -40,12 +37,12 @@ import (
 //			fmt.Printf("Found table: %s\n", stmt.CreateTable.Name)
 //		}
 //	}
-func (p *Project) ParseSchema(env string) (*parser.SQL, error) {
+func (p *Project) ParseSchema() (*parser.SQL, error) {
 	var g *parser.SQL
-	err := p.withEnv(env, func(e *Env) error {
+	err := p.withConfig(func(cfg *Config) error {
 		var buf bytes.Buffer
-		if err := compileSchema(e.Entrypoint, &buf); err != nil {
-			return errors.Wrapf(err, "failed to load schema from: %s", e.Entrypoint)
+		if err := compileSchema(cfg.Entrypoint, &buf); err != nil {
+			return errors.Wrapf(err, "failed to load schema from: %s", cfg.Entrypoint)
 		}
 
 		var err error

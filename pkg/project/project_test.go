@@ -25,7 +25,6 @@ func TestProjectInitialize(t *testing.T) {
 		// Verify directories were created)
 		assertDirExists(t, filepath.Join(tmpDir, "db"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations"))
-		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations", "dev"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "schemas"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "config.d")) // ClickHouse config directory
 
@@ -124,7 +123,6 @@ func TestProjectInitialize(t *testing.T) {
 
 		// Verify nested directories were created for the file
 		assertDirExists(t, filepath.Join(dbDir, "migrations"))
-		assertDirExists(t, filepath.Join(dbDir, "migrations", "dev"))
 		assertDirExists(t, filepath.Join(dbDir, "schemas"))
 		assertFileExists(t, filepath.Join(dbDir, "main.sql"))
 	})
