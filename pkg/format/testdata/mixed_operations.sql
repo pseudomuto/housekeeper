@@ -6,7 +6,7 @@ CREATE TABLE `analytics`.`raw_events` (
     `ts`   DateTime
 )
 ENGINE = MergeTree()
-ORDER BY ts;
+ORDER BY `ts`;
 
 CREATE DICTIONARY `analytics`.`lookup` (
     `key`   UInt64,
@@ -18,13 +18,13 @@ LAYOUT(HASHED())
 LIFETIME(3600);
 
 CREATE MATERIALIZED VIEW `analytics`.`processed_events`
-ENGINE = MergeTree() ORDER BY (date,id)
+ENGINE = MergeTree() ORDER BY (`date`, `id`)
 AS SELECT
-    id,
-    JSONExtractString(data, 'event') AS `event_type`,
-    toDate(ts) AS `date`
+    `id`,
+    JSONExtractString(`data`, 'event') AS `event_type`,
+    toDate(`ts`) AS `date`
 FROM `analytics`.`raw_events`
-WHERE event_type != '';
+WHERE `event_type` != '';
 
 ALTER TABLE `analytics`.`raw_events`
     ADD COLUMN `processed` UInt8 DEFAULT 0;

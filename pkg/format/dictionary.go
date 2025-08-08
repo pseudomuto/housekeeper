@@ -305,7 +305,7 @@ func (f *Formatter) formatDictionarySettings(settings *parser.DictionarySettings
 
 	settingParts := make([]string, 0, len(settings.Settings))
 	for _, setting := range settings.Settings {
-		settingParts = append(settingParts, f.identifier(setting.Name)+"="+setting.Value)
+		settingParts = append(settingParts, setting.Name+"="+setting.Value)
 	}
 	parts = append(parts, "("+strings.Join(settingParts, ", ")+")")
 

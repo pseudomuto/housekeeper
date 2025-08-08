@@ -9,7 +9,7 @@ PRIMARY KEY `id`
 SOURCE(HTTP(url 'https://api.company.com/users' format 'JSONEachRow'))
 LAYOUT(COMPLEX_KEY_HASHED(size_in_cells 1000000))
 LIFETIME(MIN 300 MAX 3600)
-SETTINGS(`max_threads`=4, `http_connection_timeout`=10)
+SETTINGS(max_threads=4, http_connection_timeout=10)
 COMMENT 'User directory with hierarchical structure';
 
 CREATE OR REPLACE DICTIONARY `warehouse`.`product_categories` (

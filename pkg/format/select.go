@@ -215,20 +215,6 @@ func (f *Formatter) formatFunctionWithAlias(fn *parser.FunctionWithAlias) string
 	return result
 }
 
-// formatFunctionArg formats function argument
-func (f *Formatter) formatFunctionArg(arg *parser.FunctionArg) string {
-	if arg == nil {
-		return ""
-	}
-
-	if arg.Star != nil {
-		return "*"
-	}
-	if arg.Expression != nil {
-		return f.formatExpression(arg.Expression)
-	}
-	return ""
-}
 
 // formatJoinClause formats JOIN clauses
 func (f *Formatter) formatJoinClause(join *parser.JoinClause) string {
@@ -339,7 +325,7 @@ func (f *Formatter) formatSettingsClause(settings *parser.SettingsClause) string
 
 	settingStrs := make([]string, 0, len(settings.Values))
 	for _, setting := range settings.Values {
-		settingStrs = append(settingStrs, f.identifier(setting.Key)+" = "+f.formatExpression(&setting.Value))
+		settingStrs = append(settingStrs, setting.Key+" = "+f.formatExpression(&setting.Value))
 	}
 	return f.keyword("SETTINGS") + " " + strings.Join(settingStrs, ", ")
 }

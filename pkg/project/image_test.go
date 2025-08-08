@@ -32,7 +32,7 @@ func TestGenerateImage(t *testing.T) {
 				{"db/schemas/analytics/tables/events.sql", "`id`   UInt64"},
 				{"db/schemas/analytics/tables/events.sql", "`name` String"},
 				{"db/schemas/analytics/tables/events.sql", "ENGINE = MergeTree()"},
-				{"db/schemas/analytics/tables/events.sql", "ORDER BY id"},
+				{"db/schemas/analytics/tables/events.sql", "ORDER BY `id`"},
 			},
 		},
 		{

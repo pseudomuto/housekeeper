@@ -25,7 +25,7 @@ func TestFormatter_Table(t *testing.T) {
 				"    `name` String",
 				")",
 				"ENGINE = MergeTree()",
-				"ORDER BY id;",
+				"ORDER BY `id`;",
 			},
 		},
 		{
@@ -37,7 +37,7 @@ func TestFormatter_Table(t *testing.T) {
 				"    `timestamp` DateTime",
 				")",
 				"ENGINE = MergeTree()",
-				"ORDER BY timestamp;",
+				"ORDER BY `timestamp`;",
 			},
 		},
 		{
@@ -50,7 +50,7 @@ func TestFormatter_Table(t *testing.T) {
 				"    `tags` Array(String)",
 				")",
 				"ENGINE = MergeTree()",
-				"ORDER BY id;",
+				"ORDER BY `id`;",
 			},
 		},
 	}
@@ -111,7 +111,7 @@ func TestFormatter_alterTable(t *testing.T) {
 			sql:  "ALTER TABLE users ADD INDEX idx_email email TYPE minmax GRANULARITY 1;",
 			expected: []string{
 				"ALTER TABLE `users`",
-				"    ADD INDEX `idx_email` email TYPE `minmax` GRANULARITY 1;",
+				"    ADD INDEX `idx_email` `email` TYPE `minmax` GRANULARITY 1;",
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func TestFormatter_alterTable(t *testing.T) {
 			sql:  "ALTER TABLE users ADD INDEX IF NOT EXISTS idx_name name TYPE minmax GRANULARITY 1;",
 			expected: []string{
 				"ALTER TABLE `users`",
-				"    ADD INDEX IF NOT EXISTS `idx_name` name TYPE `minmax` GRANULARITY 1;",
+				"    ADD INDEX IF NOT EXISTS `idx_name` `name` TYPE `minmax` GRANULARITY 1;",
 			},
 		},
 		{
@@ -143,7 +143,7 @@ func TestFormatter_alterTable(t *testing.T) {
 			sql:  "ALTER TABLE users ADD CONSTRAINT chk_age CHECK age > 0;",
 			expected: []string{
 				"ALTER TABLE `users`",
-				"    ADD CONSTRAINT `chk_age` CHECK age > 0;",
+				"    ADD CONSTRAINT `chk_age` CHECK `age` > 0;",
 			},
 		},
 		{
@@ -151,7 +151,7 @@ func TestFormatter_alterTable(t *testing.T) {
 			sql:  "ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS chk_email CHECK email != '';",
 			expected: []string{
 				"ALTER TABLE `users`",
-				"    ADD CONSTRAINT IF NOT EXISTS `chk_email` CHECK email != '';",
+				"    ADD CONSTRAINT IF NOT EXISTS `chk_email` CHECK `email` != '';",
 			},
 		},
 		{
