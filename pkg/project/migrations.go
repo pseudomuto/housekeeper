@@ -79,6 +79,45 @@ func (ms *MigrationSet) IsValid() (bool, error) {
 	return ms.sum.TotalHash == generatedSum.TotalHash, nil
 }
 
+// LoadMigrationSet loads all migration files for the specified environment from disk.
+// It creates a MigrationSet containing all .sql files found in the migrations directory
+// for the environment, along with any SumFile for integrity checking.
+//
+// The env parameter is case-insensitive and must match an environment name
+// defined in the housekeeper.yaml configuration file. Migration files are sorted
+// lexicographically to ensure consistent ordering.
+//
+// This method also loads the SumFile (if present) which contains SHA256 hashes
+// of all migration files for integrity validation. The SumFile can be used to
+// detect if any migration files have been modified since the last hash generation.
+//
+// Example:
+//
+//	project := project.New("/path/to/project")
+//	if err := project.Initialize(); err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Load migration set for production environment
+//	migrationSet, err := project.LoadMigrationSet("production")
+//	if err != nil {
+//		log.Fatal("Failed to load migration set:", err)
+//	}
+//
+//	// Check migration file integrity
+//	isValid, err := migrationSet.IsValid()
+//	if err != nil {
+//		log.Fatal("Failed to validate migration set:", err)
+//	}
+//
+//	if !isValid {
+//		log.Println("Warning: Migration files have been modified")
+//	}
+//
+//	// Process migration files
+//	for _, file := range migrationSet.Files() {
+//		fmt.Printf("Migration: %s\n", file.Name())
+//	}
 func (p *Project) LoadMigrationSet(env string) (*MigrationSet, error) {
 	var ms *MigrationSet
 	err := p.withEnv(env, func(e *Env) error {

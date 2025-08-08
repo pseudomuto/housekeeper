@@ -127,6 +127,21 @@ func LoadConfig(r io.Reader) (*Config, error) {
 //	if err != nil {
 //		return fmt.Errorf("loading config: %w", err)
 //	}
+
+// LoadConfigFile loads a project configuration from the specified file path.
+// This is a convenience function that opens the file and calls LoadConfig.
+//
+// Example:
+//
+//	config, err := project.LoadConfigFile("housekeeper.yaml")
+//	if err != nil {
+//		log.Fatal("Failed to load config:", err)
+//	}
+//
+//	// Access environment configurations
+//	for _, env := range config.Envs {
+//		fmt.Printf("Environment: %s (%s)\n", env.Name, env.URL)
+//	}
 func LoadConfigFile(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
