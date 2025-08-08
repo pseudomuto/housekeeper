@@ -13,12 +13,9 @@ target_sql: |
   ) ENGINE = MergeTree()
   ORDER BY id;
 expected_migration:
-  up_contains:
+  sql_contains:
     - "ALTER TABLE users"
     - "ADD COLUMN email String"
-  down_contains:
-    - "ALTER TABLE users"
-    - "DROP COLUMN email"
   diff_count: 1
   diff_types:
     - "ALTER"

@@ -2,7 +2,6 @@ description: "Cluster-aware operations (should generate error)"
 current_sql: "CREATE DATABASE cluster_db ENGINE = Atomic COMMENT 'Local database';"
 target_sql: "CREATE DATABASE cluster_db ON CLUSTER production ENGINE = Atomic COMMENT 'Cluster-aware database';"
 expected_migration:
-  up_contains: []
-  down_contains: []
+  sql_contains: []
   diff_count: 0
   diff_types: []

@@ -20,10 +20,8 @@ target_sql: |
   LIFETIME(3600)
   COMMENT 'User dictionary';
 expected_migration:
-  up_contains:
+  sql_contains:
     - "RENAME DICTIONARY analytics.old_users_dict TO analytics.users_dict"
-  down_contains:
-    - "RENAME DICTIONARY analytics.users_dict TO analytics.old_users_dict"
   diff_count: 1
   diff_types:
     - "RENAME"

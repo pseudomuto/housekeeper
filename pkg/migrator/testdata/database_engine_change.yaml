@@ -2,7 +2,6 @@ description: "Engine changes (should generate error)"
 current_sql: "CREATE DATABASE test_db ENGINE = MySQL('localhost:3306', 'db', 'user', 'pass') COMMENT 'MySQL database';"
 target_sql: "CREATE DATABASE test_db ENGINE = Atomic COMMENT 'Changed from MySQL to Atomic';"
 expected_migration:
-  up_contains: []
-  down_contains: []
+  sql_contains: []
   diff_count: 0
   diff_types: []

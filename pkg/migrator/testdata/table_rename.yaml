@@ -14,10 +14,8 @@ target_sql: |
   ) ENGINE = MergeTree()
   ORDER BY id;
 expected_migration:
-  up_contains:
+  sql_contains:
     - "RENAME TABLE old_users TO users"
-  down_contains:
-    - "RENAME TABLE users TO old_users"
   diff_count: 1
   diff_types:
     - "RENAME"

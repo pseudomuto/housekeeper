@@ -6,12 +6,9 @@ target_sql: |
   CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
   CREATE DATABASE staging_db ON CLUSTER production ENGINE = Memory COMMENT 'Temporary database';
 expected_migration:
-  up_contains:
+  sql_contains:
     - "RENAME DATABASE old_analytics TO analytics"
     - "RENAME DATABASE temp_db TO staging_db ON CLUSTER production"
-  down_contains:
-    - "RENAME DATABASE analytics TO old_analytics"
-    - "RENAME DATABASE staging_db TO temp_db ON CLUSTER production"
   diff_count: 2
   diff_types:
     - "RENAME"

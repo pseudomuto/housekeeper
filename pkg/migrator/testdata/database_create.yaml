@@ -3,10 +3,8 @@ current_sql: ""  # Empty current state
 target_sql: |
   CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
 expected_migration:
-  up_contains:
+  sql_contains:
     - "CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database'"
-  down_contains:
-    - "DROP DATABASE IF EXISTS analytics"
   diff_count: 1
   diff_types:
     - "CREATE"

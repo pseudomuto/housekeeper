@@ -9,10 +9,8 @@ current_sql: |
   LIFETIME(600);
 target_sql: ""
 expected_migration:
-  up_contains:
+  sql_contains:
     - "DROP DICTIONARY IF EXISTS users_dict"
-  down_contains:
-    - "CREATE DICTIONARY users_dict"
   diff_count: 1
   diff_types:
     - "DROP"

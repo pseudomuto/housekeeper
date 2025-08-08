@@ -6,14 +6,10 @@ target_sql: |
   CREATE DATABASE new_db ENGINE = Atomic COMMENT 'New database';
   CREATE DATABASE old_db ENGINE = Atomic COMMENT 'Updated comment';
 expected_migration:
-  up_contains:
+  sql_contains:
     - "CREATE DATABASE new_db ENGINE = Atomic COMMENT 'New database'"
     - "ALTER DATABASE old_db MODIFY COMMENT 'Updated comment'"
     - "DROP DATABASE IF EXISTS temp_db"
-  down_contains:
-    - "ALTER DATABASE old_db MODIFY COMMENT 'Old comment'"
-    - "DROP DATABASE IF EXISTS new_db"
-    - "CREATE DATABASE temp_db ENGINE = Atomic COMMENT 'Temporary database'"
   diff_count: 3
   diff_types:
     - "CREATE"

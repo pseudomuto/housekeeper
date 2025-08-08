@@ -30,10 +30,9 @@ type (
 
 	// ExpectedMigrationResult represents expected migration properties
 	ExpectedMigrationResult struct {
-		UpContains   []string `yaml:"up_contains"`
-		DownContains []string `yaml:"down_contains"`
-		DiffCount    int      `yaml:"diff_count"`
-		DiffTypes    []string `yaml:"diff_types"`
+		SQLContains []string `yaml:"sql_contains"`
+		DiffCount   int      `yaml:"diff_count"`
+		DiffTypes   []string `yaml:"diff_types"`
 	}
 )
 
@@ -74,7 +73,7 @@ func TestMigrationGeneration(t *testing.T) {
 			}
 
 			// Generate migration
-			migration, err := GenerateMigration(currentGrammar, targetGrammar, testName)
+			migration, err := GenerateMigration(currentGrammar, targetGrammar)
 			if testCase.ExpectedMigration.DiffCount == 0 {
 				require.Error(t, err, "Expected error for invalid operation or no differences")
 				// Could be no differences or unsupported operation
@@ -95,23 +94,14 @@ func TestMigrationGeneration(t *testing.T) {
 }
 
 func verifyMigrationResult(t *testing.T, migration *Migration, expected ExpectedMigrationResult, testName string) {
-	// Verify UP migration contains expected statements
-	for _, expectedContent := range expected.UpContains {
-		require.Contains(t, migration.Up, expectedContent,
-			"UP migration missing expected content in %s", testName)
+	// Verify migration contains expected statements
+	for _, expectedContent := range expected.SQLContains {
+		require.Contains(t, migration.SQL, expectedContent,
+			"Migration missing expected content in %s", testName)
 	}
 
-	// Verify DOWN migration contains expected statements
-	for _, expectedContent := range expected.DownContains {
-		require.Contains(t, migration.Down, expectedContent,
-			"DOWN migration missing expected content in %s", testName)
-	}
-
-	// Verify migration metadata
-	require.NotEmpty(t, migration.Version, "Migration version should not be empty")
-	require.Equal(t, testName, migration.Name, "Migration name mismatch")
-	require.NotEmpty(t, migration.Up, "UP migration should not be empty")
-	require.NotEmpty(t, migration.Down, "DOWN migration should not be empty")
+	// Verify migration SQL is not empty
+	require.NotEmpty(t, migration.SQL, "Migration SQL should not be empty")
 }
 
 const (
@@ -153,11 +143,7 @@ CREATE TABLE analytics.events (id UInt64, name String) ENGINE = MergeTree() ORDE
 		require.NoError(t, err)
 		contentStr := string(content)
 
-		// Should contain header comments
-		require.Contains(t, contentStr, "-- Schema migration generated at")
-		require.Contains(t, contentStr, "-- Down migration: swap current and target schemas")
-
-		// Should contain the migration SQL
+		// Should contain the migration SQL without header comments
 		require.Contains(t, contentStr, "ALTER DATABASE analytics MODIFY COMMENT 'New comment';")
 		require.Contains(t, contentStr, "CREATE TABLE analytics.events")
 	})

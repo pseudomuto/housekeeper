@@ -19,7 +19,7 @@ func (f *Formatter) formatOrExpression(or *parser.OrExpression) string {
 	if or == nil {
 		return ""
 	}
-	
+
 	result := f.formatAndExpression(or.And)
 	for _, rest := range or.Rest {
 		result += " OR " + f.formatAndExpression(rest.And)
@@ -32,7 +32,7 @@ func (f *Formatter) formatAndExpression(and *parser.AndExpression) string {
 	if and == nil {
 		return ""
 	}
-	
+
 	result := f.formatNotExpression(and.Not)
 	for _, rest := range and.Rest {
 		result += " AND " + f.formatNotExpression(rest.Not)
@@ -56,9 +56,9 @@ func (f *Formatter) formatComparisonExpression(comp *parser.ComparisonExpression
 	if comp == nil {
 		return ""
 	}
-	
+
 	left := f.formatAdditionExpression(comp.Addition)
-	
+
 	// Handle IS NULL/IS NOT NULL
 	if comp.IsNull != nil {
 		if comp.IsNull.Not {
@@ -66,9 +66,9 @@ func (f *Formatter) formatComparisonExpression(comp *parser.ComparisonExpression
 		}
 		return left + " IS NULL"
 	}
-	
+
 	// Handle other comparisons
-	if comp.Rest != nil {
+	if comp.Rest != nil { // nolint nestif
 		if comp.Rest.SimpleOp != nil {
 			op := f.formatSimpleComparisonOp(comp.Rest.SimpleOp.Op)
 			right := f.formatAdditionExpression(comp.Rest.SimpleOp.Addition)
@@ -89,7 +89,7 @@ func (f *Formatter) formatComparisonExpression(comp *parser.ComparisonExpression
 			return left + " " + betweenOp + " " + betweenExpr
 		}
 	}
-	
+
 	return left
 }
 
@@ -145,13 +145,13 @@ func (f *Formatter) formatAdditionExpression(add *parser.AdditionExpression) str
 	if add == nil {
 		return ""
 	}
-	
+
 	result := f.formatMultiplicationExpression(add.Multiplication)
-	
+
 	for _, rest := range add.Rest {
 		result += " " + rest.Op + " " + f.formatMultiplicationExpression(rest.Multiplication)
 	}
-	
+
 	return result
 }
 
@@ -160,13 +160,13 @@ func (f *Formatter) formatMultiplicationExpression(mul *parser.MultiplicationExp
 	if mul == nil {
 		return ""
 	}
-	
+
 	result := f.formatUnaryExpression(mul.Unary)
-	
+
 	for _, rest := range mul.Rest {
 		result += " " + rest.Op + " " + f.formatUnaryExpression(rest.Unary)
 	}
-	
+
 	return result
 }
 
@@ -175,7 +175,7 @@ func (f *Formatter) formatUnaryExpression(unary *parser.UnaryExpression) string 
 	if unary == nil {
 		return ""
 	}
-	
+
 	if unary.Op != "" {
 		return unary.Op + f.formatPrimaryExpression(unary.Primary)
 	}
@@ -187,7 +187,7 @@ func (f *Formatter) formatPrimaryExpression(primary *parser.PrimaryExpression) s
 	if primary == nil {
 		return ""
 	}
-	
+
 	switch {
 	case primary.Literal != nil:
 		return f.formatLiteral(primary.Literal)
@@ -219,7 +219,7 @@ func (f *Formatter) formatLiteral(lit *parser.Literal) string {
 	if lit == nil {
 		return ""
 	}
-	
+
 	switch {
 	case lit.StringValue != nil:
 		return *lit.StringValue
@@ -239,7 +239,7 @@ func (f *Formatter) formatIdentifierExpr(id *parser.IdentifierExpr) string {
 	if id == nil {
 		return ""
 	}
-	
+
 	var parts []string
 	if id.Database != nil {
 		parts = append(parts, f.identifier(*id.Database))
@@ -248,7 +248,7 @@ func (f *Formatter) formatIdentifierExpr(id *parser.IdentifierExpr) string {
 		parts = append(parts, f.identifier(*id.Table))
 	}
 	parts = append(parts, f.identifier(id.Name))
-	
+
 	return strings.Join(parts, ".")
 }
 
@@ -257,7 +257,7 @@ func (f *Formatter) formatFunctionCall(fn *parser.FunctionCall) string {
 	if fn == nil {
 		return ""
 	}
-	
+
 	result := fn.Name + "("
 	if len(fn.FirstParentheses) > 0 {
 		var args []string
@@ -267,7 +267,7 @@ func (f *Formatter) formatFunctionCall(fn *parser.FunctionCall) string {
 		result += strings.Join(args, ", ")
 	}
 	result += ")"
-	
+
 	// Handle second parentheses for parameterized functions
 	if len(fn.SecondParentheses) > 0 {
 		result += "("
@@ -278,13 +278,13 @@ func (f *Formatter) formatFunctionCall(fn *parser.FunctionCall) string {
 		result += strings.Join(args, ", ")
 		result += ")"
 	}
-	
-	// Handle OVER clause for window functions - fallback to string for now
-	if fn.Over != nil {
-		// For now, we'll omit the OVER clause formatting to avoid complexity
-		// This is a limitation that can be addressed later
-	}
-	
+
+	// TODO: Handle OVER clause for window functions - fallback to string for now
+	// if fn.Over != nil {
+	// 	// For now, we'll omit the OVER clause formatting to avoid complexity
+	// 	// This is a limitation that can be addressed later
+	// }
+
 	return result
 }
 
@@ -302,17 +302,17 @@ func (f *Formatter) formatFunctionArg(arg *parser.FunctionArg) string {
 	return arg.String()
 }
 
-
 // formatArrayExpression formats an array expression
 func (f *Formatter) formatArrayExpression(arr *parser.ArrayExpression) string {
 	if arr == nil || len(arr.Elements) == 0 {
 		return "[]"
 	}
-	
-	var elements []string
-	for _, elem := range arr.Elements {
-		elements = append(elements, f.formatExpression(&elem))
+
+	elements := make([]string, len(arr.Elements))
+	for i, elem := range arr.Elements {
+		elements[i] = f.formatExpression(&elem)
 	}
+
 	return "[" + strings.Join(elements, ", ") + "]"
 }
 
@@ -321,11 +321,12 @@ func (f *Formatter) formatTupleExpression(tuple *parser.TupleExpression) string 
 	if tuple == nil || len(tuple.Elements) == 0 {
 		return "()"
 	}
-	
-	var elements []string
-	for _, elem := range tuple.Elements {
-		elements = append(elements, f.formatExpression(&elem))
+
+	elements := make([]string, len(tuple.Elements))
+	for i, elem := range tuple.Elements {
+		elements[i] = f.formatExpression(&elem)
 	}
+
 	return "(" + strings.Join(elements, ", ") + ")"
 }
 

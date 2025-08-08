@@ -16,7 +16,7 @@ target_sql: |
   SETTINGS(max_threads = 4, max_block_size = 8192)
   COMMENT 'User dictionary with hierarchical structure and caching';
 expected_migration:
-  up_contains:
+  sql_contains:
     - "CREATE DICTIONARY IF NOT EXISTS analytics.users_dict ON CLUSTER production"
     - "user_id UInt64 IS_OBJECT_ID"
     - "parent_id UInt64 DEFAULT 0 HIERARCHICAL"
@@ -27,8 +27,6 @@ expected_migration:
     - "LIFETIME(MIN 300 MAX 3600)"
     - "SETTINGS("
     - "COMMENT 'User dictionary with hierarchical structure and caching'"
-  down_contains:
-    - "DROP DICTIONARY IF EXISTS analytics.users_dict ON CLUSTER production"
   diff_count: 1
   diff_types:
     - "CREATE"

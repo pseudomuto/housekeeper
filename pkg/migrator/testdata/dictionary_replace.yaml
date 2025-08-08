@@ -18,12 +18,9 @@ target_sql: |
   LIFETIME(600)
   COMMENT 'New comment';
 expected_migration:
-  up_contains:
+  sql_contains:
     - CREATE OR REPLACE DICTIONARY users_dict
     - COMMENT 'New comment';
-  down_contains:
-    - CREATE OR REPLACE DICTIONARY users_dict
-    - COMMENT 'Old comment';
   diff_count: 1
   diff_types:
     - "REPLACE"

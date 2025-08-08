@@ -215,7 +215,6 @@ func (f *Formatter) formatFunctionWithAlias(fn *parser.FunctionWithAlias) string
 	return result
 }
 
-
 // formatJoinClause formats JOIN clauses
 func (f *Formatter) formatJoinClause(join *parser.JoinClause) string {
 	if join == nil {
