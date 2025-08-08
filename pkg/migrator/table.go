@@ -91,7 +91,7 @@ const (
 	ColumnDiffModify ColumnDiffType = "MODIFY"
 )
 
-// CompareTableGrammars compares current and target parsed grammars to find table differences.
+// compareTables compares current and target parsed schemas to find table differences.
 // It identifies tables that need to be created, altered, dropped, or renamed.
 //
 // The function performs comprehensive table comparison including:
@@ -99,11 +99,9 @@ const (
 // - Column definitions and modifications
 // - Rename detection based on content similarity
 // - Proper ordering for migration generation
-//
-// Returns a slice of TableDiff objects representing all detected changes.
-func CompareTableGrammars(current, target *parser.SQL) ([]*TableDiff, error) {
-	currentTables := extractTablesFromGrammar(current)
-	targetTables := extractTablesFromGrammar(target)
+func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
+	currentTables := extractTablesFromSQL(current)
+	targetTables := extractTablesFromSQL(target)
 
 	var diffs []*TableDiff
 
@@ -141,10 +139,10 @@ func CompareTableGrammars(current, target *parser.SQL) ([]*TableDiff, error) {
 	return diffs, nil
 }
 
-// extractTablesFromGrammar extracts table information from parsed grammar statements
+// extractTablesFromSQL extracts table information from parsed SQL statements
 //
 //nolint:gocognit,funlen // Complex function needed for comprehensive table parsing
-func extractTablesFromGrammar(sql *parser.SQL) map[string]*TableInfo {
+func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 	tables := make(map[string]*TableInfo)
 
 	for _, stmt := range sql.Statements {

@@ -784,7 +784,7 @@ import (
 
 func main() {
     // Parse SQL from string
-    sql := `
+    sqlString := `
         CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';
         
         CREATE TABLE analytics.events (
@@ -810,13 +810,13 @@ func main() {
     `
     
     // Parse the SQL
-    grammar, err := parser.ParseSQL(sql)
+    sql, err := parser.ParseSQL(sqlString)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
     
     // Inspect parsed statements
-    for _, stmt := range grammar.Statements {
+    for _, stmt := range sql.Statements {
         if stmt.CreateDatabase != nil {
             db := stmt.CreateDatabase
             fmt.Printf("Database: %s", db.Name)
@@ -855,10 +855,10 @@ func main() {
     }
     
     // Generate migrations
-    currentGrammar, _ := parser.ParseSQL("CREATE DATABASE analytics;")
-    targetGrammar := grammar
+    currentSQL, _ := parser.ParseSQL("CREATE DATABASE analytics;")
+    targetSQL := sql
     
-    migration, err := migrator.GenerateMigration(currentGrammar, targetGrammar, "add_tables_and_dicts")
+    migration, err := migrator.GenerateMigration(currentSQL, targetSQL, "add_tables_and_dicts")
     if err != nil {
         log.Fatalf("Migration error: %v", err)
     }
@@ -963,7 +963,7 @@ func main() {
     }
     
     // Parse SELECT in view context (embedded in DDL)
-    viewSQL := `
+    viewSQLString := `
         CREATE MATERIALIZED VIEW analytics.user_activity_summary
         ENGINE = MergeTree() ORDER BY (date, user_id)
         AS SELECT 
@@ -980,12 +980,12 @@ func main() {
         ORDER BY date DESC, events DESC;
     `
     
-    viewGrammar, err := parser.ParseSQL(viewSQL)
+    viewSQL, err := parser.ParseSQL(viewSQLString)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
     
-    if view := viewGrammar.Statements[0].CreateView; view != nil {
+    if view := viewSQL.Statements[0].CreateView; view != nil {
         selectStmt := view.AsSelect
         fmt.Printf("\nMaterialized view query analysis:\n")
         fmt.Printf("- Columns in SELECT: %d\n", len(selectStmt.Columns))
@@ -1197,7 +1197,7 @@ Housekeeper is built with a modern, extensible architecture designed for reliabi
 The participle-based parser provides robust, maintainable parsing with several key advantages:
 
 #### Benefits Over Regex Approach
-1. **Maintainability**: Grammar rules are clearer and more maintainable than regex patterns
+1. **Maintainability**: SQL parsing rules are clearer and more maintainable than regex patterns
 2. **Error Handling**: Structured parsing provides detailed, actionable error messages
 3. **Extensibility**: Adding new SQL features is straightforward with grammar rules
 4. **Type Safety**: Structured data types instead of string manipulation
@@ -1342,7 +1342,7 @@ task tag TAG=v1.2.3
 
 Built with modern Go practices:
 
-- **Participle Parser**: Grammar-based parsing instead of regex
+- **Participle Parser**: SQL structure-based parsing instead of regex
 - **Comprehensive Testing**: Testdata-driven tests with YAML expectations
 - **Clean Architecture**: Separated concerns across packages
 - **Error Handling**: Structured error handling with context

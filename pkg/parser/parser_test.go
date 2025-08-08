@@ -158,7 +158,7 @@ func TestParserWithTestdata(t *testing.T) {
 
 			if *updateFlag {
 				// Generate and save YAML file
-				expectedResult := generateTestCaseFromGrammar(grammar)
+				expectedResult := generateTestCaseFromSQL(grammar)
 				yamlData, err := yaml.Marshal(&expectedResult)
 				require.NoError(t, err, "Failed to marshal YAML for %s", yamlFile)
 
@@ -178,16 +178,16 @@ func TestParserWithTestdata(t *testing.T) {
 			require.NoError(t, err, "Failed to parse YAML file: %s", yamlFile)
 
 			// Verify results
-			verifyGrammar(t, grammar, expectedResult, sqlFile)
+			verifySQL(t, grammar, expectedResult, sqlFile)
 		})
 	}
 }
 
-// generateTestCaseFromGrammar converts a parsed grammar into a TestCase for YAML generation
+// generateTestCaseFromSQL converts parsed SQL into a TestCase for YAML generation
 // Processing statements in order to preserve the sequence from the SQL file
 //
 //nolint:gocognit,gocyclo,maintidx // Complex test case generation function handles all DDL statement types
-func generateTestCaseFromGrammar(grammar *SQL) TestCase {
+func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedDatabases []ExpectedDatabase
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
@@ -198,7 +198,7 @@ func generateTestCaseFromGrammar(grammar *SQL) TestCase {
 	alterOperations := make(map[string]map[string]int)
 
 	// Process statements in order
-	for _, stmt := range grammar.Statements {
+	for _, stmt := range sql.Statements {
 		//nolint:nestif // Complex nested logic needed for comprehensive test case generation
 		if stmt.CreateDatabase != nil {
 			db := stmt.CreateDatabase
@@ -799,9 +799,9 @@ func hasWindowFunction(expr *Expression) bool {
 	return false
 }
 
-func verifyGrammar(t *testing.T, actualGrammar *SQL, expected TestCase, sqlFile string) {
-	// Use the same logic as generateTestCaseFromGrammar to extract actual results
-	actualTestCase := generateTestCaseFromGrammar(actualGrammar)
+func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) {
+	// Use the same logic as generateTestCaseFromSQL to extract actual results
+	actualTestCase := generateTestCaseFromSQL(actualSQL)
 
 	// Compare arrays by length first
 	require.Len(t, actualTestCase.Databases, len(expected.Databases),

@@ -13,48 +13,38 @@ func TestNewClient_DSNParsing(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name      string
-		dsn       string
-		shouldErr bool
-		errMsg    string
+		name string
+		dsn  string
+		msg  string
 	}{
 		{
-			name:      "valid simple host:port",
-			dsn:       "localhost:9000",
-			shouldErr: true,                    // Will fail connection but DSN should parse
-			errMsg:    "authentication failed", // Should fail at connection, not parsing
+			name: "valid simple host:port",
+			dsn:  "localhost:9000",
 		},
 		{
-			name:      "valid clickhouse:// DSN",
-			dsn:       "clickhouse://default:@localhost:9000/default",
-			shouldErr: true,                    // Will fail connection but DSN should parse
-			errMsg:    "authentication failed", // Should fail at connection, not parsing
+			name: "valid clickhouse:// DSN",
+			dsn:  "clickhouse://default:@localhost:9000/default",
 		},
 		{
-			name:      "valid tcp:// DSN",
-			dsn:       "tcp://localhost:9000?username=default&password=&database=default",
-			shouldErr: true,                    // Will fail connection but DSN should parse
-			errMsg:    "authentication failed", // Should fail at connection, not parsing
+			name: "valid tcp:// DSN",
+			dsn:  "tcp://localhost:9000?username=default&password=&database=default",
 		},
 		{
-			name:      "invalid host format",
-			dsn:       "malformed[host:9000",
-			shouldErr: true,
-			errMsg:    "failed to connect", // Will still try to connect with malformed address
+			name: "invalid host format",
+			dsn:  "malformed[host:9000",
+			msg:  "unexpected '[' in address",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := clickhouse.NewClient(ctx, tt.dsn)
-
-			if tt.shouldErr {
-				require.Error(t, err)
-				require.Contains(t, strings.ToLower(err.Error()), tt.errMsg,
-					"Expected error to contain '%s' but got: %v", tt.errMsg, err)
-			} else {
-				require.NoError(t, err)
+			if tt.msg == "" {
+				tt.msg = "connection refused"
 			}
+
+			_, err := clickhouse.NewClient(ctx, tt.dsn)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.msg)
 		})
 	}
 }
@@ -88,7 +78,7 @@ func TestNewClientWithOptions(t *testing.T) {
 			// Should fail connection but succeed in creating client
 			require.Error(t, err)
 			require.Nil(t, client)
-			require.Contains(t, strings.ToLower(err.Error()), "authentication failed")
+			require.Contains(t, strings.ToLower(err.Error()), "connection refused")
 		})
 	}
 }

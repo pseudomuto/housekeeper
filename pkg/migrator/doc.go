@@ -38,15 +38,15 @@
 // Example usage:
 //
 //	// Parse current schema (from ClickHouse or existing SQL files)
-//	currentGrammar, _ := parser.ParseSQL("CREATE DATABASE analytics;")
+//	currentSQL, _ := parser.ParseSQL("CREATE DATABASE analytics;")
 //
 //	// Parse target schema (from SQL files)
-//	targetGrammar, _ := parser.ParseSQLFromDirectory("schema/")
+//	targetSQL, _ := parser.ParseSQLFromDirectory("schema/")
 //
 //	// Generate migration
 //	migration, err := migrator.GenerateMigration(
-//	    currentGrammar,
-//	    targetGrammar
+//	    currentSQL,
+//	    targetSQL
 //	)
 //	if err != nil {
 //	    // Handle error (e.g., unsupported operation like engine changes)

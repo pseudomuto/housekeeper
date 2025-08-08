@@ -44,8 +44,8 @@ The parser package provides a robust participle-based parser for ClickHouse DDL 
 
 ### Adding New DDL Support
 
-1. Define grammar types in the appropriate file (database.go, or create table.go, view.go, etc.)
-2. Add parsing rules to the Grammar type in parser.go
+1. Define SQL structure types in the appropriate file (database.go, or create table.go, view.go, etc.)
+2. Add parsing rules to the SQL type in parser.go
 3. Implement processing functions
 4. Add comprehensive tests using the testdata system
 5. Update documentation

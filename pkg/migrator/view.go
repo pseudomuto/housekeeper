@@ -50,8 +50,8 @@ type (
 	}
 )
 
-// CompareViewGrammars compares current and target grammars to find view differences.
-// It analyzes CREATE VIEW statements from both grammars and generates appropriate
+// compareViews compares current and target schemas to find view differences.
+// It analyzes CREATE VIEW statements from both schemas and generates appropriate
 // migration operations including CREATE, DROP, ALTER (for materialized views), and RENAME.
 //
 // For materialized views that have changed:
@@ -63,12 +63,10 @@ type (
 // - Uses CREATE OR REPLACE for content changes
 // - Uses standard CREATE/DROP for creation/deletion
 // - Uses RENAME TABLE for renames
-//
-// Returns a slice of ViewDiff structs representing all the differences found.
-func CompareViewGrammars(current, target *parser.SQL) ([]*ViewDiff, error) {
-	// Extract views from both grammars
-	currentViews := extractViewsFromGrammar(current)
-	targetViews := extractViewsFromGrammar(target)
+func compareViews(current, target *parser.SQL) ([]*ViewDiff, error) { // nolint: unparam
+	// Extract views from both schemas
+	currentViews := extractViewsFromSQL(current)
+	targetViews := extractViewsFromSQL(target)
 
 	var diffs []*ViewDiff
 
@@ -156,8 +154,8 @@ func CompareViewGrammars(current, target *parser.SQL) ([]*ViewDiff, error) {
 	return diffs, nil
 }
 
-// extractViewsFromGrammar extracts all view information from a parsed grammar
-func extractViewsFromGrammar(sql *parser.SQL) map[string]*ViewInfo {
+// extractViewsFromSQL extracts all view information from parsed SQL
+func extractViewsFromSQL(sql *parser.SQL) map[string]*ViewInfo {
 	views := make(map[string]*ViewInfo)
 
 	for _, stmt := range sql.Statements {

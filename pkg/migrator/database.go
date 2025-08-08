@@ -51,8 +51,8 @@ type (
 	}
 )
 
-// CompareDatabaseGrammars compares current and target database grammars and returns migration diffs.
-// It analyzes both grammars to identify differences and generates appropriate migration operations.
+// compareDatabases compares current and target database schemas and returns migration diffs.
+// It analyzes both schemas to identify differences and generates appropriate migration operations.
 //
 // The function identifies:
 //   - Databases that need to be created (exist in target but not current)
@@ -64,26 +64,10 @@ type (
 // The function intelligently detects rename operations by comparing database properties
 // (engine, comment, cluster) excluding the name. If two databases have identical
 // properties but different names, it generates a RENAME operation instead of DROP+CREATE.
-//
-// Example:
-//
-//	currentSQL := `CREATE DATABASE old_analytics ENGINE = Atomic COMMENT 'Analytics DB';`
-//	targetSQL := `CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';`
-//
-//	current, _ := parser.ParseSQL(currentSQL)
-//	target, _ := parser.ParseSQL(targetSQL)
-//
-//	diffs, err := CompareDatabaseGrammars(current, target)
-//	// Returns: []*DatabaseDiff with Type: DatabaseDiffRename
-//	// UpSQL: "RENAME DATABASE old_analytics TO analytics;"
-//	// DownSQL: "RENAME DATABASE analytics TO old_analytics;"
-//
-// The function returns a slice of DatabaseDiff objects describing each change needed.
-// It returns an error if an unsupported operation is detected (e.g., engine or cluster changes).
-func CompareDatabaseGrammars(current, target *parser.SQL) ([]*DatabaseDiff, error) {
+func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 	var diffs []*DatabaseDiff
 
-	// Extract database information from both grammars
+	// Extract database information from both SQL structures
 	currentDBs := extractDatabaseInfo(current)
 	targetDBs := extractDatabaseInfo(target)
 
@@ -122,7 +106,7 @@ func CompareDatabaseGrammars(current, target *parser.SQL) ([]*DatabaseDiff, erro
 	return diffs, nil
 }
 
-// extractDatabaseInfo extracts database information from CREATE DATABASE statements in a grammar
+// extractDatabaseInfo extracts database information from CREATE DATABASE statements in SQL
 func extractDatabaseInfo(sql *parser.SQL) map[string]*DatabaseInfo {
 	databases := make(map[string]*DatabaseInfo)
 

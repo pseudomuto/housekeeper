@@ -78,7 +78,7 @@ func TestFormatter_Options(t *testing.T) {
 	})
 }
 
-func TestFormatter_Grammar(t *testing.T) {
+func TestFormatter_SQL(t *testing.T) {
 	sql := `CREATE DATABASE test;
 			CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();`
 
@@ -205,7 +205,7 @@ func TestFormatSQL_Method(t *testing.T) {
 	}
 }
 
-func TestFormatSQL_NilGrammar(t *testing.T) {
+func TestFormatSQL_NilSQL(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Test function with nil grammar
@@ -220,7 +220,7 @@ func TestFormatSQL_NilGrammar(t *testing.T) {
 	require.Empty(t, buf.String())
 }
 
-func TestFormatSQL_EmptyGrammar(t *testing.T) {
+func TestFormatSQL_EmptySQL(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Test function with empty sqlResult

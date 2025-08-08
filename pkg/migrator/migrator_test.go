@@ -56,24 +56,24 @@ func TestMigrationGeneration(t *testing.T) {
 			require.NoError(t, err, "Failed to parse YAML file: %s", yamlFile)
 
 			// Parse current and target SQL
-			var currentGrammar, targetGrammar *parser.SQL
+			var currentSQL, targetSQL *parser.SQL
 
 			if testCase.CurrentSQL == "" {
-				currentGrammar = &parser.SQL{Statements: []*parser.Statement{}}
+				currentSQL = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
-				currentGrammar, err = parser.ParseSQL(testCase.CurrentSQL)
+				currentSQL, err = parser.ParseSQL(testCase.CurrentSQL)
 				require.NoError(t, err, "Failed to parse current SQL")
 			}
 
 			if testCase.TargetSQL == "" {
-				targetGrammar = &parser.SQL{Statements: []*parser.Statement{}}
+				targetSQL = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
-				targetGrammar, err = parser.ParseSQL(testCase.TargetSQL)
+				targetSQL, err = parser.ParseSQL(testCase.TargetSQL)
 				require.NoError(t, err, "Failed to parse target SQL")
 			}
 
 			// Generate migration
-			migration, err := GenerateMigration(currentGrammar, targetGrammar)
+			migration, err := GenerateMigration(currentSQL, targetSQL)
 			if testCase.ExpectedMigration.DiffCount == 0 {
 				require.Error(t, err, "Expected error for invalid operation or no differences")
 				// Could be no differences or unsupported operation

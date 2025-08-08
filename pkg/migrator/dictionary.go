@@ -48,8 +48,8 @@ type (
 	}
 )
 
-// CompareDictionaryGrammars compares current and target dictionary grammars and returns migration diffs.
-// It analyzes both grammars to identify differences and generates appropriate migration operations.
+// compareDictionaries compares current and target dictionary schemas and returns migration diffs.
+// It analyzes both schemas to identify differences and generates appropriate migration operations.
 //
 // The function identifies:
 //   - Dictionaries that need to be created (exist in target but not current)
@@ -64,27 +64,10 @@ type (
 // operation instead of DROP+CREATE.
 //
 // Since dictionaries cannot be altered in ClickHouse, any modification requires CREATE OR REPLACE.
-//
-// Example:
-//
-//	currentSQL := `CREATE DICTIONARY analytics.old_users (id UInt64) PRIMARY KEY id
-//	                SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
-//	targetSQL := `CREATE DICTIONARY analytics.users (id UInt64) PRIMARY KEY id
-//	               SOURCE(HTTP(url 'test')) LAYOUT(FLAT()) LIFETIME(600);`
-//
-//	current, _ := parser.ParseSQL(currentSQL)
-//	target, _ := parser.ParseSQL(targetSQL)
-//
-//	diffs, err := CompareDictionaryGrammars(current, target)
-//	// Returns: []*DictionaryDiff with Type: DictionaryDiffRename
-//	// UpSQL: "RENAME DICTIONARY analytics.old_users TO analytics.users;"
-//	// DownSQL: "RENAME DICTIONARY analytics.users TO analytics.old_users;"
-//
-// The function returns a slice of DictionaryDiff objects describing each change needed.
-func CompareDictionaryGrammars(current, target *parser.SQL) ([]*DictionaryDiff, error) {
+func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error) { // nolint: unparam
 	var diffs []*DictionaryDiff
 
-	// Extract dictionary information from both grammars
+	// Extract dictionary information from both SQL structures
 	currentDicts := extractDictionaryInfo(current)
 	targetDicts := extractDictionaryInfo(target)
 

@@ -60,24 +60,24 @@ type (
 //nolint:gocyclo,funlen,maintidx // Complex function handles multiple DDL statement types and migration ordering
 func GenerateMigration(current, target *parser.SQL) (*Migration, error) {
 	// Compare databases and dictionaries to find differences
-	dbDiffs, err := CompareDatabaseGrammars(current, target)
+	dbDiffs, err := compareDatabases(current, target)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compare database grammars")
+		return nil, errors.Wrap(err, "failed to compare databases")
 	}
 
-	dictDiffs, err := CompareDictionaryGrammars(current, target)
+	dictDiffs, err := compareDictionaries(current, target)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compare dictionary grammars")
+		return nil, errors.Wrap(err, "failed to compare dictionaries")
 	}
 
-	viewDiffs, err := CompareViewGrammars(current, target)
+	viewDiffs, err := compareViews(current, target)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compare view grammars")
+		return nil, errors.Wrap(err, "failed to compare views")
 	}
 
-	tableDiffs, err := CompareTableGrammars(current, target)
+	tableDiffs, err := compareTables(current, target)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compare table grammars")
+		return nil, errors.Wrap(err, "failed to compare tables")
 	}
 
 	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 {
