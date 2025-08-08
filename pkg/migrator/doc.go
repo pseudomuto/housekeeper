@@ -26,7 +26,8 @@
 //   - Tables: Full DDL support including column modifications
 //   - Dictionaries: CREATE OR REPLACE for modifications (since they can't be altered)
 //   - Regular Views: CREATE OR REPLACE for modifications
-//   - Materialized Views: ALTER TABLE MODIFY QUERY for query changes
+//   - Materialized Views: DROP+CREATE for query changes (more reliable than ALTER TABLE MODIFY QUERY)
+//   - Integration Engine Tables: DROP+CREATE for all modifications (required due to read-only nature)
 //
 // The migration generation process:
 //  1. Parse current schema state (from ClickHouse or SQL files)
@@ -60,6 +61,8 @@
 //	os.WriteFile(migrationFile, []byte(migration.SQL), 0644)
 //
 // The package will return errors for operations that cannot be safely
-// automated, such as database engine changes, cluster modifications, or
-// certain complex table structure changes that require manual intervention.
+// automated, such as database engine changes or cluster modifications.
+// For integration engines and materialized views, it automatically uses
+// DROP+CREATE strategies instead of reporting errors, ensuring migrations
+// are both safe and executable.
 package migrator

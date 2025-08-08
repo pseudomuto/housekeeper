@@ -658,7 +658,8 @@ The tool generates intelligent migrations with proper operation ordering:
 ### Table Operations  
 - **Creating tables**: When a table exists in target schema but not in current state
 - **Dropping tables**: When a table exists in current state but not in target schema
-- **Altering tables**: Column ADD, DROP, MODIFY operations with proper ordering
+- **Altering tables**: Column ADD, DROP, MODIFY operations with proper ordering for standard table engines
+- **Integration engine tables**: Uses DROP+CREATE strategy for all modifications (required due to read-only nature from ClickHouse perspective)
 - **Renaming tables**: When a table has identical structure but different name
 - **Column modifications**: Type changes, constraint additions, codec updates
 - **Complex table features**: Supports all ENGINE clauses, partitioning, ordering, TTL
@@ -675,7 +676,7 @@ The tool generates intelligent migrations with proper operation ordering:
 - **Dropping views**: When a view exists in current state but not in target schema
 - **Altering views**: 
   - **Regular views**: Uses CREATE OR REPLACE for modifications
-  - **Materialized views**: Uses ALTER TABLE MODIFY QUERY for query changes (ClickHouse limitation)
+  - **Materialized views**: Uses DROP+CREATE for query modifications (more reliable than ALTER TABLE MODIFY QUERY)
 - **Renaming views**: Uses RENAME TABLE for both regular and materialized views when properties match but names differ
 - **Complex view features**: Supports ENGINE clauses, POPULATE option, TO table for materialized views
 
@@ -686,11 +687,19 @@ The tool ensures proper operation ordering for both UP and DOWN migrations:
 
 ### Unsupported Operations
 
-The following operations will return an error and require manual intervention:
+The following operations will return validation errors and require manual intervention:
 
-- **Engine changes**: Changing a database or table engine requires manual recreation
-- **Cluster changes**: Adding/removing ON CLUSTER requires manual intervention  
-- **Complex table alterations**: Some advanced table schema changes may require DROP+CREATE
+- **Engine changes**: Changing a database or table engine requires manual recreation (returns `ErrEngineChange`)
+- **Cluster changes**: Adding/removing ON CLUSTER requires manual intervention (returns `ErrClusterChange`)
+- **System object modifications**: Attempting to modify system databases/tables (returns `ErrSystemObject`)
+
+### Automatically Handled Operations
+
+The following operations are automatically handled using optimal strategies:
+
+- **Integration engine modifications**: Automatically uses DROP+CREATE strategy (Kafka, MySQL, PostgreSQL, etc.)
+- **Materialized view query changes**: Automatically uses DROP+CREATE strategy for reliability
+- **Dictionary modifications**: Automatically uses CREATE OR REPLACE strategy (since ALTER DICTIONARY doesn't exist)
 
 ## Examples
 
