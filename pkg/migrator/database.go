@@ -2,6 +2,7 @@ package migrator
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -62,18 +63,26 @@ type (
 // (engine, comment, cluster) excluding the name. If two databases have identical
 // properties but different names, it generates a RENAME operation instead of DROP+CREATE.
 func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
-	var diffs []*DatabaseDiff
-
 	// Extract database information from both SQL structures
 	currentDBs := extractDatabaseInfo(current)
 	targetDBs := extractDatabaseInfo(target)
+
+	// Pre-allocate diffs slice with estimated capacity
+	diffs := make([]*DatabaseDiff, 0, len(currentDBs)+len(targetDBs))
 
 	// Detect renames first to avoid treating them as drop+create
 	renameDiffs, processedCurrent, processedTarget := detectDatabaseRenames(currentDBs, targetDBs)
 	diffs = append(diffs, renameDiffs...)
 
-	// Find databases to create or modify
-	for name, targetDB := range processedTarget {
+	// Find databases to create or modify (sorted for deterministic order)
+	targetNames := make([]string, 0, len(processedTarget))
+	for name := range processedTarget {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+
+	for _, name := range targetNames {
+		targetDB := processedTarget[name]
 		currentDB, exists := processedCurrent[name]
 		diff, err := createDatabaseDiff(name, currentDB, targetDB, exists)
 		if err != nil {
@@ -84,20 +93,27 @@ func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 		}
 	}
 
-	// Find databases to drop
-	for name, currentDB := range processedCurrent {
+	// Find databases to drop (sorted for deterministic order)
+	currentNames := make([]string, 0, len(processedCurrent))
+	for name := range processedCurrent {
 		if _, exists := processedTarget[name]; !exists {
-			// Database should be dropped
-			diff := &DatabaseDiff{
-				Type:         DatabaseDiffDrop,
-				DatabaseName: name,
-				Description:  fmt.Sprintf("Drop database '%s'", name),
-				Current:      currentDB,
-				UpSQL:        generateDropDatabaseSQL(currentDB),
-				DownSQL:      generateCreateDatabaseSQL(currentDB),
-			}
-			diffs = append(diffs, diff)
+			currentNames = append(currentNames, name)
 		}
+	}
+	sort.Strings(currentNames)
+
+	for _, name := range currentNames {
+		currentDB := processedCurrent[name]
+		// Database should be dropped
+		diff := &DatabaseDiff{
+			Type:         DatabaseDiffDrop,
+			DatabaseName: name,
+			Description:  fmt.Sprintf("Drop database '%s'", name),
+			Current:      currentDB,
+			UpSQL:        generateDropDatabaseSQL(currentDB),
+			DownSQL:      generateCreateDatabaseSQL(currentDB),
+		}
+		diffs = append(diffs, diff)
 	}
 
 	return diffs, nil

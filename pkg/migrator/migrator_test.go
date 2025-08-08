@@ -1,8 +1,7 @@
 package migrator_test
 
 import (
-	"embed"
-	"io/fs"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,97 +9,120 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	. "github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
-)
-
-//go:embed testdata/*.yaml
-var testdataFS embed.FS
-
-type (
-	// MigrationTestCase represents expected results for a migration test
-	MigrationTestCase struct {
-		Description       string                  `yaml:"description"`
-		CurrentSQL        string                  `yaml:"current_sql"`
-		TargetSQL         string                  `yaml:"target_sql"`
-		ExpectedMigration ExpectedMigrationResult `yaml:"expected_migration"`
-	}
-
-	// ExpectedMigrationResult represents expected migration properties
-	ExpectedMigrationResult struct {
-		SQLContains []string `yaml:"sql_contains"`
-		DiffCount   int      `yaml:"diff_count"`
-		DiffTypes   []string `yaml:"diff_types"`
-	}
+	"gotest.tools/v3/golden"
 )
 
 func TestMigrationGeneration(t *testing.T) {
-	// Find all YAML test files in embedded testdata
-	yamlFiles, err := fs.Glob(testdataFS, "testdata/*.yaml")
+	// Find all *.in.sql test files
+	inputFiles, err := filepath.Glob("testdata/*.in.sql")
 	require.NoError(t, err)
 
-	// Run each test case
-	for _, yamlPath := range yamlFiles {
-		yamlFile := filepath.Base(yamlPath)
-		testName := strings.TrimSuffix(yamlFile, ".yaml")
+	for _, inputPath := range inputFiles {
+		inputFile := filepath.Base(inputPath)
+		testName := strings.TrimSuffix(inputFile, ".in.sql")
 
 		t.Run(testName, func(t *testing.T) {
-			// Read YAML test case
-			yamlData, err := testdataFS.ReadFile(yamlPath)
+			// Read input file containing 2 SQL statements
+			inputData, err := os.ReadFile(inputPath)
 			require.NoError(t, err)
 
-			var testCase MigrationTestCase
-			require.NoError(t, yaml.Unmarshal(yamlData, &testCase))
+			inputSQL := string(inputData)
+
+			// Split input into current and target SQL by looking for comment sections
+			// Each .in.sql file should have a current state section and a target state section
+			lines := strings.Split(inputSQL, "\n")
+
+			var currentSQLLines, targetSQLLines []string
+			inTargetSection := false
+
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "-- Target state:") {
+					inTargetSection = true
+					continue
+				}
+				if strings.HasPrefix(line, "--") {
+					// Skip other comment lines
+					continue
+				}
+				if line == "" {
+					// Skip empty lines
+					continue
+				}
+
+				// Skip lines that are just a semicolon (empty state markers)
+				if line == ";" {
+					continue
+				}
+
+				if inTargetSection {
+					targetSQLLines = append(targetSQLLines, line)
+				} else {
+					currentSQLLines = append(currentSQLLines, line)
+				}
+			}
+
+			currentSQLText := strings.Join(currentSQLLines, " ")
+			targetSQLText := strings.Join(targetSQLLines, " ")
+
+			// Clean up any double spaces and normalize
+			currentSQLText = strings.Join(strings.Fields(currentSQLText), " ")
+			targetSQLText = strings.Join(strings.Fields(targetSQLText), " ")
 
 			// Parse current and target SQL
 			var currentSQL, targetSQL *parser.SQL
 
-			if testCase.CurrentSQL == "" {
+			if currentSQLText == "" {
 				currentSQL = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
-				currentSQL, err = parser.ParseSQL(testCase.CurrentSQL)
+				// Ensure currentSQLText ends with semicolon for parser
+				if !strings.HasSuffix(currentSQLText, ";") {
+					currentSQLText += ";"
+				}
+				currentSQL, err = parser.ParseSQL(currentSQLText)
 				require.NoError(t, err)
 			}
 
-			if testCase.TargetSQL == "" {
+			if targetSQLText == "" {
 				targetSQL = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
-				targetSQL, err = parser.ParseSQL(testCase.TargetSQL)
+				// Ensure targetSQLText ends with semicolon for parser
+				if !strings.HasSuffix(targetSQLText, ";") {
+					targetSQLText += ";"
+				}
+				targetSQL, err = parser.ParseSQL(targetSQLText)
 				require.NoError(t, err)
 			}
 
 			// Generate migration
 			migration, err := GenerateMigration(currentSQL, targetSQL)
-			if testCase.ExpectedMigration.DiffCount == 0 {
-				require.Error(t, err)
-				// Could be no differences or unsupported operation
-				if !errors.Is(err, ErrNoDiff) {
-					// If not "no differences", it should be an unsupported operation error
-					require.ErrorIs(t, err, ErrUnsupported,
-						"Expected unsupported operation error, got: %s", err.Error())
+			// Handle expected errors for unsupported operations
+			if err != nil {
+				if errors.Is(err, ErrNoDiff) {
+					// For no differences, expect empty golden file or specific error message
+					golden.Assert(t, "ErrNoDiff: no differences found", testName+".sql")
+					return
+				} else if errors.Is(err, ErrUnsupported) {
+					// For unsupported operations, store the error message in golden file
+					golden.Assert(t, "ErrUnsupported: "+err.Error(), testName+".sql")
+					return
+				} else {
+					// Other errors should fail the test
+					require.NoError(t, err)
 				}
-				return
 			}
 
-			require.NoError(t, err)
+			// Format the migration SQL
+			formattedSQL := formatMigrationSQL(migration.SQL)
 
-			// Verify migration contents
-			verifyMigrationResult(t, migration, testCase.ExpectedMigration, testName)
+			// Compare formatted migration SQL with golden file
+			golden.Assert(t, formattedSQL, testName+".sql")
 		})
 	}
-}
-
-func verifyMigrationResult(t *testing.T, migration *Migration, expected ExpectedMigrationResult, testName string) {
-	// Verify migration contains expected statements
-	for _, expectedContent := range expected.SQLContains {
-		require.Contains(t, migration.SQL, expectedContent,
-			"Migration missing expected content in %s", testName)
-	}
-
-	// Verify migration SQL is not empty
-	require.NotEmpty(t, migration.SQL)
 }
 
 const (
@@ -314,4 +336,36 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to write migration file")
 	})
+}
+
+// formatMigrationSQL formats migration SQL for consistent output
+func formatMigrationSQL(sql string) string {
+	if strings.TrimSpace(sql) == "" {
+		return sql
+	}
+
+	// Ensure each statement ends with a semicolon
+	lines := strings.Split(sql, "\n\n")
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasSuffix(line, ";") {
+			lines[i] = line + ";"
+		} else {
+			lines[i] = line
+		}
+	}
+	formattedSQL := strings.Join(lines, "\n\n")
+
+	// Try to parse and format the SQL, but fall back to raw SQL if it fails
+	parsedMigration, err := parser.ParseSQL(formattedSQL)
+	if err != nil {
+		return formattedSQL
+	}
+
+	var formattedBuf bytes.Buffer
+	if err := format.FormatSQL(&formattedBuf, format.Defaults, parsedMigration); err != nil {
+		return formattedSQL
+	}
+
+	return formattedBuf.String()
 }

@@ -1,0 +1,5 @@
+ALTER DATABASE `old_db` MODIFY COMMENT 'Updated comment';
+
+DROP DATABASE IF EXISTS `new_db`;
+
+DROP DATABASE IF EXISTS `temp_db`;

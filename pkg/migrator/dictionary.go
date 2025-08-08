@@ -2,6 +2,7 @@ package migrator
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -65,18 +66,26 @@ type (
 //
 // Since dictionaries cannot be altered in ClickHouse, any modification requires CREATE OR REPLACE.
 func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error) {
-	var diffs []*DictionaryDiff
-
 	// Extract dictionary information from both SQL structures
 	currentDicts := extractDictionaryInfo(current)
 	targetDicts := extractDictionaryInfo(target)
+
+	// Pre-allocate diffs slice with estimated capacity
+	diffs := make([]*DictionaryDiff, 0, len(currentDicts)+len(targetDicts))
 
 	// Detect renames first to avoid treating them as drop+create
 	renameDiffs, processedCurrent, processedTarget := detectDictionaryRenames(currentDicts, targetDicts)
 	diffs = append(diffs, renameDiffs...)
 
-	// Find dictionaries to create or replace
-	for name, targetDict := range processedTarget {
+	// Find dictionaries to create or replace - sorted for deterministic order
+	targetNames := make([]string, 0, len(processedTarget))
+	for name := range processedTarget {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+
+	for _, name := range targetNames {
+		targetDict := processedTarget[name]
 		currentDict, exists := processedCurrent[name]
 
 		// Validate operation before proceeding
@@ -113,25 +122,32 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 		}
 	}
 
-	// Find dictionaries to drop
-	for name, currentDict := range processedCurrent {
+	// Find dictionaries to drop - sorted for deterministic order
+	currentNames := make([]string, 0, len(processedCurrent))
+	for name := range processedCurrent {
 		if _, exists := processedTarget[name]; !exists {
-			// Validate drop operation
-			if err := validateDictionaryOperation(currentDict, nil); err != nil {
-				return nil, err
-			}
-
-			// Dictionary should be dropped
-			diff := &DictionaryDiff{
-				Type:           DictionaryDiffDrop,
-				DictionaryName: name,
-				Description:    fmt.Sprintf("Drop dictionary '%s'", name),
-				Current:        currentDict,
-				UpSQL:          generateDropDictionarySQL(currentDict),
-				DownSQL:        generateCreateDictionarySQL(currentDict),
-			}
-			diffs = append(diffs, diff)
+			currentNames = append(currentNames, name)
 		}
+	}
+	sort.Strings(currentNames)
+
+	for _, name := range currentNames {
+		currentDict := processedCurrent[name]
+		// Validate drop operation
+		if err := validateDictionaryOperation(currentDict, nil); err != nil {
+			return nil, err
+		}
+
+		// Dictionary should be dropped
+		diff := &DictionaryDiff{
+			Type:           DictionaryDiffDrop,
+			DictionaryName: name,
+			Description:    fmt.Sprintf("Drop dictionary '%s'", name),
+			Current:        currentDict,
+			UpSQL:          generateDropDictionarySQL(currentDict),
+			DownSQL:        generateCreateDictionarySQL(currentDict),
+		}
+		diffs = append(diffs, diff)
 	}
 
 	return diffs, nil

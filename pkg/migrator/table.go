@@ -3,6 +3,7 @@ package migrator
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -102,10 +103,18 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	currentTables := extractTablesFromSQL(current)
 	targetTables := extractTablesFromSQL(target)
 
-	var diffs []*TableDiff
+	// Pre-allocate diffs slice with estimated capacity
+	diffs := make([]*TableDiff, 0, len(currentTables)+len(targetTables))
 
-	// Find tables to create or modify (exist in target but not in current)
-	for tableName, targetTable := range targetTables {
+	// Find tables to create or modify (exist in target but not in current) - sorted for deterministic order
+	targetTableNames := make([]string, 0, len(targetTables))
+	for tableName := range targetTables {
+		targetTableNames = append(targetTableNames, tableName)
+	}
+	sort.Strings(targetTableNames)
+
+	for _, tableName := range targetTableNames {
+		targetTable := targetTables[tableName]
 		currentTable, exists := currentTables[tableName]
 		diff, err := createTableDiff(tableName, currentTable, targetTable, currentTables, targetTables, exists)
 		if err != nil {
@@ -120,19 +129,26 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 		}
 	}
 
-	// Find tables to drop (exist in current but not in target)
-	for tableName, currentTable := range currentTables {
+	// Find tables to drop (exist in current but not in target) - sorted for deterministic order
+	currentTableNames := make([]string, 0, len(currentTables))
+	for tableName := range currentTables {
 		if _, exists := targetTables[tableName]; !exists {
-			diff := &TableDiff{
-				Type:        TableDiffDrop,
-				TableName:   tableName,
-				Description: "Drop table " + tableName,
-				Current:     currentTable,
-			}
-			diff.UpSQL = generateDropTableSQL(currentTable)
-			diff.DownSQL = generateCreateTableSQL(currentTable)
-			diffs = append(diffs, diff)
+			currentTableNames = append(currentTableNames, tableName)
 		}
+	}
+	sort.Strings(currentTableNames)
+
+	for _, tableName := range currentTableNames {
+		currentTable := currentTables[tableName]
+		diff := &TableDiff{
+			Type:        TableDiffDrop,
+			TableName:   tableName,
+			Description: "Drop table " + tableName,
+			Current:     currentTable,
+		}
+		diff.UpSQL = generateDropTableSQL(currentTable)
+		diff.DownSQL = generateCreateTableSQL(currentTable)
+		diffs = append(diffs, diff)
 	}
 
 	return diffs, nil

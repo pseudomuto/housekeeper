@@ -1,7 +1,0 @@
-description: "Error handling for unsupported database engine changes"
-current_sql: |
-  CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
-target_sql: |
-  CREATE DATABASE analytics ENGINE = Memory COMMENT 'Analytics database';
-expected_migration:
-  diff_count: 0  # This triggers error expectation

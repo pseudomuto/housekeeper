@@ -1,0 +1,1 @@
+CREATE DATABASE `analytics` ENGINE = Atomic COMMENT 'Analytics database';

@@ -1,9 +1,12 @@
 package migrator
 
 import (
+	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -95,26 +98,42 @@ func compareViews(current, target *parser.SQL) ([]*ViewDiff, error) { // nolint:
 
 // findViewsToCreate finds views that need to be created (exist in target but not in current)
 func findViewsToCreate(targetViews, currentViews map[string]*ViewInfo) ([]*ViewDiff, error) {
-	var diffs []*ViewDiff
-
-	for name, targetView := range targetViews {
+	// Count views to create for pre-allocation
+	createCount := 0
+	for name := range targetViews {
 		if _, exists := currentViews[name]; !exists {
-			// Validate create operation
-			if err := validateViewOperation(nil, targetView); err != nil {
-				return nil, err
-			}
-
-			diff := &ViewDiff{
-				Type:           ViewDiffCreate,
-				ViewName:       name,
-				Description:    fmt.Sprintf("Create %s %s", getViewType(targetView), name),
-				Target:         targetView,
-				IsMaterialized: targetView.IsMaterialized,
-			}
-			diff.UpSQL = generateCreateViewSQL(targetView)
-			diff.DownSQL = generateDropViewSQL(targetView)
-			diffs = append(diffs, diff)
+			createCount++
 		}
+	}
+
+	diffs := make([]*ViewDiff, 0, createCount)
+
+	// Sort view names for deterministic order
+	viewNames := make([]string, 0, createCount)
+	for name := range targetViews {
+		if _, exists := currentViews[name]; !exists {
+			viewNames = append(viewNames, name)
+		}
+	}
+	sort.Strings(viewNames)
+
+	for _, name := range viewNames {
+		targetView := targetViews[name]
+		// Validate create operation
+		if err := validateViewOperation(nil, targetView); err != nil {
+			return nil, err
+		}
+
+		diff := &ViewDiff{
+			Type:           ViewDiffCreate,
+			ViewName:       name,
+			Description:    fmt.Sprintf("Create %s %s", getViewType(targetView), name),
+			Target:         targetView,
+			IsMaterialized: targetView.IsMaterialized,
+		}
+		diff.UpSQL = generateCreateViewSQL(targetView)
+		diff.DownSQL = generateDropViewSQL(targetView)
+		diffs = append(diffs, diff)
 	}
 
 	return diffs, nil
@@ -122,26 +141,42 @@ func findViewsToCreate(targetViews, currentViews map[string]*ViewInfo) ([]*ViewD
 
 // findViewsToDrop finds views that need to be dropped (exist in current but not in target)
 func findViewsToDrop(currentViews, targetViews map[string]*ViewInfo) ([]*ViewDiff, error) {
-	var diffs []*ViewDiff
-
-	for name, currentView := range currentViews {
+	// Count views to drop for pre-allocation
+	dropCount := 0
+	for name := range currentViews {
 		if _, exists := targetViews[name]; !exists {
-			// Validate drop operation
-			if err := validateViewOperation(currentView, nil); err != nil {
-				return nil, err
-			}
-
-			diff := &ViewDiff{
-				Type:           ViewDiffDrop,
-				ViewName:       name,
-				Description:    fmt.Sprintf("Drop %s %s", getViewType(currentView), name),
-				Current:        currentView,
-				IsMaterialized: currentView.IsMaterialized,
-			}
-			diff.UpSQL = generateDropViewSQL(currentView)
-			diff.DownSQL = generateCreateViewSQL(currentView)
-			diffs = append(diffs, diff)
+			dropCount++
 		}
+	}
+
+	diffs := make([]*ViewDiff, 0, dropCount)
+
+	// Sort view names for deterministic order
+	viewNames := make([]string, 0, dropCount)
+	for name := range currentViews {
+		if _, exists := targetViews[name]; !exists {
+			viewNames = append(viewNames, name)
+		}
+	}
+	sort.Strings(viewNames)
+
+	for _, name := range viewNames {
+		currentView := currentViews[name]
+		// Validate drop operation
+		if err := validateViewOperation(currentView, nil); err != nil {
+			return nil, err
+		}
+
+		diff := &ViewDiff{
+			Type:           ViewDiffDrop,
+			ViewName:       name,
+			Description:    fmt.Sprintf("Drop %s %s", getViewType(currentView), name),
+			Current:        currentView,
+			IsMaterialized: currentView.IsMaterialized,
+		}
+		diff.UpSQL = generateDropViewSQL(currentView)
+		diff.DownSQL = generateCreateViewSQL(currentView)
+		diffs = append(diffs, diff)
 	}
 
 	return diffs, nil
@@ -151,57 +186,73 @@ func findViewsToDrop(currentViews, targetViews map[string]*ViewInfo) ([]*ViewDif
 func findViewsToAlterOrRename(currentViews, targetViews map[string]*ViewInfo) ([]*ViewDiff, error) {
 	var diffs []*ViewDiff
 
-	for name, currentView := range currentViews {
+	// Sort view names for deterministic order
+	var currentNames []string
+	for name := range currentViews {
+		if _, exists := targetViews[name]; exists {
+			currentNames = append(currentNames, name)
+		}
+	}
+	sort.Strings(currentNames)
+
+	for _, name := range currentNames {
+		currentView := currentViews[name]
+		targetView := targetViews[name]
 		//nolint:nestif // Complex nested logic needed for view comparison and rename detection
-		if targetView, exists := targetViews[name]; exists {
-			// Validate operation before proceeding
-			if err := validateViewOperation(currentView, targetView); err != nil {
-				return nil, err
-			}
+		// Validate operation before proceeding
+		if err := validateViewOperation(currentView, targetView); err != nil {
+			return nil, err
+		}
 
-			// Check if it's a rename by comparing properties (excluding names)
-			if isViewRename(currentView, targetViews) {
-				// Find the renamed target
-				for targetName, candidate := range targetViews {
-					if targetName != name && viewsHaveSameProperties(currentView, candidate) {
-						diff := &ViewDiff{
-							Type:           ViewDiffRename,
-							ViewName:       name,
-							NewViewName:    targetName,
-							Description:    fmt.Sprintf("Rename %s %s to %s", getViewType(currentView), name, targetName),
-							Current:        currentView,
-							Target:         candidate,
-							IsMaterialized: currentView.IsMaterialized,
-						}
-						diff.UpSQL = generateRenameViewSQL(currentView, candidate)
-						diff.DownSQL = generateRenameViewSQL(candidate, currentView)
-						diffs = append(diffs, diff)
-						break
+		// Check if it's a rename by comparing properties (excluding names)
+		if isViewRename(currentView, targetViews) {
+			// Find the renamed target - sort target names for deterministic order
+			var targetNames []string
+			for targetName := range targetViews {
+				targetNames = append(targetNames, targetName)
+			}
+			sort.Strings(targetNames)
+
+			for _, targetName := range targetNames {
+				candidate := targetViews[targetName]
+				if targetName != name && viewsHaveSameProperties(currentView, candidate) {
+					diff := &ViewDiff{
+						Type:           ViewDiffRename,
+						ViewName:       name,
+						NewViewName:    targetName,
+						Description:    fmt.Sprintf("Rename %s %s to %s", getViewType(currentView), name, targetName),
+						Current:        currentView,
+						Target:         candidate,
+						IsMaterialized: currentView.IsMaterialized,
 					}
+					diff.UpSQL = generateRenameViewSQL(currentView, candidate)
+					diff.DownSQL = generateRenameViewSQL(candidate, currentView)
+					diffs = append(diffs, diff)
+					break
 				}
-			} else if !viewsAreEqual(currentView, targetView) {
-				// View needs to be altered
-				diff := &ViewDiff{
-					Type:           ViewDiffAlter,
-					ViewName:       name,
-					Description:    fmt.Sprintf("Alter %s %s", getViewType(currentView), name),
-					Current:        currentView,
-					Target:         targetView,
-					IsMaterialized: currentView.IsMaterialized,
-				}
-
-				// For materialized views, use DROP+CREATE (more reliable than ALTER TABLE MODIFY QUERY)
-				// For regular views, use CREATE OR REPLACE
-				if currentView.IsMaterialized {
-					diff.UpSQL = generateDropViewSQL(currentView) + "\n\n" + generateCreateViewSQL(targetView)
-					diff.DownSQL = generateDropViewSQL(targetView) + "\n\n" + generateCreateViewSQL(currentView)
-				} else {
-					diff.UpSQL = generateCreateOrReplaceViewSQL(targetView)
-					diff.DownSQL = generateCreateOrReplaceViewSQL(currentView)
-				}
-
-				diffs = append(diffs, diff)
 			}
+		} else if !viewsAreEqual(currentView, targetView) {
+			// View needs to be altered
+			diff := &ViewDiff{
+				Type:           ViewDiffAlter,
+				ViewName:       name,
+				Description:    fmt.Sprintf("Alter %s %s", getViewType(currentView), name),
+				Current:        currentView,
+				Target:         targetView,
+				IsMaterialized: currentView.IsMaterialized,
+			}
+
+			// For materialized views, use DROP+CREATE (more reliable than ALTER TABLE MODIFY QUERY)
+			// For regular views, use CREATE OR REPLACE
+			if currentView.IsMaterialized {
+				diff.UpSQL = generateDropViewSQL(currentView) + "\n\n" + generateCreateViewSQL(targetView)
+				diff.DownSQL = generateDropViewSQL(targetView) + "\n\n" + generateCreateViewSQL(currentView)
+			} else {
+				diff.UpSQL = generateCreateOrReplaceViewSQL(targetView)
+				diff.DownSQL = generateCreateOrReplaceViewSQL(currentView)
+			}
+
+			diffs = append(diffs, diff)
 		}
 	}
 
@@ -383,93 +434,41 @@ func selectClausesAreEqual(select1, select2 *parser.SelectStatement) bool {
 	return selectStatementToString(select1) == selectStatementToString(select2)
 }
 
-// selectStatementToString converts a SelectStatement to a string representation
+// selectStatementToString converts a SelectStatement to a properly formatted string representation
 func selectStatementToString(stmt *parser.SelectStatement) string {
 	if stmt == nil {
 		return ""
 	}
 
-	// Build SQL without spaces to match expected format
-	sql := "SELECT"
-
-	if stmt.Distinct {
-		sql += "DISTINCT"
+	// The formatSelectStatement method is private, so we'll use a workaround
+	// Create a fake SELECT statement wrapper and format it, then extract the SELECT part
+	fakeSQL := &parser.SQL{
+		Statements: []*parser.Statement{
+			{
+				SelectStatement: &parser.TopLevelSelectStatement{
+					SelectStatement: *stmt,
+					Semicolon:       true,
+				},
+			},
+		},
 	}
 
-	// Add columns
-	if len(stmt.Columns) > 0 {
-		for i, col := range stmt.Columns {
-			if i > 0 {
-				sql += ","
-			}
-			if col.Star != nil {
-				sql += "*"
-			} else if col.Expression != nil {
-				sql += col.Expression.String()
-			}
-			if col.Alias != nil {
-				sql += "as" + *col.Alias
-			}
-		}
+	var buf bytes.Buffer
+	if err := format.FormatSQL(&buf, format.Defaults, fakeSQL); err != nil {
+		// Fallback to basic string representation if formatting fails
+		return "SELECT * FROM unknown"
 	}
 
-	// Add FROM clause
-	//nolint:nestif // Complex nested logic needed for SELECT statement formatting
-	if stmt.From != nil {
-		sql += "FROM"
-		if stmt.From.Table.TableName != nil {
-			if stmt.From.Table.TableName.Database != nil {
-				sql += *stmt.From.Table.TableName.Database + "."
-			}
-			sql += stmt.From.Table.TableName.Table
-			if stmt.From.Table.TableName.Alias != nil && stmt.From.Table.TableName.Alias.Name != nil {
-				sql += "as" + *stmt.From.Table.TableName.Alias.Name
-			}
-		}
+	// Extract the formatted SELECT statement
+	formatted := buf.String()
+	// Remove any trailing semicolon since this is used within CREATE VIEW statements
+	formatted = strings.TrimSuffix(formatted, ";")
+	// Convert to single line for view definitions
+	formatted = strings.ReplaceAll(formatted, "\n", " ")
+	// Clean up multiple spaces
+	formatted = strings.Join(strings.Fields(formatted), " ")
 
-		// Add JOINs
-		for _, join := range stmt.From.Joins {
-			if join.Type != "" {
-				sql += join.Type
-			}
-			sql += join.Join
-			// Simplified join table representation
-			sql += "table"
-		}
-	}
-
-	// Add WHERE clause
-	if stmt.Where != nil {
-		sql += "WHEREcondition"
-	}
-
-	// Add GROUP BY clause with actual columns
-	if stmt.GroupBy != nil && len(stmt.GroupBy.Columns) > 0 {
-		sql += "GROUPBY"
-		for i, col := range stmt.GroupBy.Columns {
-			if i > 0 {
-				sql += ","
-			}
-			sql += col.String()
-		}
-	}
-
-	// Add HAVING clause
-	if stmt.Having != nil {
-		sql += "HAVINGcondition"
-	}
-
-	// Add ORDER BY clause
-	if stmt.OrderBy != nil {
-		sql += "ORDERBYcolumns"
-	}
-
-	// Add LIMIT clause
-	if stmt.Limit != nil {
-		sql += "LIMITn"
-	}
-
-	return sql
+	return formatted
 }
 
 // getViewType returns a human-readable view type string

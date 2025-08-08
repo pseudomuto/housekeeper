@@ -17,8 +17,6 @@ var ErrNoDiff = errors.New("no differences found")
 var (
 	// ErrUnsupported is returned for operations that are fundamentally unsupported by ClickHouse
 	ErrUnsupported = errors.New("unsupported operation")
-	// ErrIntegrationEngine is returned when attempting to modify integration engine schema
-	ErrIntegrationEngine = errors.New("integration engine schema modification not supported")
 	// ErrDictionaryAlter is returned when attempting to use ALTER operations on dictionaries
 	ErrDictionaryAlter = errors.New("dictionary ALTER operations not supported")
 	// ErrClusterChange is returned when attempting to change cluster configuration
@@ -29,8 +27,6 @@ var (
 	ErrSystemObject = errors.New("system object modifications not supported")
 	// ErrInvalidType is returned for invalid type combinations
 	ErrInvalidType = errors.New("invalid type combination")
-	// ErrMaterializedViewQuery is returned when attempting to modify materialized view queries
-	ErrMaterializedViewQuery = errors.New("materialized view query changes not supported")
 )
 
 type (
