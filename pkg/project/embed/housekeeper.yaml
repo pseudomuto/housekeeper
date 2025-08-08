@@ -5,7 +5,5 @@ clickhouse:
 
 environments:
   - name: dev
-    dev: docker://clickhouse:9000/dev
-    url: clickhouse://localhost:9000/prod
     entrypoint: db/main.sql
     dir: db/migrations

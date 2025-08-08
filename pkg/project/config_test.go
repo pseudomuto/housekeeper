@@ -95,8 +95,6 @@ func validateTestConfig(t *testing.T, config *Config) {
 	// Test dev environment
 	dev := config.Envs[0]
 	require.Equal(t, "dev", dev.Name)
-	require.Equal(t, "docker://clickhouse:9000/dev", dev.DevURL)
-	require.Equal(t, "clickhouse://localhost:9000/prod", dev.URL)
 	require.Equal(t, "db/main.sql", dev.Entrypoint)
 	require.Equal(t, "db/migrations", dev.Dir)
 }
@@ -110,7 +108,6 @@ clickhouse:
   cluster: "production"
 environments:
   - name: test
-    url: clickhouse://localhost:9000/test
     entrypoint: test.sql
     dir: migrations
 `
@@ -129,7 +126,6 @@ clickhouse:
   cluster: ""
 environments:
   - name: test
-    url: clickhouse://localhost:9000/test
     entrypoint: test.sql
     dir: migrations
 `
@@ -147,7 +143,6 @@ environments:
 		yamlData := `
 environments:
   - name: test
-    url: clickhouse://localhost:9000/test
     entrypoint: test.sql
     dir: migrations
 `
@@ -165,7 +160,6 @@ environments:
 		yamlData := `
 environments:
   - name: test
-    url: clickhouse://localhost:9000/test
     entrypoint: test.sql
     dir: migrations
 `
