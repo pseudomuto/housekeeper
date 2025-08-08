@@ -8,7 +8,8 @@ target_sql: |
 expected_migration:
   sql_contains:
     - "CREATE OR REPLACE VIEW analytics.stats AS SELECTcount(*)astotal,max(timestamp)aslatestFROMevents;"
-    - "ALTER TABLE analytics.mv_stats MODIFY QUERY SELECTtoDate(timestamp)asdate,count()ascntFROMeventsGROUPBYdate;"
+    - "DROP TABLE IF EXISTS analytics.mv_stats;"
+    - "CREATE MATERIALIZED VIEW analytics.mv_stats ENGINE = MergeTree() ORDER BY date AS SELECTtoDate(timestamp)asdate,count()ascntFROMeventsGROUPBYdate;"
   diff_count: 2
   diff_types:
     - "ALTER"

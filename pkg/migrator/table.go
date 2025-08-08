@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -725,6 +724,11 @@ func formatColumnCodec(codec *parser.CodecClause) string {
 }
 
 func createTableDiff(tableName string, currentTable, targetTable *TableInfo, currentTables, targetTables map[string]*TableInfo, exists bool) (*TableDiff, error) {
+	// Validate operation before proceeding
+	if err := validateTableOperation(currentTable, targetTable); err != nil {
+		return nil, err
+	}
+
 	if !exists {
 		// Check if this might be a renamed table
 		renamedFrom := findRenamedTable(targetTable, currentTables, targetTables)
@@ -760,14 +764,23 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 		return nil, nil
 	}
 
-	// Check if engine change is involved (not supported)
-	if currentTable.Engine != targetTable.Engine {
-		return nil, errors.Wrapf(ErrUnsupported,
-			"table engine change from %s to %s for table %s is not supported",
-			currentTable.Engine, targetTable.Engine, tableName)
+	// For integration engines, use DROP+CREATE (similar to materialized views)
+	// Integration engines are read-only from ClickHouse perspective and modifications
+	// require recreating the table anyway
+	if isIntegrationEngine(currentTable.Engine) || isIntegrationEngine(targetTable.Engine) {
+		diff := &TableDiff{
+			Type:        TableDiffAlter,
+			TableName:   tableName,
+			Description: "Alter table " + tableName + " (DROP+CREATE for integration engine)",
+			Current:     currentTable,
+			Target:      targetTable,
+		}
+		diff.UpSQL = generateDropTableSQL(currentTable) + "\n\n" + generateCreateTableSQL(targetTable)
+		diff.DownSQL = generateDropTableSQL(targetTable) + "\n\n" + generateCreateTableSQL(currentTable)
+		return diff, nil
 	}
 
-	// Generate column diffs
+	// Generate column diffs for regular tables
 	columnChanges := compareColumns(currentTable.Columns, targetTable.Columns)
 
 	diff := &TableDiff{

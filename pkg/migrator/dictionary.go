@@ -42,7 +42,7 @@ type (
 	DictionaryInfo struct {
 		Name      string                       // Dictionary name
 		Database  string                       // Database name (empty for default database)
-		OnCluster string                       // Cluster name if specified (empty if not clustered)
+		Cluster   string                       // Cluster name if specified (empty if not clustered)
 		Comment   string                       // Dictionary comment (without quotes)
 		Statement *parser.CreateDictionaryStmt // Full parsed CREATE DICTIONARY statement for deep comparison
 	}
@@ -64,7 +64,7 @@ type (
 // operation instead of DROP+CREATE.
 //
 // Since dictionaries cannot be altered in ClickHouse, any modification requires CREATE OR REPLACE.
-func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error) { // nolint: unparam
+func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error) {
 	var diffs []*DictionaryDiff
 
 	// Extract dictionary information from both SQL structures
@@ -78,6 +78,12 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 	// Find dictionaries to create or replace
 	for name, targetDict := range processedTarget {
 		currentDict, exists := processedCurrent[name]
+
+		// Validate operation before proceeding
+		if err := validateDictionaryOperation(currentDict, targetDict); err != nil {
+			return nil, err
+		}
+
 		if !exists {
 			// Dictionary needs to be created
 			diff := &DictionaryDiff{
@@ -110,6 +116,11 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 	// Find dictionaries to drop
 	for name, currentDict := range processedCurrent {
 		if _, exists := processedTarget[name]; !exists {
+			// Validate drop operation
+			if err := validateDictionaryOperation(currentDict, nil); err != nil {
+				return nil, err
+			}
+
 			// Dictionary should be dropped
 			diff := &DictionaryDiff{
 				Type:           DictionaryDiffDrop,
@@ -143,7 +154,7 @@ func extractDictionaryInfo(sql *parser.SQL) map[string]*DictionaryInfo {
 			}
 
 			if dict.OnCluster != nil {
-				info.OnCluster = *dict.OnCluster
+				info.Cluster = *dict.OnCluster
 			}
 
 			if dict.Comment != nil {
@@ -200,8 +211,8 @@ func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInf
 					Description:       fmt.Sprintf("Rename dictionary '%s' to '%s'", currentName, targetName),
 					Current:           currentDict,
 					Target:            targetDict,
-					UpSQL:             generateRenameDictionarySQL(currentName, targetName, currentDict.OnCluster),
-					DownSQL:           generateRenameDictionarySQL(targetName, currentName, currentDict.OnCluster),
+					UpSQL:             generateRenameDictionarySQL(currentName, targetName, currentDict.Cluster),
+					DownSQL:           generateRenameDictionarySQL(targetName, currentName, currentDict.Cluster),
 				}
 				renameDiffs = append(renameDiffs, diff)
 
@@ -220,7 +231,7 @@ func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInf
 func dictionaryPropertiesMatch(dict1, dict2 *DictionaryInfo) bool {
 	// Compare basic metadata (excluding name)
 	if dict1.Comment != dict2.Comment ||
-		dict1.OnCluster != dict2.OnCluster ||
+		dict1.Cluster != dict2.Cluster ||
 		dict1.Database != dict2.Database {
 		return false
 	}
@@ -246,7 +257,7 @@ func generateRenameDictionarySQL(oldName, newName, onCluster string) string {
 func needsDictionaryModification(current, target *DictionaryInfo) bool {
 	// Basic metadata comparison
 	if current.Comment != target.Comment ||
-		current.OnCluster != target.OnCluster ||
+		current.Cluster != target.Cluster ||
 		current.Database != target.Database {
 		return true
 	}
@@ -505,8 +516,8 @@ func generateDropDictionarySQL(dict *DictionaryInfo) string {
 		parts = append(parts, dict.Name)
 	}
 
-	if dict.OnCluster != "" {
-		parts = append(parts, "ON CLUSTER", dict.OnCluster)
+	if dict.Cluster != "" {
+		parts = append(parts, "ON CLUSTER", dict.Cluster)
 	}
 
 	return strings.Join(parts, " ") + ";"

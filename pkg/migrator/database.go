@@ -19,9 +19,6 @@ const (
 	DatabaseDiffRename DatabaseDiffType = "RENAME"
 )
 
-// ErrUnsupported is returned when an operation is not supported
-var ErrUnsupported = errors.New("unsupported operation")
-
 type (
 	// DatabaseDiff represents a difference between current and target database states.
 	// It contains all information needed to generate migration SQL statements for
@@ -44,10 +41,10 @@ type (
 	// This structure contains all the properties needed for database comparison and
 	// migration generation, including metadata for cluster and engine configuration.
 	DatabaseInfo struct {
-		Name      string // Database name
-		Engine    string // Engine type (e.g., "Atomic", "MySQL", "Memory")
-		Comment   string // Database comment (without quotes)
-		OnCluster string // Cluster name if specified (empty if not clustered)
+		Name    string // Database name
+		Engine  string // Engine type (e.g., "Atomic", "MySQL", "Memory")
+		Comment string // Database comment (without quotes)
+		Cluster string // Cluster name if specified (empty if not clustered)
 	}
 )
 
@@ -118,7 +115,7 @@ func extractDatabaseInfo(sql *parser.SQL) map[string]*DatabaseInfo {
 			}
 
 			if db.OnCluster != nil {
-				info.OnCluster = *db.OnCluster
+				info.Cluster = *db.OnCluster
 			}
 
 			if db.Engine != nil {
@@ -173,8 +170,8 @@ func detectDatabaseRenames(currentDBs, targetDBs map[string]*DatabaseInfo) ([]*D
 					Description:     fmt.Sprintf("Rename database '%s' to '%s'", currentName, targetName),
 					Current:         currentDB,
 					Target:          targetDB,
-					UpSQL:           generateRenameDatabaseSQL(currentName, targetName, currentDB.OnCluster),
-					DownSQL:         generateRenameDatabaseSQL(targetName, currentName, currentDB.OnCluster),
+					UpSQL:           generateRenameDatabaseSQL(currentName, targetName, currentDB.Cluster),
+					DownSQL:         generateRenameDatabaseSQL(targetName, currentName, currentDB.Cluster),
 				}
 				renameDiffs = append(renameDiffs, diff)
 
@@ -193,7 +190,7 @@ func detectDatabaseRenames(currentDBs, targetDBs map[string]*DatabaseInfo) ([]*D
 func databasePropertiesMatch(db1, db2 *DatabaseInfo) bool {
 	return db1.Engine == db2.Engine &&
 		db1.Comment == db2.Comment &&
-		db1.OnCluster == db2.OnCluster
+		db1.Cluster == db2.Cluster
 }
 
 // generateRenameDatabaseSQL generates RENAME DATABASE SQL
@@ -212,7 +209,7 @@ func generateRenameDatabaseSQL(oldName, newName, onCluster string) string {
 func needsModification(current, target *DatabaseInfo) bool {
 	return current.Comment != target.Comment ||
 		current.Engine != target.Engine ||
-		current.OnCluster != target.OnCluster
+		current.Cluster != target.Cluster
 }
 
 // generateCreateDatabaseSQL generates CREATE DATABASE SQL from database info
@@ -220,8 +217,8 @@ func generateCreateDatabaseSQL(db *DatabaseInfo) string {
 	var parts []string
 	parts = append(parts, "CREATE DATABASE", db.Name)
 
-	if db.OnCluster != "" {
-		parts = append(parts, "ON CLUSTER", db.OnCluster)
+	if db.Cluster != "" {
+		parts = append(parts, "ON CLUSTER", db.Cluster)
 	}
 
 	if db.Engine != "" {
@@ -240,8 +237,8 @@ func generateDropDatabaseSQL(db *DatabaseInfo) string {
 	var parts []string
 	parts = append(parts, "DROP DATABASE IF EXISTS", db.Name)
 
-	if db.OnCluster != "" {
-		parts = append(parts, "ON CLUSTER", db.OnCluster)
+	if db.Cluster != "" {
+		parts = append(parts, "ON CLUSTER", db.Cluster)
 	}
 
 	return strings.Join(parts, " ") + ";"
@@ -256,8 +253,8 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 		return "", errors.Wrapf(ErrUnsupported, "engine change from '%s' to '%s' - requires manual database recreation", current.Engine, target.Engine)
 	}
 
-	if current.OnCluster != target.OnCluster {
-		return "", errors.Wrapf(ErrUnsupported, "cluster change from '%s' to '%s' - requires manual intervention", current.OnCluster, target.OnCluster)
+	if current.Cluster != target.Cluster {
+		return "", errors.Wrapf(ErrUnsupported, "cluster change from '%s' to '%s' - requires manual intervention", current.Cluster, target.Cluster)
 	}
 
 	// Check if comment changed
@@ -265,8 +262,8 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 		var parts []string
 		parts = append(parts, "ALTER DATABASE", target.Name)
 
-		if target.OnCluster != "" {
-			parts = append(parts, "ON CLUSTER", target.OnCluster)
+		if target.Cluster != "" {
+			parts = append(parts, "ON CLUSTER", target.Cluster)
 		}
 
 		parts = append(parts, "MODIFY COMMENT", fmt.Sprintf("'%s'", escapeSQL(target.Comment)))
@@ -281,6 +278,11 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 }
 
 func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists bool) (*DatabaseDiff, error) {
+	// Validate operation before proceeding
+	if err := validateDatabaseOperation(currentDB, targetDB); err != nil {
+		return nil, err
+	}
+
 	if !exists {
 		// Database needs to be created
 		return &DatabaseDiff{

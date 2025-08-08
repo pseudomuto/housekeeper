@@ -13,6 +13,26 @@ import (
 // ErrNoDiff is returned when no differences are found between current and target schemas
 var ErrNoDiff = errors.New("no differences found")
 
+// Invalid migration operation errors
+var (
+	// ErrUnsupported is returned for operations that are fundamentally unsupported by ClickHouse
+	ErrUnsupported = errors.New("unsupported operation")
+	// ErrIntegrationEngine is returned when attempting to modify integration engine schema
+	ErrIntegrationEngine = errors.New("integration engine schema modification not supported")
+	// ErrDictionaryAlter is returned when attempting to use ALTER operations on dictionaries
+	ErrDictionaryAlter = errors.New("dictionary ALTER operations not supported")
+	// ErrClusterChange is returned when attempting to change cluster configuration
+	ErrClusterChange = errors.New("cluster configuration changes not supported")
+	// ErrEngineChange is returned when attempting to change engine types
+	ErrEngineChange = errors.New("engine type changes not supported")
+	// ErrSystemObject is returned when attempting to modify system objects
+	ErrSystemObject = errors.New("system object modifications not supported")
+	// ErrInvalidType is returned for invalid type combinations
+	ErrInvalidType = errors.New("invalid type combination")
+	// ErrMaterializedViewQuery is returned when attempting to modify materialized view queries
+	ErrMaterializedViewQuery = errors.New("materialized view query changes not supported")
+)
+
 type (
 	// Migration represents a database migration with SQL statements
 	Migration struct {
