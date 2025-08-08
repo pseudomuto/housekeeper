@@ -27,7 +27,7 @@ func TestClient_GetViews(t *testing.T) {
 
 		// All statements should be view creates
 		for _, stmt := range views.Statements {
-			require.NotNil(t, stmt.CreateView, "All statements should be CREATE VIEW")
+			require.NotNil(t, stmt.CreateView)
 
 			// Check that system views are excluded by database name
 			if stmt.CreateView.Database != nil {

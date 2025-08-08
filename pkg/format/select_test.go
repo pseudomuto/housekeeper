@@ -183,7 +183,7 @@ func TestFormatter_selectStatement(t *testing.T) {
 			// Compare line by line for better error reporting
 			require.Len(t, lines, len(tt.expected), "Number of lines mismatch")
 			for i, expectedLine := range tt.expected {
-				require.Equal(t, expectedLine, lines[i], "Line %d mismatch", i+1)
+				require.Equal(t, expectedLine, lines[i])
 			}
 		})
 	}
@@ -235,7 +235,7 @@ func TestFormatter_SelectInView(t *testing.T) {
 			// Compare line by line for better error reporting
 			require.Len(t, lines, len(tt.expected), "Number of lines mismatch")
 			for i, expectedLine := range tt.expected {
-				require.Equal(t, expectedLine, lines[i], "Line %d mismatch", i+1)
+				require.Equal(t, expectedLine, lines[i])
 			}
 		})
 	}

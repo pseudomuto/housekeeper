@@ -100,13 +100,13 @@ func TestSelectParsing(t *testing.T) {
 
 			grammar, err := ParseSQL(query)
 			if tt.valid {
-				require.NoError(t, err, "Failed to parse: %s", query)
+				require.NoError(t, err)
 				require.NotNil(t, grammar)
 				if len(grammar.Statements) > 0 {
-					require.NotNil(t, grammar.Statements[0].SelectStatement, "Expected top-level SELECT statement")
+					require.NotNil(t, grammar.Statements[0].SelectStatement)
 				}
 			} else {
-				require.Error(t, err, "Expected parse error for: %s", query)
+				require.Error(t, err)
 			}
 		})
 	}
@@ -181,15 +181,10 @@ func TestSelectStatementFixture(t *testing.T) {
 	for _, fixture := range fixtures {
 		t.Run(fixture.description, func(t *testing.T) {
 			grammar, err := ParseSQL(fixture.query)
-			require.NoError(t, err, "Failed to parse fixture query: %s", fixture.description)
-			require.NotNil(t, grammar, "Parser returned nil result for: %s", fixture.description)
-			require.Len(t, grammar.Statements, 1, "Expected exactly one statement")
-			require.NotNil(t, grammar.Statements[0].SelectStatement, "Expected top-level SELECT statement")
-
-			// Log the successful parsing for documentation
-			t.Logf("✅ Successfully parsed: %s", fixture.description)
-			t.Logf("   Features: %v", fixture.expectedFeatures)
-			t.Logf("   Query: %s", fixture.query)
+			require.NoError(t, err)
+			require.NotNil(t, grammar)
+			require.Len(t, grammar.Statements, 1)
+			require.NotNil(t, grammar.Statements[0].SelectStatement)
 		})
 	}
 }
@@ -220,14 +215,12 @@ func TestSemicolonRequirement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			grammar, err := ParseSQL(tt.sql)
 			if tt.shouldWork {
-				require.NoError(t, err, "Failed to parse: %s - %s", tt.sql, tt.description)
+				require.NoError(t, err)
 				require.NotNil(t, grammar)
-				require.NotEmpty(t, grammar.Statements, "Should have parsed at least one statement")
+				require.NotEmpty(t, grammar.Statements)
 			} else {
-				require.Error(t, err, "Expected parse error: %s - %s", tt.sql, tt.description)
+				require.Error(t, err)
 			}
-
-			t.Logf("✅ %s: %s", tt.description, tt.sql)
 		})
 	}
 }
@@ -239,13 +232,10 @@ func TestQueryFixtures(t *testing.T) {
 
 	// Verify that query.sql and query.yaml exist
 	_, err := os.Stat("testdata/query.sql")
-	require.NoError(t, err, "query.sql should exist in testdata")
+	require.NoError(t, err)
 
 	_, err = os.Stat("testdata/query.yaml")
-	require.NoError(t, err, "query.yaml should exist in testdata")
-
-	t.Log("✅ SELECT query testdata files exist and are part of standard testdata framework")
-	t.Log("📋 All SELECT parsing is tested through TestParserWithTestdata")
+	require.NoError(t, err)
 }
 
 func TestParseSelectStatement(t *testing.T) {
@@ -270,13 +260,13 @@ func TestParseSelectStatement(t *testing.T) {
 
 			grammar, err := ParseSQL(query)
 			if tt.valid {
-				require.NoError(t, err, "Failed to parse: %s", query)
+				require.NoError(t, err)
 				require.NotNil(t, grammar)
 				if len(grammar.Statements) > 0 {
-					require.NotNil(t, grammar.Statements[0].SelectStatement, "Expected top-level SELECT statement")
+					require.NotNil(t, grammar.Statements[0].SelectStatement)
 				}
 			} else {
-				require.Error(t, err, "Expected parse error for: %s", query)
+				require.Error(t, err)
 			}
 		})
 	}

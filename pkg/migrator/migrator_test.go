@@ -39,7 +39,7 @@ type (
 func TestMigrationGeneration(t *testing.T) {
 	// Find all YAML test files in embedded testdata
 	yamlFiles, err := fs.Glob(testdataFS, "testdata/*.yaml")
-	require.NoError(t, err, "Failed to find YAML test files")
+	require.NoError(t, err)
 
 	// Run each test case
 	for _, yamlPath := range yamlFiles {
@@ -49,11 +49,10 @@ func TestMigrationGeneration(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			// Read YAML test case
 			yamlData, err := testdataFS.ReadFile(yamlPath)
-			require.NoError(t, err, "Failed to read YAML file: %s", yamlFile)
+			require.NoError(t, err)
 
 			var testCase MigrationTestCase
-			err = yaml.Unmarshal(yamlData, &testCase)
-			require.NoError(t, err, "Failed to parse YAML file: %s", yamlFile)
+			require.NoError(t, yaml.Unmarshal(yamlData, &testCase))
 
 			// Parse current and target SQL
 			var currentSQL, targetSQL *parser.SQL
@@ -62,20 +61,20 @@ func TestMigrationGeneration(t *testing.T) {
 				currentSQL = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
 				currentSQL, err = parser.ParseSQL(testCase.CurrentSQL)
-				require.NoError(t, err, "Failed to parse current SQL")
+				require.NoError(t, err)
 			}
 
 			if testCase.TargetSQL == "" {
 				targetSQL = &parser.SQL{Statements: []*parser.Statement{}}
 			} else {
 				targetSQL, err = parser.ParseSQL(testCase.TargetSQL)
-				require.NoError(t, err, "Failed to parse target SQL")
+				require.NoError(t, err)
 			}
 
 			// Generate migration
 			migration, err := GenerateMigration(currentSQL, targetSQL)
 			if testCase.ExpectedMigration.DiffCount == 0 {
-				require.Error(t, err, "Expected error for invalid operation or no differences")
+				require.Error(t, err)
 				// Could be no differences or unsupported operation
 				if !errors.Is(err, ErrNoDiff) {
 					// If not "no differences", it should be an unsupported operation error
@@ -85,7 +84,7 @@ func TestMigrationGeneration(t *testing.T) {
 				return
 			}
 
-			require.NoError(t, err, "Failed to generate migration")
+			require.NoError(t, err)
 
 			// Verify migration contents
 			verifyMigrationResult(t, migration, testCase.ExpectedMigration, testName)
@@ -101,7 +100,7 @@ func verifyMigrationResult(t *testing.T, migration *Migration, expected Expected
 	}
 
 	// Verify migration SQL is not empty
-	require.NotEmpty(t, migration.SQL, "Migration SQL should not be empty")
+	require.NotEmpty(t, migration.SQL)
 }
 
 const (
@@ -278,7 +277,7 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		// Verify all filenames are unique
 		uniqueNames := make(map[string]bool)
 		for _, filename := range filenames {
-			require.False(t, uniqueNames[filename], "duplicate filename: %s", filename)
+			require.False(t, uniqueNames[filename])
 			uniqueNames[filename] = true
 		}
 	})

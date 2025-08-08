@@ -19,17 +19,14 @@ func TestProjectParseSchema(t *testing.T) {
 		configContent, err := os.ReadFile("testdata/housekeeper.yaml")
 		require.NoError(t, err)
 
-		err = os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), configContent, filePerms)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), configContent, filePerms))
 
 		// Copy test schema files
-		err = copyDir("testdata/db", filepath.Join(tmpDir, "db"))
-		require.NoError(t, err)
+		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
 
 		// Initialize project
 		p := project.New(tmpDir)
-		err = p.Initialize()
-		require.NoError(t, err)
+		require.NoError(t, p.Initialize())
 
 		return p
 	}

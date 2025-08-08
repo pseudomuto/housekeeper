@@ -27,7 +27,7 @@ func TestClient_GetDatabases(t *testing.T) {
 
 		// All statements should be database creates
 		for _, stmt := range databases.Statements {
-			require.NotNil(t, stmt.CreateDatabase, "All statements should be CREATE DATABASE")
+			require.NotNil(t, stmt.CreateDatabase)
 			// Check that system databases are excluded
 			require.NotEqual(t, "system", stmt.CreateDatabase.Name)
 			require.NotEqual(t, "information_schema", stmt.CreateDatabase.Name)

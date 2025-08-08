@@ -27,7 +27,7 @@ func TestClient_GetTables(t *testing.T) {
 
 		// All statements should be table creates
 		for _, stmt := range tables.Statements {
-			require.NotNil(t, stmt.CreateTable, "All statements should be CREATE TABLE")
+			require.NotNil(t, stmt.CreateTable)
 
 			// Check that system tables are excluded by database name
 			if stmt.CreateTable.Database != nil {

@@ -23,8 +23,7 @@ func TestFormatter_Options(t *testing.T) {
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		err = Format(&buf, options, sqlResult.Statements[0])
-		require.NoError(t, err)
+		require.NoError(t, Format(&buf, options, sqlResult.Statements[0]))
 		formatted := buf.String()
 		require.Equal(t, "create database `test`;", formatted)
 	})
@@ -42,8 +41,7 @@ func TestFormatter_Options(t *testing.T) {
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		err = Format(&buf, options, sqlResult.Statements[0])
-		require.NoError(t, err)
+		require.NoError(t, Format(&buf, options, sqlResult.Statements[0]))
 		formatted := buf.String()
 		lines := []string{
 			"CREATE TABLE `users` (",
@@ -69,8 +67,7 @@ func TestFormatter_Options(t *testing.T) {
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		err = Format(&buf, options, sqlResult.Statements[0])
-		require.NoError(t, err)
+		require.NoError(t, Format(&buf, options, sqlResult.Statements[0]))
 		formatted := buf.String()
 		// Should not have extra spaces for alignment
 		require.Contains(t, formatted, "`id` UInt64,")
@@ -87,8 +84,7 @@ func TestFormatter_SQL(t *testing.T) {
 	require.Len(t, sqlResult.Statements, 2)
 
 	var buf bytes.Buffer
-	err = Format(&buf, Defaults, sqlResult.Statements...)
-	require.NoError(t, err)
+	require.NoError(t, Format(&buf, Defaults, sqlResult.Statements...))
 	formatted := buf.String()
 
 	expected := "CREATE DATABASE `test`;\n\nCREATE TABLE `test`.`users` (\n    `id` UInt64\n)\nENGINE = MergeTree();"
@@ -102,15 +98,13 @@ func TestFormatter_FormatFunction(t *testing.T) {
 
 	// Test Format function with single statement
 	var buf1 bytes.Buffer
-	err = Format(&buf1, Defaults, sqlResult.Statements[0])
-	require.NoError(t, err)
+	require.NoError(t, Format(&buf1, Defaults, sqlResult.Statements[0]))
 	formatted1 := buf1.String()
 	require.Equal(t, "CREATE DATABASE `test`;", formatted1)
 
 	// Test Format function with multiple statements
 	var buf2 bytes.Buffer
-	err = Format(&buf2, Defaults, sqlResult.Statements...)
-	require.NoError(t, err)
+	require.NoError(t, Format(&buf2, Defaults, sqlResult.Statements...))
 	formatted2 := buf2.String()
 	require.Equal(t, "CREATE DATABASE `test`;", formatted2)
 }
@@ -118,20 +112,17 @@ func TestFormatter_FormatFunction(t *testing.T) {
 func TestFormatter_EmptyInput(t *testing.T) {
 	// Test no statements
 	var buf1 bytes.Buffer
-	err := Format(&buf1, Defaults)
-	require.NoError(t, err)
+	require.NoError(t, Format(&buf1, Defaults))
 	require.Empty(t, buf1.String())
 
 	// Test nil statement
 	var buf2 bytes.Buffer
-	err = Format(&buf2, Defaults, nil)
-	require.NoError(t, err)
+	require.NoError(t, Format(&buf2, Defaults, nil))
 	require.Empty(t, buf2.String())
 
 	// Test empty statements
 	var buf3 bytes.Buffer
-	err = Format(&buf3, Defaults, []*parser.Statement{}...)
-	require.NoError(t, err)
+	require.NoError(t, Format(&buf3, Defaults, []*parser.Statement{}...))
 	require.Empty(t, buf3.String())
 }
 
@@ -164,8 +155,7 @@ func TestFormatSQL_Function(t *testing.T) {
 			require.NoError(t, err)
 
 			var buf bytes.Buffer
-			err = FormatSQL(&buf, Defaults, sqlResult)
-			require.NoError(t, err)
+			require.NoError(t, FormatSQL(&buf, Defaults, sqlResult))
 
 			require.Equal(t, tt.expected, buf.String())
 		})
@@ -197,8 +187,7 @@ func TestFormatSQL_Method(t *testing.T) {
 			})
 
 			var buf bytes.Buffer
-			err = formatter.FormatSQL(&buf, sqlResult)
-			require.NoError(t, err)
+			require.NoError(t, formatter.FormatSQL(&buf, sqlResult))
 
 			require.Equal(t, tt.expected, buf.String())
 		})
@@ -209,14 +198,12 @@ func TestFormatSQL_NilSQL(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Test function with nil grammar
-	err := FormatSQL(&buf, Defaults, nil)
-	require.NoError(t, err)
+	require.NoError(t, FormatSQL(&buf, Defaults, nil))
 	require.Empty(t, buf.String())
 
 	// Test method with nil grammar
 	formatter := New(Defaults)
-	err = formatter.FormatSQL(&buf, nil)
-	require.NoError(t, err)
+	require.NoError(t, formatter.FormatSQL(&buf, nil))
 	require.Empty(t, buf.String())
 }
 
@@ -225,13 +212,11 @@ func TestFormatSQL_EmptySQL(t *testing.T) {
 
 	// Test function with empty sqlResult
 	sqlResult := &parser.SQL{Statements: []*parser.Statement{}}
-	err := FormatSQL(&buf, Defaults, sqlResult)
-	require.NoError(t, err)
+	require.NoError(t, FormatSQL(&buf, Defaults, sqlResult))
 	require.Empty(t, buf.String())
 
 	// Test method with empty sqlResult
 	formatter := New(Defaults)
-	err = formatter.FormatSQL(&buf, sqlResult)
-	require.NoError(t, err)
+	require.NoError(t, formatter.FormatSQL(&buf, sqlResult))
 	require.Empty(t, buf.String())
 }

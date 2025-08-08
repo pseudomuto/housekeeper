@@ -138,7 +138,7 @@ func removeQuotes(s string) string {
 func TestParserWithTestdata(t *testing.T) {
 	// Find all SQL files in embedded testdata
 	sqlFiles, err := fs.Glob(testdataFS, "testdata/*.sql")
-	require.NoError(t, err, "Failed to find SQL files")
+	require.NoError(t, err)
 
 	// Run each test case
 	for _, sqlPath := range sqlFiles {
@@ -148,11 +148,11 @@ func TestParserWithTestdata(t *testing.T) {
 		t.Run(sqlFile, func(t *testing.T) {
 			// Read SQL file from embedded FS
 			sqlData, err := testdataFS.ReadFile(sqlPath)
-			require.NoError(t, err, "Failed to read SQL file: %s", sqlFile)
+			require.NoError(t, err)
 
 			// Parse SQL
 			grammar, err := ParseSQL(string(sqlData))
-			require.NoError(t, err, "Failed to parse SQL from %s", sqlFile)
+			require.NoError(t, err)
 
 			yamlPath := filepath.Join("testdata", yamlFile)
 
@@ -160,22 +160,19 @@ func TestParserWithTestdata(t *testing.T) {
 				// Generate and save YAML file
 				expectedResult := generateTestCaseFromSQL(grammar)
 				yamlData, err := yaml.Marshal(&expectedResult)
-				require.NoError(t, err, "Failed to marshal YAML for %s", yamlFile)
+				require.NoError(t, err)
 
-				err = os.WriteFile(yamlPath, yamlData, 0o600)
-				require.NoError(t, err, "Failed to write YAML file: %s", yamlFile)
+				require.NoError(t, os.WriteFile(yamlPath, yamlData, 0o600))
 
-				t.Logf("Updated %s", yamlFile)
 				return
 			}
 
 			// Load expected results from corresponding YAML file
 			yamlData, err := os.ReadFile(yamlPath)
-			require.NoError(t, err, "Failed to read YAML file: %s (run with -update to generate)", yamlFile)
+			require.NoError(t, err)
 
 			var expectedResult TestCase
-			err = yaml.Unmarshal(yamlData, &expectedResult)
-			require.NoError(t, err, "Failed to parse YAML file: %s", yamlFile)
+			require.NoError(t, yaml.Unmarshal(yamlData, &expectedResult))
 
 			// Verify results
 			verifySQL(t, grammar, expectedResult, sqlFile)

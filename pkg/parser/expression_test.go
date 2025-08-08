@@ -144,9 +144,9 @@ func TestExpressionParsing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := testExpression(tt.input)
 			if tt.valid {
-				require.NoError(t, err, "Failed to parse: %s", tt.input)
+				require.NoError(t, err)
 			} else {
-				require.Error(t, err, "Expected parse error for: %s", tt.input)
+				require.Error(t, err)
 			}
 		})
 	}
@@ -187,7 +187,7 @@ func TestExpressionInContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sqlResult, err := parser.ParseSQL(tt.sql)
-			require.NoError(t, err, "Failed to parse SQL: %s", tt.sql)
+			require.NoError(t, err)
 			require.NotNil(t, sqlResult)
 			require.NotEmpty(t, sqlResult.Statements)
 		})

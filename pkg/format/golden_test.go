@@ -20,7 +20,7 @@ func TestGoldenFiles(t *testing.T) {
 	pattern := filepath.Join(testdataDir, "*.in.sql")
 	matches, err := filepath.Glob(pattern)
 	require.NoError(t, err)
-	require.NotEmpty(t, matches, "No *.in.sql files found in testdata directory")
+	require.NotEmpty(t, matches)
 
 	for _, inputFile := range matches {
 		// Derive output filename: "example.in.sql" -> "example.sql"
@@ -30,16 +30,15 @@ func TestGoldenFiles(t *testing.T) {
 		t.Run(outputName, func(t *testing.T) {
 			// Read input SQL file
 			inputSQL, err := os.ReadFile(inputFile)
-			require.NoError(t, err, "Failed to read input file %s", inputFile)
+			require.NoError(t, err)
 
 			// Parse the SQL
 			sqlResult, err := parser.ParseSQL(string(inputSQL))
-			require.NoError(t, err, "Failed to parse SQL from %s", inputFile)
+			require.NoError(t, err)
 
 			// Format all statements using the new API
 			var buf bytes.Buffer
-			err = Format(&buf, Defaults, sqlResult.Statements...)
-			require.NoError(t, err)
+			require.NoError(t, Format(&buf, Defaults, sqlResult.Statements...))
 			result := buf.String()
 
 			// Add final newline for proper file ending

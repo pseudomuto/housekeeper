@@ -81,22 +81,21 @@ func TestDumpSchema(t *testing.T) {
 
 	// Format the extracted schema for golden file comparison
 	var buf bytes.Buffer
-	err = format.FormatSQL(&buf, format.Defaults, schema)
-	require.NoError(t, err, "Failed to format extracted schema")
+	require.NoError(t, format.FormatSQL(&buf, format.Defaults, schema))
 
 	// Compare with golden file using gotest.tools/v3/golden
 	golden.Assert(t, buf.String(), "expected_schema.sql")
 
 	// Test individual extraction methods work without errors
 	_, err = client.GetDatabases(ctx)
-	require.NoError(t, err, "GetDatabases should work without errors")
+	require.NoError(t, err)
 
 	_, err = client.GetTables(ctx)
-	require.NoError(t, err, "GetTables should work without errors")
+	require.NoError(t, err)
 
 	_, err = client.GetViews(ctx)
-	require.NoError(t, err, "GetViews should work without errors")
+	require.NoError(t, err)
 
 	_, err = client.GetDictionaries(ctx)
-	require.NoError(t, err, "GetDictionaries should work without errors")
+	require.NoError(t, err)
 }

@@ -96,7 +96,7 @@ func TestGenerateImage(t *testing.T) {
 			// Check expected files and content
 			for _, ft := range tt.fileTests {
 				file, err := fsImage.Open(ft.path)
-				require.NoError(t, err, "Expected file %s to exist", ft.path)
+				require.NoError(t, err)
 				defer file.Close()
 
 				content, err := io.ReadAll(file)

@@ -27,7 +27,7 @@ func TestClient_GetDictionaries(t *testing.T) {
 
 		// All statements should be dictionary creates
 		for _, stmt := range dictionaries.Statements {
-			require.NotNil(t, stmt.CreateDictionary, "All statements should be CREATE DICTIONARY")
+			require.NotNil(t, stmt.CreateDictionary)
 
 			// Check that system dictionaries are excluded by database name
 			if stmt.CreateDictionary.Database != nil {

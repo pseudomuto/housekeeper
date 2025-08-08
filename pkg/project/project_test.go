@@ -20,10 +20,9 @@ func TestProjectInitialize(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		p := project.New(tmpDir)
-		err := p.Initialize()
-		require.NoError(t, err)
+		require.NoError(t, p.Initialize())
 
-		// Verify directories were created
+		// Verify directories were created)
 		assertDirExists(t, filepath.Join(tmpDir, "db"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations", "dev"))
@@ -49,13 +48,11 @@ func TestProjectInitialize(t *testing.T) {
 		// Create an existing file with custom content
 		existingContent := []byte("environments: ~")
 		housekeeperPath := filepath.Join(tmpDir, "housekeeper.yaml")
-		err := os.WriteFile(housekeeperPath, existingContent, filePerms)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(housekeeperPath, existingContent, filePerms))
 
 		// Initialize the project
 		p := project.New(tmpDir)
-		err = p.Initialize()
-		require.NoError(t, err)
+		require.NoError(t, p.Initialize())
 
 		// Verify the existing file was not overwritten
 		content, err := os.ReadFile(housekeeperPath)
@@ -68,17 +65,14 @@ func TestProjectInitialize(t *testing.T) {
 
 		// Create an existing directory with a custom file
 		dbDir := filepath.Join(tmpDir, "db")
-		err := os.MkdirAll(dbDir, dirPerms)
-		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(dbDir, dirPerms))
 
 		customFile := filepath.Join(dbDir, "custom.sql")
-		err = os.WriteFile(customFile, []byte("custom"), filePerms)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(customFile, []byte("custom"), filePerms))
 
 		// Initialize the project
 		p := project.New(tmpDir)
-		err = p.Initialize()
-		require.NoError(t, err)
+		require.NoError(t, p.Initialize())
 
 		// Verify the custom file still exists
 		assertFileExists(t, customFile)
@@ -96,8 +90,7 @@ func TestProjectInitialize(t *testing.T) {
 		p := project.New(tmpDir)
 
 		// First initialization
-		err := p.Initialize()
-		require.NoError(t, err)
+		require.NoError(t, p.Initialize())
 
 		// Modify a file
 		housekeeperPath := filepath.Join(tmpDir, "housekeeper.yaml")
@@ -105,12 +98,10 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, err)
 
 		modifiedContent := append(originalContent, []byte("\n# Custom comment")...)
-		err = os.WriteFile(housekeeperPath, modifiedContent, filePerms)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(housekeeperPath, modifiedContent, filePerms))
 
 		// Second initialization
-		err = p.Initialize()
-		require.NoError(t, err)
+		require.NoError(t, p.Initialize())
 
 		// Verify the modified file was not overwritten
 		content, err := os.ReadFile(housekeeperPath)
@@ -187,14 +178,14 @@ func TestProjectInitialize(t *testing.T) {
 func assertDirExists(t *testing.T, path string) {
 	t.Helper()
 	info, err := os.Stat(path)
-	require.NoError(t, err, "directory should exist: %s", path)
+	require.NoError(t, err)
 	require.True(t, info.IsDir(), "path should be a directory: %s", path)
 }
 
 func assertFileExists(t *testing.T, path string) {
 	t.Helper()
 	info, err := os.Stat(path)
-	require.NoError(t, err, "file should exist: %s", path)
+	require.NoError(t, err)
 	require.False(t, info.IsDir(), "path should be a file: %s", path)
 }
 

@@ -343,7 +343,7 @@ func TestComplexNestedTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			col, err := parseColumn(tt.input)
-			require.NoError(t, err, "Failed to parse: %s", tt.input)
+			require.NoError(t, err)
 			require.NotNil(t, col)
 		})
 	}
