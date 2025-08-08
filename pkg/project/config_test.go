@@ -38,6 +38,9 @@ func TestLoadConfig(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, config)
 		require.Empty(t, config.Envs)
+		require.Equal(t, DefaultClickHouseVersion, config.ClickHouse.Version)
+		require.Equal(t, DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, DefaultClickHouseCluster, config.ClickHouse.Cluster)
 	})
 }
 
@@ -84,6 +87,9 @@ func TestLoadConfigFile(t *testing.T) {
 func validateTestConfig(t *testing.T, config *Config) {
 	t.Helper()
 	require.NotNil(t, config)
+	require.Equal(t, "25.7", config.ClickHouse.Version)
+	require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
+	require.Equal(t, "cluster", config.ClickHouse.Cluster)
 	require.Len(t, config.Envs, 1)
 
 	// Test dev environment
@@ -93,4 +99,80 @@ func validateTestConfig(t *testing.T, config *Config) {
 	require.Equal(t, "clickhouse://localhost:9000/prod", dev.URL)
 	require.Equal(t, "db/main.sql", dev.Entrypoint)
 	require.Equal(t, "db/migrations", dev.Dir)
+}
+
+func TestLoadConfig_ClickHouseDefaults(t *testing.T) {
+	t.Run("keeps configured values when set", func(t *testing.T) {
+		yamlData := `
+clickhouse:
+  version: "24.8"
+  config_dir: "custom/config"
+  cluster: "production"
+environments:
+  - name: test
+    url: clickhouse://localhost:9000/test
+    entrypoint: test.sql
+    dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.Equal(t, "24.8", config.ClickHouse.Version)
+		require.Equal(t, "custom/config", config.ClickHouse.ConfigDir)
+		require.Equal(t, "production", config.ClickHouse.Cluster)
+	})
+
+	t.Run("sets default values when empty", func(t *testing.T) {
+		yamlData := `
+clickhouse:
+  version: ""
+  config_dir: ""
+  cluster: ""
+environments:
+  - name: test
+    url: clickhouse://localhost:9000/test
+    entrypoint: test.sql
+    dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.Equal(t, DefaultClickHouseVersion, config.ClickHouse.Version)
+		require.Equal(t, "25.7", config.ClickHouse.Version)
+		require.Equal(t, DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
+		require.Equal(t, DefaultClickHouseCluster, config.ClickHouse.Cluster)
+		require.Equal(t, "cluster", config.ClickHouse.Cluster)
+	})
+
+	t.Run("sets default values when not specified", func(t *testing.T) {
+		yamlData := `
+environments:
+  - name: test
+    url: clickhouse://localhost:9000/test
+    entrypoint: test.sql
+    dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.Equal(t, DefaultClickHouseVersion, config.ClickHouse.Version)
+		require.Equal(t, "25.7", config.ClickHouse.Version)
+		require.Equal(t, DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
+		require.Equal(t, DefaultClickHouseCluster, config.ClickHouse.Cluster)
+		require.Equal(t, "cluster", config.ClickHouse.Cluster)
+	})
+
+	t.Run("sets defaults when clickhouse section missing", func(t *testing.T) {
+		yamlData := `
+environments:
+  - name: test
+    url: clickhouse://localhost:9000/test
+    entrypoint: test.sql
+    dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.Equal(t, DefaultClickHouseVersion, config.ClickHouse.Version)
+		require.Equal(t, DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, DefaultClickHouseCluster, config.ClickHouse.Cluster)
+	})
 }

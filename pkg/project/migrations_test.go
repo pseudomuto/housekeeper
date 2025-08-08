@@ -23,7 +23,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		require.NoError(t, err)
 
 		proj := project.New(testdataPath)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -51,7 +51,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		require.NoError(t, err)
 
 		proj := project.New(testdataPath)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("staging")
@@ -99,7 +99,7 @@ func TestLoadMigrationSet(t *testing.T) {
 
 		// Initialize project and load migration set
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -137,7 +137,7 @@ func TestLoadMigrationSet(t *testing.T) {
 
 		// Initialize project and load migration set
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -155,7 +155,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		require.NoError(t, err)
 
 		proj := project.New(testdataPath)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		// Try to load migration set for non-existent environment
@@ -179,7 +179,7 @@ func TestLoadMigrationSet(t *testing.T) {
 
 		// Initialize project
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		// Try to load migration set for directory that doesn't exist
@@ -213,7 +213,7 @@ func TestLoadMigrationSet(t *testing.T) {
 
 		// Initialize project
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		// Try to load migration set with invalid sum file
@@ -228,7 +228,7 @@ func TestLoadMigrationSet(t *testing.T) {
 		require.NoError(t, err)
 
 		proj := project.New(testdataPath)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		// This should fail since the migrations directory doesn't exist
@@ -245,7 +245,7 @@ func TestMigrationSet_GenerateSumFile(t *testing.T) {
 		require.NoError(t, err)
 
 		proj := project.New(testdataPath)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -311,7 +311,7 @@ func TestMigrationSet_GenerateSumFile(t *testing.T) {
 
 		// Load migration set
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -366,7 +366,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 
 		// Load migration set
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -386,7 +386,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		require.NoError(t, err)
 
 		proj := project.New(testdataPath)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -437,7 +437,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 
 		// Load migration set
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")
@@ -488,7 +488,7 @@ func TestMigrationSet_IsValid(t *testing.T) {
 
 		// Load migration set
 		proj := project.New(tempDir)
-		err = proj.Initialize()
+		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		ms, err := proj.LoadMigrationSet("test")

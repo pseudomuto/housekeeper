@@ -41,6 +41,13 @@ func initCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "init",
 		Usage: "Initialize a project in the current directory",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "cluster",
+				Aliases: []string{"c"},
+				Usage:   "ClickHouse cluster name to use in configuration (defaults to 'cluster')",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dir := "."
 			if path := cmd.String("dir"); path != "" {
@@ -51,50 +58,56 @@ func initCmd() *cli.Command {
 				return err
 			}
 
-			return project.New(dir).Initialize()
+			options := project.InitOptions{
+				Cluster: cmd.String("cluster"),
+			}
+
+			return project.New(dir).Initialize(options)
 		},
 	}
 }
 
-// bootstrap returns a CLI command that creates a new housekeeper project
-// by extracting schema from an existing ClickHouse server. This command
-// combines project initialization with schema extraction and organization.
+// bootstrap returns a CLI command that extracts schema from an existing ClickHouse server
+// into an already initialized housekeeper project. This command reads the cluster configuration
+// from the existing housekeeper.yaml and uses it for connecting to ClickHouse.
+//
+// Prerequisites:
+//  1. Project must already be initialized with `housekeeper init`
+//  2. housekeeper.yaml must exist in the current directory
 //
 // The bootstrap process:
-//  1. Initializes a standard housekeeper project structure
-//  2. Connects to the specified ClickHouse server
+//  1. Loads configuration from existing housekeeper.yaml
+//  2. Connects to the specified ClickHouse server using cluster config
 //  3. Extracts all schema objects (databases, tables, dictionaries, views)
-//  4. Organizes the schema into a structured project layout
+//  4. Organizes the schema into the existing project layout
 //  5. Creates individual SQL files for each database object
 //  6. Generates import directives for modular schema management
 //
-// The resulting project structure:
-//   - housekeeper.yaml: Configuration file
-//   - db/main.sql: Main schema file with imports to all databases
+// The resulting project structure adds to existing:
+//   - db/main.sql: Updated main schema file with imports to all databases
 //   - db/schemas/<database>/schema.sql: Database-specific schema with imports
 //   - db/schemas/<database>/tables/<table>.sql: Individual table files
 //   - db/schemas/<database>/dictionaries/<dict>.sql: Individual dictionary files
 //   - db/schemas/<database>/views/<view>.sql: Individual view files
-//   - db/migrations/: Directory for future migration files
 //
 // Example usage:
 //
-//	# Bootstrap from local ClickHouse instance
-//	housekeeper bootstrap --url localhost:9000
+//	# First initialize a project
+//	housekeeper init --cluster production
 //
-//	# Bootstrap with cluster support for distributed deployments
-//	housekeeper bootstrap --url clickhouse://prod-cluster:9000 --cluster production
+//	# Then bootstrap from ClickHouse server (uses cluster from config)
+//	housekeeper bootstrap --url localhost:9000
 //
 //	# Bootstrap using environment variable for connection
 //	export CH_DATABASE_URL=tcp://localhost:9000
 //	housekeeper bootstrap
 //
-// The command handles all ClickHouse object types and creates a fully
-// functional housekeeper project ready for schema management and migrations.
+// The command handles all ClickHouse object types and uses the cluster configuration
+// from the existing project for proper ON CLUSTER injection.
 func bootstrap() *cli.Command {
 	return &cli.Command{
 		Name:  "bootstrap",
-		Usage: "Create a new project from an existing ClickHouse server",
+		Usage: "Extract schema from an existing ClickHouse server into initialized project",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "url",
@@ -103,11 +116,6 @@ func bootstrap() *cli.Command {
 				Sources:  cli.EnvVars("CH_DATABASE_URL"),
 				Required: true,
 			},
-			&cli.StringFlag{
-				Name:    "cluster",
-				Aliases: []string{"c"},
-				Usage:   "Cluster name to inject ON CLUSTER clauses for distributed deployments",
-			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dir := "."
@@ -115,20 +123,23 @@ func bootstrap() *cli.Command {
 				dir = path
 			}
 
-			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-				return err
+			// Load existing project configuration
+			configPath := filepath.Join(dir, "housekeeper.yaml")
+			if _, err := os.Stat(configPath); os.IsNotExist(err) {
+				return errors.New("housekeeper.yaml not found - please run 'housekeeper init' first to initialize the project")
 			}
 
-			p := project.New(dir)
-			if err := p.Initialize(); err != nil {
-				return err
+			config, err := project.LoadConfigFile(configPath)
+			if err != nil {
+				return errors.Wrap(err, "failed to load existing housekeeper.yaml")
 			}
 
+			// Use cluster from existing configuration
 			client, err := clickhouse.NewClientWithOptions(
 				ctx,
 				cmd.String("url"),
 				clickhouse.ClientOptions{
-					Cluster: cmd.String("cluster"),
+					Cluster: config.ClickHouse.Cluster,
 				},
 			)
 			if err != nil {
@@ -154,17 +165,18 @@ func bootstrap() *cli.Command {
 }
 
 // overlayImage writes the contents of an fs.FS to a directory,
-// creating the necessary directory structure and files.
+// creating the necessary directory structure and files that don't already exist.
 //
 // This function traverses the virtual file system created by project.GenerateImage()
 // and materializes it to the actual file system. It handles:
 //   - Creating directory structures as needed
-//   - Writing file contents with proper permissions (0644)
+//   - Writing file contents with proper permissions (0644) only if files don't exist
+//   - Preserving existing files (especially housekeeper.yaml and other user configs)
 //   - Preserving the hierarchical organization of the schema files
 //
 // The function is used by the bootstrap command to convert the virtual
 // file system representation of the extracted schema into actual files
-// and directories on disk.
+// and directories on disk without overwriting existing files.
 //
 // Parameters:
 //   - targetDir: The root directory where files should be written
@@ -184,7 +196,16 @@ func overlayImage(targetDir string, fsImage fs.FS) error {
 			return os.MkdirAll(targetPath, os.ModePerm)
 		}
 
-		// Create file
+		// Check if file already exists
+		if _, err := os.Stat(targetPath); err == nil {
+			// File exists, skip it to preserve user modifications
+			return nil
+		} else if !os.IsNotExist(err) {
+			// Some other error occurred
+			return errors.Wrapf(err, "failed to stat file %s", targetPath)
+		}
+
+		// File doesn't exist, create it
 		file, err := fsImage.Open(path)
 		if err != nil {
 			return errors.Wrapf(err, "failed to open file %s", path)

@@ -6,6 +6,7 @@ package clickhouse_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/format"
+	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	clickhousemodule "github.com/testcontainers/testcontainers-go/modules/clickhouse"
@@ -31,7 +33,7 @@ func TestDumpSchema(t *testing.T) {
 	// Start ClickHouse container with the ClickHouse module
 	container, err := clickhousemodule.Run(
 		ctx,
-		"clickhouse/clickhouse-server:25.6-alpine",
+		fmt.Sprintf("clickhouse/clickhouse-server:%s-alpine", project.DefaultClickHouseVersion),
 		clickhousemodule.WithUsername("default"),
 		clickhousemodule.WithPassword(""),
 		clickhousemodule.WithDatabase("default"),

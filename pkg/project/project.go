@@ -8,6 +8,7 @@ import (
 	"testing/fstest"
 
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -27,10 +28,19 @@ var (
 	}
 )
 
-type Project struct {
-	root   string
-	config *Config
-}
+type (
+	// InitOptions contains options for project initialization
+	InitOptions struct {
+		// Cluster specifies the ClickHouse cluster name to use in configuration
+		// If empty, the default cluster name will be used
+		Cluster string
+	}
+
+	Project struct {
+		root   string
+		config *Config
+	}
+)
 
 // New creates a new Project instance for managing ClickHouse schema projects.
 // The path should point to an existing directory that will serve as the project root.
@@ -74,7 +84,27 @@ func New(path string) *Project {
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}
-func (p *Project) Initialize() error {
+//
+// Initialize sets up the project directory structure and loads the configuration
+// with the provided initialization options. This method is idempotent - it will only create
+// missing files and directories, preserving any existing content.
+//
+// The options parameter allows customizing the initialization process, such as specifying
+// a custom ClickHouse cluster name. To use defaults, pass an empty InitOptions{}.
+//
+// Example:
+//
+//	project := project.New("/path/to/my/project")
+//	options := project.InitOptions{Cluster: "production"}
+//	if err := project.Initialize(options); err != nil {
+//		log.Fatal("Failed to initialize project:", err)
+//	}
+//
+//	// Or with defaults:
+//	if err := project.Initialize(project.InitOptions{}); err != nil {
+//		log.Fatal("Failed to initialize project:", err)
+//	}
+func (p *Project) Initialize(options InitOptions) error {
 	// Ensure the root directory exists and is valid
 	if err := p.ensureDirectory(); err != nil {
 		return err
@@ -122,7 +152,38 @@ func (p *Project) Initialize() error {
 		return errors.Wrap(err, "failed to load housekeeper.yaml")
 	}
 
+	// Apply custom options if provided
+	if options.Cluster != "" {
+		cfg.ClickHouse.Cluster = options.Cluster
+
+		// Write the updated config back to the file
+		configPath := filepath.Join(p.root, "housekeeper.yaml")
+		configFile, err := os.Create(configPath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open config file for writing: %s", configPath)
+		}
+		defer configFile.Close()
+
+		// Use yaml.NewEncoder to write the updated config
+		encoder := yaml.NewEncoder(configFile)
+		if err := encoder.Encode(cfg); err != nil {
+			return errors.Wrap(err, "failed to write updated config")
+		}
+		if err := encoder.Close(); err != nil {
+			return errors.Wrap(err, "failed to close yaml encoder")
+		}
+	}
+
 	p.config = cfg
+
+	// Create ClickHouse config directory if it doesn't exist
+	configDirPath := filepath.Join(p.root, cfg.ClickHouse.ConfigDir)
+	if _, err := os.Stat(configDirPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(configDirPath, 0o755); err != nil {
+			return errors.Wrapf(err, "failed to create ClickHouse config directory %s", configDirPath)
+		}
+	}
+
 	return nil
 }
 

@@ -8,13 +8,45 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// DefaultClickHouseVersion is the default ClickHouse version used when none is specified
+	DefaultClickHouseVersion = "25.7"
+
+	// DefaultClickHouseConfigDir is the default directory for ClickHouse configuration files
+	DefaultClickHouseConfigDir = "db/config.d"
+
+	// DefaultClickHouseCluster is the default cluster name used when none is specified
+	DefaultClickHouseCluster = "cluster"
+)
+
 type (
+	// ClickHouse represents ClickHouse-specific configuration settings.
+	//
+	// This struct contains configuration values that are specific to the ClickHouse
+	// database system, including version compatibility and configuration file management.
+	ClickHouse struct {
+		// Version specifies the target ClickHouse version for schema compatibility
+		// This helps ensure generated DDL is compatible with the specified version
+		Version string `yaml:"version,omitempty"`
+
+		// ConfigDir specifies the directory where ClickHouse configuration files are stored
+		// This directory is used for managing ClickHouse server configuration fragments
+		ConfigDir string `yaml:"config_dir,omitempty"`
+
+		// Cluster specifies the default cluster name for distributed ClickHouse deployments
+		// This is used for ON CLUSTER operations and distributed DDL statements
+		Cluster string `yaml:"cluster,omitempty"`
+	}
+
 	// Config represents the complete schema configuration containing multiple environments.
 	//
 	// Each configuration file can define multiple database environments with their
 	// specific connection details and schema entry points. This allows for flexible
 	// deployment scenarios across development, staging, and production environments.
 	Config struct {
+		// ClickHouse contains ClickHouse-specific configuration settings
+		ClickHouse ClickHouse `yaml:"clickhouse"`
+
 		// Envs contains the list of configured database environments
 		Envs []*Env `yaml:"environments"`
 	}
@@ -49,7 +81,7 @@ type (
 // The function expects YAML-formatted configuration data that defines database
 // environments with their connection details and schema entry points. It uses
 // a streaming YAML decoder to handle potentially large configuration files
-// efficiently.
+// efficiently. If no ClickHouse version is specified, it defaults to DefaultClickHouseVersion.
 //
 // Parameters:
 //   - r: An io.Reader containing YAML configuration data
@@ -84,6 +116,17 @@ func LoadConfig(r io.Reader) (*Config, error) {
 	var cfg Config
 	if err := yaml.NewDecoder(r).Decode(&cfg); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal schema config")
+	}
+
+	// Set default ClickHouse configuration values if not specified
+	if cfg.ClickHouse.Version == "" {
+		cfg.ClickHouse.Version = DefaultClickHouseVersion
+	}
+	if cfg.ClickHouse.ConfigDir == "" {
+		cfg.ClickHouse.ConfigDir = DefaultClickHouseConfigDir
+	}
+	if cfg.ClickHouse.Cluster == "" {
+		cfg.ClickHouse.Cluster = DefaultClickHouseCluster
 	}
 
 	return &cfg, nil

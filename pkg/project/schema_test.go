@@ -26,7 +26,7 @@ func TestProjectParseSchema(t *testing.T) {
 
 		// Initialize project
 		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize())
+		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		return p
 	}
@@ -111,7 +111,7 @@ func TestProjectParseSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		p := project.New(tmpDir)
-		err = p.Initialize()
+		err = p.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		_, err = p.ParseSchema("missing")

@@ -20,13 +20,14 @@ func TestProjectInitialize(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize())
+		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify directories were created)
 		assertDirExists(t, filepath.Join(tmpDir, "db"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations", "dev"))
 		assertDirExists(t, filepath.Join(tmpDir, "db", "schemas"))
+		assertDirExists(t, filepath.Join(tmpDir, "db", "config.d")) // ClickHouse config directory
 
 		// Verify files were created
 		assertFileExists(t, filepath.Join(tmpDir, "db", "main.sql"))
@@ -52,7 +53,7 @@ func TestProjectInitialize(t *testing.T) {
 
 		// Initialize the project
 		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize())
+		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify the existing file was not overwritten
 		content, err := os.ReadFile(housekeeperPath)
@@ -72,7 +73,7 @@ func TestProjectInitialize(t *testing.T) {
 
 		// Initialize the project
 		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize())
+		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify the custom file still exists
 		assertFileExists(t, customFile)
@@ -90,7 +91,7 @@ func TestProjectInitialize(t *testing.T) {
 		p := project.New(tmpDir)
 
 		// First initialization
-		require.NoError(t, p.Initialize())
+		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Modify a file
 		housekeeperPath := filepath.Join(tmpDir, "housekeeper.yaml")
@@ -101,7 +102,7 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, os.WriteFile(housekeeperPath, modifiedContent, filePerms))
 
 		// Second initialization
-		require.NoError(t, p.Initialize())
+		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify the modified file was not overwritten
 		content, err := os.ReadFile(housekeeperPath)
@@ -118,7 +119,7 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, err)
 
 		p := project.New(tmpDir)
-		err = p.Initialize()
+		err = p.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify nested directories were created for the file
@@ -137,7 +138,7 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, err)
 
 		p := project.New(filePath)
-		err = p.Initialize()
+		err = p.Initialize(project.InitOptions{})
 		require.Error(t, err)
 		// The error can be either from ensureDirectory or from trying to create subdirectories
 		require.True(t,
@@ -150,7 +151,7 @@ func TestProjectInitialize(t *testing.T) {
 		nonExistentPath := "/non/existent/path"
 
 		p := project.New(nonExistentPath)
-		err := p.Initialize()
+		err := p.Initialize(project.InitOptions{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to stat dir")
 	})
@@ -168,10 +169,76 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, err)
 
 		p := project.New(readOnlyDir)
-		err = p.Initialize()
+		err = p.Initialize(project.InitOptions{})
 		require.Error(t, err)
 		// The error should be about failing to create a directory or file
 		require.Contains(t, err.Error(), "failed to")
+	})
+
+	t.Run("creates custom ClickHouse config directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create custom config with different config dir
+		configContent := `
+clickhouse:
+  version: "24.8"
+  config_dir: "custom/clickhouse"
+  cluster: "test-cluster"
+environments:
+  - name: dev
+    dev: docker://clickhouse:9000/dev
+    url: clickhouse://localhost:9000/prod
+    entrypoint: db/main.sql
+    dir: db/migrations
+`
+		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
+		require.NoError(t, os.WriteFile(configPath, []byte(configContent), filePerms))
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(project.InitOptions{}))
+
+		// Verify custom config directory was created
+		assertDirExists(t, filepath.Join(tmpDir, "custom", "clickhouse"))
+	})
+
+	t.Run("initializes with custom cluster name", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		options := project.InitOptions{
+			Cluster: "production",
+		}
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(options))
+
+		// Verify config file was created and updated with custom cluster
+		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
+		assertFileExists(t, configPath)
+
+		// Load and verify the config contains the custom cluster
+		config, err := project.LoadConfigFile(configPath)
+		require.NoError(t, err)
+		require.Equal(t, "production", config.ClickHouse.Cluster)
+		require.Equal(t, project.DefaultClickHouseVersion, config.ClickHouse.Version)
+		require.Equal(t, project.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+	})
+
+	t.Run("initializes with default cluster when not specified", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		options := project.InitOptions{
+			Cluster: "", // Empty cluster should use default
+		}
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(options))
+
+		// Verify config file was created with default cluster
+		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
+		config, err := project.LoadConfigFile(configPath)
+		require.NoError(t, err)
+		require.Equal(t, project.DefaultClickHouseCluster, config.ClickHouse.Cluster)
+		require.Equal(t, "cluster", config.ClickHouse.Cluster)
 	})
 }
 
