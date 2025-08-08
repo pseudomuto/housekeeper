@@ -202,11 +202,13 @@ dir: migrations/test`
 		// Create temporary directory structure
 		tempDir := t.TempDir()
 
-		// Create housekeeper.yaml with test environment pointing to non-existent directory
-		configContent := `environments:
-  - name: test
-    entrypoint: db/main.sql
-    dir: nonexistent/migrations`
+		// Create housekeeper.yaml pointing to non-existent directory
+		configContent := `clickhouse:
+  version: "25.7"
+  config_dir: "db/config.d"
+  cluster: "cluster"
+entrypoint: db/main.sql
+dir: nonexistent/migrations`
 
 		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
 		require.NoError(t, err)

@@ -1,0 +1,61 @@
+<clickhouse>
+    <!-- Logging configuration -->
+    <logger>
+        <level>information</level>
+        <console>true</console>
+    </logger>
+
+    <!-- Network configuration -->
+    <listen_host>0.0.0.0</listen_host>
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+
+    <!-- Macros for replica names -->
+    <macros>
+        <cluster>test_cluster</cluster>
+        <shard>01</shard>
+        <replica>replica_1</replica>
+    </macros>
+
+    <!-- Cluster configuration with single replica -->
+    <remote_servers>
+        <test_cluster>
+            <shard>
+                <replica>
+                    <host>localhost</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </test_cluster>
+    </remote_servers>
+
+    <!-- Keeper configuration for replication -->
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+
+        <coordination_settings>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+            <session_timeout_ms>30000</session_timeout_ms>
+            <raft_logs_level>trace</raft_logs_level>
+        </coordination_settings>
+
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>localhost</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+
+    <!-- Zookeeper configuration pointing to our Keeper -->
+    <zookeeper>
+        <node>
+            <host>localhost</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+</clickhouse>

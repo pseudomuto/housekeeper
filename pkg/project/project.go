@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing/fstest"
 
 	"github.com/pkg/errors"
@@ -17,12 +18,17 @@ var (
 	//go:embed embed/housekeeper.yaml
 	defaultHouseKeeper []byte
 
+	//go:embed embed/_clickhouse.xml
+	defaultClickHouseXML []byte
+
 	image = fstest.MapFS{
-		"db":               {Mode: os.ModeDir | 0o755},
-		"db/migrations":    {Mode: os.ModeDir | 0o755},
-		"db/schemas":       {Mode: os.ModeDir | 0o755},
-		"db/main.sql":      {Data: defaultMainSQL},
-		"housekeeper.yaml": {Data: defaultHouseKeeper},
+		"db":                          {Mode: os.ModeDir | 0o755},
+		"db/config.d":                 {Mode: os.ModeDir | 0o755},
+		"db/config.d/_clickhouse.xml": {Data: defaultClickHouseXML},
+		"db/main.sql":                 {Data: defaultMainSQL},
+		"db/migrations":               {Mode: os.ModeDir | 0o755},
+		"db/schemas":                  {Mode: os.ModeDir | 0o755},
+		"housekeeper.yaml":            {Data: defaultHouseKeeper},
 	}
 )
 
@@ -110,6 +116,12 @@ func (p *Project) Initialize(options InitOptions) error {
 
 	perm := os.FileMode(0o644)
 
+	// Determine the cluster name to use
+	clusterName := options.Cluster
+	if clusterName == "" {
+		clusterName = "cluster" // default cluster name
+	}
+
 	// Walk the embedded FS and create missing files/directories
 	for path, entry := range image {
 		fullPath := filepath.Join(p.root, path)
@@ -139,8 +151,17 @@ func (p *Project) Initialize(options InitOptions) error {
 			return errors.Wrapf(err, "failed to create parent directory %s", parentDir)
 		}
 
-		// Create file with embedded content
-		if err := os.WriteFile(fullPath, entry.Data, perm); err != nil {
+		// Special handling for _clickhouse.xml to replace cluster name
+		fileContent := entry.Data
+		if path == "db/config.d/_clickhouse.xml" {
+			// Replace $$CLUSTER placeholder with the actual cluster name
+			xmlContent := string(defaultClickHouseXML)
+			xmlContent = strings.ReplaceAll(xmlContent, "$$CLUSTER", clusterName)
+			fileContent = []byte(xmlContent)
+		}
+
+		// Create file with content
+		if err := os.WriteFile(fullPath, fileContent, perm); err != nil {
 			return errors.Wrapf(err, "failed to write file %s", fullPath)
 		}
 	}

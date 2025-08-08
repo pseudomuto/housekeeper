@@ -15,7 +15,7 @@ const (
 	filePerms = os.FileMode(0o644)
 )
 
-func TestProjectInitialize(t *testing.T) {
+func TestProjectInitialize_CreatesDirectoriesAndFiles(t *testing.T) {
 	t.Run("creates all missing directories and files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -23,14 +23,15 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify directories were created)
-		assertDirExists(t, filepath.Join(tmpDir, "db"))
-		assertDirExists(t, filepath.Join(tmpDir, "db", "migrations"))
-		assertDirExists(t, filepath.Join(tmpDir, "db", "schemas"))
-		assertDirExists(t, filepath.Join(tmpDir, "db", "config.d")) // ClickHouse config directory
+		require.DirExists(t, filepath.Join(tmpDir, "db"))
+		require.DirExists(t, filepath.Join(tmpDir, "db", "migrations"))
+		require.DirExists(t, filepath.Join(tmpDir, "db", "schemas"))
+		require.DirExists(t, filepath.Join(tmpDir, "db", "config.d")) // ClickHouse config directory
 
 		// Verify files were created
-		assertFileExists(t, filepath.Join(tmpDir, "db", "main.sql"))
-		assertFileExists(t, filepath.Join(tmpDir, "housekeeper.yaml"))
+		require.FileExists(t, filepath.Join(tmpDir, "db", "main.sql"))
+		require.FileExists(t, filepath.Join(tmpDir, "housekeeper.yaml"))
+		require.FileExists(t, filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml"))
 
 		// Verify file contents are not empty
 		mainSQL, err := os.ReadFile(filepath.Join(tmpDir, "db", "main.sql"))
@@ -40,15 +41,35 @@ func TestProjectInitialize(t *testing.T) {
 		configYAML, err := os.ReadFile(filepath.Join(tmpDir, "housekeeper.yaml"))
 		require.NoError(t, err)
 		require.NotEmpty(t, configYAML)
-	})
 
+		// Verify ClickHouse XML file is not empty and has default cluster
+		clickhouseXML, err := os.ReadFile(filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml"))
+		require.NoError(t, err)
+		require.NotEmpty(t, clickhouseXML)
+		// Should have default cluster name
+		require.Contains(t, string(clickhouseXML), "<cluster>cluster</cluster>")
+		require.Contains(t, string(clickhouseXML), "<cluster>")
+		require.Contains(t, string(clickhouseXML), "</cluster>")
+		// Should NOT have placeholder
+		require.NotContains(t, string(clickhouseXML), "$$CLUSTER")
+	})
+}
+
+func TestProjectInitialize_PreservesExisting(t *testing.T) {
 	t.Run("preserves existing files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create an existing file with custom content
-		existingContent := []byte("environments: ~")
+		existingContent := []byte("entrypoint: custom.sql\ndir: custom/migrations")
 		housekeeperPath := filepath.Join(tmpDir, "housekeeper.yaml")
 		require.NoError(t, os.WriteFile(housekeeperPath, existingContent, filePerms))
+
+		// Create an existing ClickHouse XML with custom content
+		configDir := filepath.Join(tmpDir, "db", "config.d")
+		require.NoError(t, os.MkdirAll(configDir, dirPerms))
+		existingXMLContent := []byte("<clickhouse><custom>value</custom></clickhouse>")
+		clickhouseXMLPath := filepath.Join(configDir, "_clickhouse.xml")
+		require.NoError(t, os.WriteFile(clickhouseXMLPath, existingXMLContent, filePerms))
 
 		// Initialize the project
 		p := project.New(tmpDir)
@@ -58,6 +79,11 @@ func TestProjectInitialize(t *testing.T) {
 		content, err := os.ReadFile(housekeeperPath)
 		require.NoError(t, err)
 		require.Equal(t, existingContent, content)
+
+		// Verify the existing ClickHouse XML was not overwritten
+		xmlContent, err := os.ReadFile(clickhouseXMLPath)
+		require.NoError(t, err)
+		require.Equal(t, existingXMLContent, xmlContent)
 	})
 
 	t.Run("preserves existing directories", func(t *testing.T) {
@@ -75,13 +101,13 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify the custom file still exists
-		assertFileExists(t, customFile)
+		require.FileExists(t, customFile)
 		content, err := os.ReadFile(customFile)
 		require.NoError(t, err)
 		require.Equal(t, []byte("custom"), content)
 
 		// Verify default files were also created
-		assertFileExists(t, filepath.Join(dbDir, "main.sql"))
+		require.FileExists(t, filepath.Join(dbDir, "main.sql"))
 	})
 
 	t.Run("is idempotent", func(t *testing.T) {
@@ -122,11 +148,13 @@ func TestProjectInitialize(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify nested directories were created for the file
-		assertDirExists(t, filepath.Join(dbDir, "migrations"))
-		assertDirExists(t, filepath.Join(dbDir, "schemas"))
-		assertFileExists(t, filepath.Join(dbDir, "main.sql"))
+		require.DirExists(t, filepath.Join(dbDir, "migrations"))
+		require.DirExists(t, filepath.Join(dbDir, "schemas"))
+		require.FileExists(t, filepath.Join(dbDir, "main.sql"))
 	})
+}
 
+func TestProjectInitialize_ErrorHandling(t *testing.T) {
 	t.Run("returns error if root is not a directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		filePath := filepath.Join(tmpDir, "not_a_dir")
@@ -140,8 +168,8 @@ func TestProjectInitialize(t *testing.T) {
 		require.Error(t, err)
 		// The error can be either from ensureDirectory or from trying to create subdirectories
 		require.True(t,
-			contains(err.Error(), "is not a directory") ||
-				contains(err.Error(), "not a directory"),
+			strings.Contains(err.Error(), "is not a directory") ||
+				strings.Contains(err.Error(), "not a directory"),
 			"error should indicate that path is not a directory: %v", err)
 	})
 
@@ -172,7 +200,9 @@ func TestProjectInitialize(t *testing.T) {
 		// The error should be about failing to create a directory or file
 		require.Contains(t, err.Error(), "failed to")
 	})
+}
 
+func TestProjectInitialize_CustomConfiguration(t *testing.T) {
 	t.Run("creates custom ClickHouse config directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -182,12 +212,8 @@ clickhouse:
   version: "24.8"
   config_dir: "custom/clickhouse"
   cluster: "test-cluster"
-environments:
-  - name: dev
-    dev: docker://clickhouse:9000/dev
-    url: clickhouse://localhost:9000/prod
-    entrypoint: db/main.sql
-    dir: db/migrations
+entrypoint: db/main.sql
+dir: db/migrations
 `
 		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
 		require.NoError(t, os.WriteFile(configPath, []byte(configContent), filePerms))
@@ -196,9 +222,11 @@ environments:
 		require.NoError(t, p.Initialize(project.InitOptions{}))
 
 		// Verify custom config directory was created
-		assertDirExists(t, filepath.Join(tmpDir, "custom", "clickhouse"))
+		require.DirExists(t, filepath.Join(tmpDir, "custom", "clickhouse"))
 	})
+}
 
+func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 	t.Run("initializes with custom cluster name", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -211,7 +239,7 @@ environments:
 
 		// Verify config file was created and updated with custom cluster
 		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
-		assertFileExists(t, configPath)
+		require.FileExists(t, configPath)
 
 		// Load and verify the config contains the custom cluster
 		config, err := project.LoadConfigFile(configPath)
@@ -219,6 +247,53 @@ environments:
 		require.Equal(t, "production", config.ClickHouse.Cluster)
 		require.Equal(t, project.DefaultClickHouseVersion, config.ClickHouse.Version)
 		require.Equal(t, project.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+
+		// Verify the ClickHouse XML file was created with the custom cluster name
+		clickhouseXMLPath := filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml")
+		require.FileExists(t, clickhouseXMLPath)
+		clickhouseXML, err := os.ReadFile(clickhouseXMLPath)
+		require.NoError(t, err)
+
+		// Check that the cluster name was properly replaced in all locations
+		xmlContent := string(clickhouseXML)
+		// In macros
+		require.Contains(t, xmlContent, "<cluster>production</cluster>")
+		// In remote_servers opening tag
+		require.Contains(t, xmlContent, "<production>")
+		// In remote_servers closing tag
+		require.Contains(t, xmlContent, "</production>")
+		// Should NOT have placeholder
+		require.NotContains(t, xmlContent, "$$CLUSTER")
+		// Should NOT have default cluster name
+		require.NotContains(t, xmlContent, "<cluster>cluster</cluster>")
+	})
+
+	t.Run("initializes with cluster name containing special characters", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		options := project.InitOptions{
+			Cluster: "prod_cluster_01",
+		}
+
+		p := project.New(tmpDir)
+		require.NoError(t, p.Initialize(options))
+
+		// Verify the ClickHouse XML file was created with the cluster name with special chars
+		clickhouseXMLPath := filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml")
+		require.FileExists(t, clickhouseXMLPath)
+		clickhouseXML, err := os.ReadFile(clickhouseXMLPath)
+		require.NoError(t, err)
+
+		// Check that the cluster name with underscores and numbers works correctly
+		xmlContent := string(clickhouseXML)
+		// In macros
+		require.Contains(t, xmlContent, "<cluster>prod_cluster_01</cluster>")
+		// In remote_servers opening tag
+		require.Contains(t, xmlContent, "<prod_cluster_01>")
+		// In remote_servers closing tag
+		require.Contains(t, xmlContent, "</prod_cluster_01>")
+		// Should NOT have placeholder
+		require.NotContains(t, xmlContent, "$$CLUSTER")
 	})
 
 	t.Run("initializes with default cluster when not specified", func(t *testing.T) {
@@ -237,23 +312,23 @@ environments:
 		require.NoError(t, err)
 		require.Equal(t, project.DefaultClickHouseCluster, config.ClickHouse.Cluster)
 		require.Equal(t, "cluster", config.ClickHouse.Cluster)
+
+		// Verify the ClickHouse XML file was created with the default cluster name
+		clickhouseXMLPath := filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml")
+		require.FileExists(t, clickhouseXMLPath)
+		clickhouseXML, err := os.ReadFile(clickhouseXMLPath)
+		require.NoError(t, err)
+
+		// Check that the default cluster name is used in all locations
+		xmlContent := string(clickhouseXML)
+		// In macros
+		require.Contains(t, xmlContent, "<cluster>cluster</cluster>")
+		// In remote_servers - count occurrences to make sure both tags exist
+		clusterOpenCount := strings.Count(xmlContent, "<cluster>")
+		clusterCloseCount := strings.Count(xmlContent, "</cluster>")
+		require.GreaterOrEqual(t, clusterOpenCount, 2, "Should have at least 2 <cluster> tags (one in macros, one in remote_servers)")
+		require.GreaterOrEqual(t, clusterCloseCount, 2, "Should have at least 2 </cluster> tags")
+		// Should NOT have placeholder
+		require.NotContains(t, xmlContent, "$$CLUSTER")
 	})
-}
-
-func assertDirExists(t *testing.T, path string) {
-	t.Helper()
-	info, err := os.Stat(path)
-	require.NoError(t, err)
-	require.True(t, info.IsDir(), "path should be a directory: %s", path)
-}
-
-func assertFileExists(t *testing.T, path string) {
-	t.Helper()
-	info, err := os.Stat(path)
-	require.NoError(t, err)
-	require.False(t, info.IsDir(), "path should be a file: %s", path)
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
 }
