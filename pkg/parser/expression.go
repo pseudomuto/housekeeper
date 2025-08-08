@@ -144,11 +144,13 @@ type (
 		Name     string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
-	// FunctionCall represents function invocations
+	// FunctionCall represents function invocations, including parameterized functions like quantilesState(0.5, 0.75)(value)
 	FunctionCall struct {
-		Name      string        `parser:"@(Ident | BacktickIdent)"`
-		Arguments []FunctionArg `parser:"'(' (@@ (',' @@)*)? ')'"`
-		Over      *OverClause   `parser:"@@?"`
+		Name             string        `parser:"@(Ident | BacktickIdent)"`
+		FirstParentheses []FunctionArg `parser:"'(' (@@ (',' @@)*)? ')'"`
+		// Optional second set of parentheses for parameterized functions
+		SecondParentheses []FunctionArg `parser:"('(' (@@ (',' @@)*)? ')')?"`
+		Over              *OverClause   `parser:"@@?"`
 	}
 
 	// FunctionArg represents arguments in function calls (can be * or expression)
@@ -473,14 +475,30 @@ func (i IdentifierExpr) String() string {
 
 // String returns the string representation of a FunctionCall with function name and arguments.
 func (f FunctionCall) String() string {
-	result := f.Name + "("
-	for i, arg := range f.Arguments {
+	result := f.Name
+
+	// First set of parentheses
+	result += "("
+	for i, arg := range f.FirstParentheses {
 		if i > 0 {
 			result += ", "
 		}
 		result += arg.String()
 	}
 	result += ")"
+
+	// Second set of parentheses if present (for parameterized functions)
+	if len(f.SecondParentheses) > 0 {
+		result += "("
+		for i, arg := range f.SecondParentheses {
+			if i > 0 {
+				result += ", "
+			}
+			result += arg.String()
+		}
+		result += ")"
+	}
+
 	return result
 }
 

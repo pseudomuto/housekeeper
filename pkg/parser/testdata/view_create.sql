@@ -115,6 +115,7 @@ AS SELECT
     sumState(amount) AS total_amount_state,
     avgState(duration) AS avg_duration_state,
     uniqState(session_id) AS unique_sessions_state,
+    quantilesState(0.5, 0.75, 0.95)(response_time) AS response_time_quantiles_state,
     maxState(value) AS max_value_state,
     minState(value) AS min_value_state,
     countState() AS count_state
