@@ -267,3 +267,57 @@ tables:
         - name: sales_amount
           data_type: Decimal(10, 2)
       order_by: expression
+    - name: web_vital_events_by_hour
+      database: sessions
+      operation: CREATE
+      engine: Distributed('datawarehouse', 'sessions', 'web_vital_events_by_hour_local', rand())
+      columns:
+        - name: '`received_at`'
+          data_type: DateTime
+          codec: CODEC(DoubleDelta)
+        - name: '`pv_domain`'
+          data_type: LowCardinality(String)
+        - name: '`pv_browser`'
+          data_type: LowCardinality(String)
+        - name: '`pv_os`'
+          data_type: LowCardinality(String)
+        - name: '`pv_device_type`'
+          data_type: LowCardinality(String)
+        - name: '`pv_country_code`'
+          data_type: LowCardinality(String)
+        - name: '`current_url`'
+          data_type: String
+        - name: '`current_ref_url`'
+          data_type: String
+        - name: '`vital_name`'
+          data_type: LowCardinality(String)
+        - name: '`vital_rating`'
+          data_type: LowCardinality(String)
+        - name: '`value_avg`'
+          data_type: AggregateFunction(avg, Float64)
+        - name: '`value_min`'
+          data_type: AggregateFunction(min, Float64)
+        - name: '`value_max`'
+          data_type: AggregateFunction(max, Float64)
+        - name: '`value_quantiles`'
+          data_type: AggregateFunction(quantiles(0.5, 0.75, 0.9, 0.95, 0.99), Float64)
+        - name: '`count`'
+          data_type: AggregateFunction(sum, UInt32)
+        - name: '`users`'
+          data_type: AggregateFunction(uniq, UUID)
+        - name: '`visits`'
+          data_type: AggregateFunction(uniq, UUID)
+    - name: daily_aggregates
+      database: metrics
+      operation: CREATE
+      engine: AggregatingMergeTree
+      columns:
+        - name: date
+          data_type: Date
+        - name: metric_sum
+          data_type: SimpleAggregateFunction(sum, Float64)
+        - name: metric_max
+          data_type: SimpleAggregateFunction(max, Float64)
+        - name: metric_any
+          data_type: SimpleAggregateFunction(any, String)
+      order_by: expression

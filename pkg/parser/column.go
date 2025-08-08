@@ -104,11 +104,18 @@ type (
 		Parameters []TypeParameter `parser:"('(' @@ (',' @@)* ')')?"`
 	}
 
-	// TypeParameter represents a parameter in a parametric type (can be number or identifier)
+	// TypeParameter represents a parameter in a parametric type (can be number, identifier, string, or nested function call)
 	TypeParameter struct {
-		Number *string `parser:"@Number"`
-		Ident  *string `parser:"| @(Ident | BacktickIdent)"`
-		String *string `parser:"| @String"`
+		Function *ParametricFunction `parser:"@@"`
+		Number   *string             `parser:"| @Number"`
+		String   *string             `parser:"| @String"`
+		Ident    *string             `parser:"| @(Ident | BacktickIdent)"`
+	}
+
+	// ParametricFunction represents a function call within type parameters (e.g., quantiles(0.5, 0.75))
+	ParametricFunction struct {
+		Name       string          `parser:"@(Ident | BacktickIdent)"`
+		Parameters []TypeParameter `parser:"'(' (@@ (',' @@)*)? ')'"`
 	}
 
 	// DefaultClause represents DEFAULT, MATERIALIZED, EPHEMERAL, or ALIAS expressions

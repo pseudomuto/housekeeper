@@ -57,17 +57,43 @@ func (f *Formatter) formatSimpleDataType(simple *parser.SimpleType) string {
 		result += "("
 		var params []string
 		for _, param := range simple.Parameters {
-			if param.String != nil {
+			if param.Function != nil {
+				params = append(params, f.formatParametricFunction(param.Function))
+			} else if param.String != nil {
 				params = append(params, *param.String)
 			} else if param.Number != nil {
 				params = append(params, *param.Number)
 			} else if param.Ident != nil {
-				params = append(params, f.identifier(*param.Ident))
+				params = append(params, *param.Ident)
 			}
 		}
 		result += strings.Join(params, ", ")
 		result += ")"
 	}
+	return result
+}
+
+// formatParametricFunction formats a function call within type parameters
+func (f *Formatter) formatParametricFunction(fn *parser.ParametricFunction) string {
+	if fn == nil {
+		return ""
+	}
+
+	result := fn.Name + "("
+	var params []string
+	for _, param := range fn.Parameters {
+		if param.Function != nil {
+			params = append(params, f.formatParametricFunction(param.Function))
+		} else if param.String != nil {
+			params = append(params, *param.String)
+		} else if param.Number != nil {
+			params = append(params, *param.Number)
+		} else if param.Ident != nil {
+			params = append(params, *param.Ident)
+		}
+	}
+	result += strings.Join(params, ", ")
+	result += ")"
 	return result
 }
 

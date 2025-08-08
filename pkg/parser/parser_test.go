@@ -948,6 +948,31 @@ func formatTableEngine(engine *TableEngine) string {
 	return result
 }
 
+// formatParametricFunction formats a function call within type parameters for tests
+func formatParametricFunction(fn *ParametricFunction) string {
+	if fn == nil {
+		return ""
+	}
+
+	result := fn.Name + "("
+	for i, param := range fn.Parameters {
+		if i > 0 {
+			result += ", "
+		}
+		if param.Function != nil {
+			result += formatParametricFunction(param.Function)
+		} else if param.String != nil {
+			result += *param.String
+		} else if param.Number != nil {
+			result += *param.Number
+		} else if param.Ident != nil {
+			result += *param.Ident
+		}
+	}
+	result += ")"
+	return result
+}
+
 // formatDataType formats a data type with all its components
 func formatDataType(dataType *DataType) string {
 	if dataType == nil {
@@ -999,7 +1024,9 @@ func formatDataType(dataType *DataType) string {
 				if i > 0 {
 					result += ", "
 				}
-				if param.String != nil {
+				if param.Function != nil {
+					result += formatParametricFunction(param.Function)
+				} else if param.String != nil {
 					result += *param.String
 				} else if param.Number != nil {
 					result += *param.Number

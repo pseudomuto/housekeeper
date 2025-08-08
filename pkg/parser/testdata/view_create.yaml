@@ -63,3 +63,8 @@ views:
       materialized: true
       operation: CREATE
       engine: MergeTree()ORDERBY(date,region)
+    - name: mv_user_stats_state
+      database: metrics
+      materialized: true
+      operation: CREATE
+      to: metrics.user_stats_aggregated

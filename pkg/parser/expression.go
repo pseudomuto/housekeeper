@@ -569,6 +569,31 @@ func (s Subquery) String() string {
 	return "(SELECT ...)"
 }
 
+// formatParametricFunctionForExpression formats a function call within type parameters for expressions
+func formatParametricFunctionForExpression(fn *ParametricFunction) string {
+	if fn == nil {
+		return ""
+	}
+
+	result := fn.Name + "("
+	for i, param := range fn.Parameters {
+		if i > 0 {
+			result += ", "
+		}
+		if param.Function != nil {
+			result += formatParametricFunctionForExpression(param.Function)
+		} else if param.String != nil {
+			result += *param.String
+		} else if param.Number != nil {
+			result += *param.Number
+		} else if param.Ident != nil {
+			result += *param.Ident
+		}
+	}
+	result += ")"
+	return result
+}
+
 // formatDataTypeForExpression formats a DataType for use in expressions
 func formatDataTypeForExpression(dataType DataType) string {
 	if dataType.Nullable != nil {
@@ -606,7 +631,9 @@ func formatDataTypeForExpression(dataType DataType) string {
 				if i > 0 {
 					result += ", "
 				}
-				if param.String != nil {
+				if param.Function != nil {
+					result += formatParametricFunctionForExpression(param.Function)
+				} else if param.String != nil {
 					result += *param.String
 				} else if param.Number != nil {
 					result += *param.Number
