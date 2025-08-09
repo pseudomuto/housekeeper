@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	. "github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -124,11 +125,6 @@ func TestMigrationGeneration(t *testing.T) {
 		})
 	}
 }
-
-const (
-	dirPerm  = os.FileMode(0o755)
-	filePerm = os.FileMode(0o644)
-)
 
 func TestGenerateMigrationFile(t *testing.T) {
 	t.Run("generates migration file with correct timestamp format", func(t *testing.T) {
@@ -310,7 +306,7 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		migrationDir := filepath.Join(tempDir, "readonly")
 
 		// Create migration directory but make it read-only
-		err := os.MkdirAll(migrationDir, dirPerm)
+		err := os.MkdirAll(migrationDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		err = os.Chmod(migrationDir, 0o444) // Read-only
@@ -318,7 +314,7 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 
 		// Restore permissions after test
 		defer func() {
-			_ = os.Chmod(migrationDir, dirPerm)
+			_ = os.Chmod(migrationDir, consts.ModeDir)
 		}()
 
 		// Create simple schemas

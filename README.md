@@ -12,6 +12,8 @@ A modern command-line tool for managing ClickHouse schema migrations with compre
 - **Project Management**: Complete project initialization and schema compilation with import directives
 - **Migration File Generation**: Timestamped migration files with UTC format and automatic directory creation
 - **Migration Set Management**: Load, validate, and manage migration files with SumFile integrity checking
+- **Docker Integration**: ClickHouse container management using testcontainers for migration testing and validation
+- **Constants Management**: Centralized file permission constants for consistent filesystem operations
 - **SQL Formatting**: Professional SQL output with configurable styling, indentation, and ClickHouse-optimized backtick formatting
 - **Intelligent Migrations**: Smart comparison and migration generation with proper operation ordering
 - **Expression Engine**: Advanced expression parsing with proper operator precedence
@@ -219,30 +221,27 @@ housekeeper init
 This creates the following structure:
 ```
 my-clickhouse-project/
-├── housekeeper.yaml        # Environment configuration
+├── housekeeper.yaml        # Project configuration
 ├── db/
 │   ├── main.sql            # Main schema entrypoint
-│   ├── migrations/
-│   │   └── dev/            # Development migrations
+│   ├── config.d/           # ClickHouse configuration files
+│   │   └── _clickhouse.xml # Generated cluster configuration
+│   ├── migrations/         # Generated migration files
 │   └── schemas/            # Organized schema files
 ```
 
 #### Configuration File
 
-The `housekeeper.yaml` file defines environments and their schema entrypoints:
+The `housekeeper.yaml` file defines the project configuration:
 
 ```yaml
-environments:
-  - name: local
-    dev: clickhouse://localhost:9000/dev_db
-    url: clickhouse://localhost:9000/prod_db
-    entrypoint: db/main.sql
-  - name: staging
-    url: clickhouse://staging:9443/staging_db
-    entrypoint: db/staging.sql
-  - name: production
-    url: clickhouse://prod:9443/prod_db
-    entrypoint: db/production.sql
+clickhouse:
+  version: "25.7"           # ClickHouse version for Docker containers
+  config_dir: "db/config.d" # ClickHouse configuration directory
+  cluster: "cluster"        # Default cluster name for ON CLUSTER operations
+
+entrypoint: db/main.sql     # Main schema file with import directives
+dir: db/migrations          # Directory for generated migration files
 ```
 
 #### Schema Import System
@@ -275,14 +274,14 @@ CREATE TABLE analytics.events (
 #### Compile and Validate Schemas
 
 ```bash
-# Compile schema for specific environment with import resolution
-housekeeper schema compile --env production
+# Compile schema with import resolution
+housekeeper schema compile
 
-# Compile to file for deployment
-housekeeper schema compile --env production --out compiled_schema.sql
+# Compile to file for deployment  
+housekeeper schema compile --out compiled_schema.sql
 
-# Compile development environment to stdout
-housekeeper schema compile --env local
+# Use with specific configuration file
+housekeeper schema compile --config custom_config.yaml
 ```
 
 The compile command:
@@ -1090,13 +1089,13 @@ import (
 func main() {
     // Initialize project
     proj := project.New("/path/to/project")
-    err := proj.Initialize()
+    err := proj.Initialize(project.InitOptions{})
     if err != nil {
         log.Fatal(err)
     }
 
-    // Load migration set for environment
-    migrationSet, err := proj.LoadMigrationSet("production")
+    // Load migration set
+    migrationSet, err := proj.LoadMigrationSet()
     if err != nil {
         log.Fatal(err)
     }

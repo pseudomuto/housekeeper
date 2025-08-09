@@ -6,13 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	dirPerms  = os.FileMode(0o755)
-	filePerms = os.FileMode(0o644)
 )
 
 func TestProjectInitialize_CreatesDirectoriesAndFiles(t *testing.T) {
@@ -62,14 +58,14 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		// Create an existing file with custom content
 		existingContent := []byte("entrypoint: custom.sql\ndir: custom/migrations")
 		housekeeperPath := filepath.Join(tmpDir, "housekeeper.yaml")
-		require.NoError(t, os.WriteFile(housekeeperPath, existingContent, filePerms))
+		require.NoError(t, os.WriteFile(housekeeperPath, existingContent, consts.ModeFile))
 
 		// Create an existing ClickHouse XML with custom content
 		configDir := filepath.Join(tmpDir, "db", "config.d")
-		require.NoError(t, os.MkdirAll(configDir, dirPerms))
+		require.NoError(t, os.MkdirAll(configDir, consts.ModeDir))
 		existingXMLContent := []byte("<clickhouse><custom>value</custom></clickhouse>")
 		clickhouseXMLPath := filepath.Join(configDir, "_clickhouse.xml")
-		require.NoError(t, os.WriteFile(clickhouseXMLPath, existingXMLContent, filePerms))
+		require.NoError(t, os.WriteFile(clickhouseXMLPath, existingXMLContent, consts.ModeFile))
 
 		// Initialize the project
 		p := project.New(tmpDir)
@@ -91,10 +87,10 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 
 		// Create an existing directory with a custom file
 		dbDir := filepath.Join(tmpDir, "db")
-		require.NoError(t, os.MkdirAll(dbDir, dirPerms))
+		require.NoError(t, os.MkdirAll(dbDir, consts.ModeDir))
 
 		customFile := filepath.Join(dbDir, "custom.sql")
-		require.NoError(t, os.WriteFile(customFile, []byte("custom"), filePerms))
+		require.NoError(t, os.WriteFile(customFile, []byte("custom"), consts.ModeFile))
 
 		// Initialize the project
 		p := project.New(tmpDir)
@@ -124,7 +120,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, err)
 
 		modifiedContent := append(originalContent, []byte("\n# Custom comment")...)
-		require.NoError(t, os.WriteFile(housekeeperPath, modifiedContent, filePerms))
+		require.NoError(t, os.WriteFile(housekeeperPath, modifiedContent, consts.ModeFile))
 
 		// Second initialization
 		require.NoError(t, p.Initialize(project.InitOptions{}))
@@ -140,7 +136,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 
 		// Create only the top-level db directory
 		dbDir := filepath.Join(tmpDir, "db")
-		err := os.MkdirAll(dbDir, dirPerms)
+		err := os.MkdirAll(dbDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		p := project.New(tmpDir)
@@ -160,7 +156,7 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 		filePath := filepath.Join(tmpDir, "not_a_dir")
 
 		// Create a file instead of directory
-		err := os.WriteFile(filePath, []byte("content"), filePerms)
+		err := os.WriteFile(filePath, []byte("content"), consts.ModeFile)
 		require.NoError(t, err)
 
 		p := project.New(filePath)
@@ -216,7 +212,7 @@ entrypoint: db/main.sql
 dir: db/migrations
 `
 		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
-		require.NoError(t, os.WriteFile(configPath, []byte(configContent), filePerms))
+		require.NoError(t, os.WriteFile(configPath, []byte(configContent), consts.ModeFile))
 
 		p := project.New(tmpDir)
 		require.NoError(t, p.Initialize(project.InitOptions{}))

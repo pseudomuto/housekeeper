@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestProjectParseSchema(t *testing.T) {
 		configContent, err := os.ReadFile("testdata/housekeeper.yaml")
 		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), configContent, filePerms))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), configContent, consts.ModeFile))
 
 		// Copy test schema files
 		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
@@ -62,7 +63,7 @@ func TestProjectParseSchema(t *testing.T) {
 entrypoint: db/with_imports.sql
 dir: db/migrations`
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
 
 		p := project.New(tmpDir)
@@ -99,7 +100,7 @@ dir: db/migrations`
 entrypoint: db/staging.sql
 dir: db/migrations`
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
 
 		p := project.New(tmpDir)
@@ -129,7 +130,7 @@ dir: db/migrations`
 entrypoint: ""
 dir: ""`
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 
 		p := project.New(tmpDir)
 		require.NoError(t, p.Initialize(project.InitOptions{}))
@@ -146,7 +147,7 @@ dir: ""`
 		configContent := `entrypoint: nonexistent/file.sql
 dir: db/migrations`
 
-		err := os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerms)
+		err := os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		p := project.New(tmpDir)

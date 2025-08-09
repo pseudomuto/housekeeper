@@ -8,6 +8,7 @@ import (
 	"testing/fstest"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,12 +23,12 @@ var (
 	defaultClickHouseXML []byte
 
 	image = fstest.MapFS{
-		"db":                          {Mode: os.ModeDir | 0o755},
-		"db/config.d":                 {Mode: os.ModeDir | 0o755},
+		"db":                          {Mode: os.ModeDir | consts.ModeDir},
+		"db/config.d":                 {Mode: os.ModeDir | consts.ModeDir},
 		"db/config.d/_clickhouse.xml": {Data: defaultClickHouseXML},
 		"db/main.sql":                 {Data: defaultMainSQL},
-		"db/migrations":               {Mode: os.ModeDir | 0o755},
-		"db/schemas":                  {Mode: os.ModeDir | 0o755},
+		"db/migrations":               {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas":                  {Mode: os.ModeDir | consts.ModeDir},
 		"housekeeper.yaml":            {Data: defaultHouseKeeper},
 	}
 )
@@ -52,15 +53,15 @@ type (
 // Example:
 //
 //	// Create a new project in an existing directory
-//	project := project.New("/path/to/my/clickhouse/project")
+//	proj := project.New("/path/to/my/clickhouse/project")
 //
 //	// Initialize the project structure and configuration
-//	if err := project.Initialize(); err != nil {
+//	if err := proj.Initialize(project.InitOptions{}); err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	// Parse project schema
-//	grammar, err := project.ParseSchema()
+//	// Parse project schema for specific environment
+//	grammar, err := proj.ParseSchema("production")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -78,13 +79,13 @@ func New(path string) *Project {
 //
 // Example:
 //
-//	project := project.New("/path/to/my/project")
-//	if err := project.Initialize(); err != nil {
+//	proj := project.New("/path/to/my/project")
+//	if err := proj.Initialize(project.InitOptions{}); err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
 //	// Project is now ready for schema parsing
-//	grammar, err := project.ParseSchema()
+//	grammar, err := proj.ParseSchema("production")
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}
@@ -98,14 +99,14 @@ func New(path string) *Project {
 //
 // Example:
 //
-//	project := project.New("/path/to/my/project")
+//	proj := project.New("/path/to/my/project")
 //	options := project.InitOptions{Cluster: "production"}
-//	if err := project.Initialize(options); err != nil {
+//	if err := proj.Initialize(options); err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
 //	// Or with defaults:
-//	if err := project.Initialize(project.InitOptions{}); err != nil {
+//	if err := proj.Initialize(project.InitOptions{}); err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 func (p *Project) Initialize(options InitOptions) error {
@@ -114,7 +115,7 @@ func (p *Project) Initialize(options InitOptions) error {
 		return err
 	}
 
-	perm := os.FileMode(0o644)
+	perm := consts.ModeFile
 
 	// Determine the cluster name to use
 	clusterName := options.Cluster
@@ -147,7 +148,7 @@ func (p *Project) Initialize(options InitOptions) error {
 
 		// Ensure parent directory exists
 		parentDir := filepath.Dir(fullPath)
-		if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		if err := os.MkdirAll(parentDir, consts.ModeDir); err != nil {
 			return errors.Wrapf(err, "failed to create parent directory %s", parentDir)
 		}
 
@@ -198,7 +199,7 @@ func (p *Project) Initialize(options InitOptions) error {
 	// Create ClickHouse config directory if it doesn't exist
 	configDirPath := filepath.Join(p.root, cfg.ClickHouse.ConfigDir)
 	if _, err := os.Stat(configDirPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(configDirPath, 0o755); err != nil {
+		if err := os.MkdirAll(configDirPath, consts.ModeDir); err != nil {
 			return errors.Wrapf(err, "failed to create ClickHouse config directory %s", configDirPath)
 		}
 	}

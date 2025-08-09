@@ -6,14 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	dirPerm  = os.FileMode(0o755)
-	filePerm = os.FileMode(0o644)
 )
 
 func TestLoadMigrationSet(t *testing.T) {
@@ -73,15 +69,15 @@ func TestLoadMigrationSet(t *testing.T) {
 		// Create config
 		configContent := `entrypoint: db/main.sql
 dir: migrations`
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), filePerm))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tmpDir, "migrations")
-		require.NoError(t, os.MkdirAll(migrationsDir, dirPerm))
+		require.NoError(t, os.MkdirAll(migrationsDir, consts.ModeDir))
 
 		// Create a migration file
 		migrationContent := "CREATE DATABASE test_db;"
-		require.NoError(t, os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), filePerm))
+		require.NoError(t, os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), consts.ModeFile))
 
 		// Create and write proper sum file using migrator
 		sumFile := migrator.NewSumFile()
@@ -114,12 +110,12 @@ dir: migrations`
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create sum file with different case
@@ -154,20 +150,20 @@ dir: migrations/test`
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create subdirectory that should be skipped
-		err = os.MkdirAll(filepath.Join(migrationsDir, "subdir"), dirPerm)
+		err = os.MkdirAll(filepath.Join(migrationsDir, "subdir"), consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create migration file
-		err = os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte("CREATE DATABASE test;"), filePerm)
+		err = os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte("CREATE DATABASE test;"), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Initialize project and load migration set
@@ -210,7 +206,7 @@ dir: migrations/test`
 entrypoint: db/main.sql
 dir: nonexistent/migrations`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Initialize project
@@ -232,17 +228,17 @@ dir: nonexistent/migrations`
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create invalid sum file
 		sumFilePath := filepath.Join(migrationsDir, "housekeeper.sum")
-		err = os.WriteFile(sumFilePath, []byte("invalid sum file content"), filePerm)
+		err = os.WriteFile(sumFilePath, []byte("invalid sum file content"), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Initialize project
@@ -329,17 +325,17 @@ func TestMigrationSet_GenerateSumFile(t *testing.T) {
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory but with a file that will be deleted
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create a migration file then delete it after loading the migration set
 		migrationPath := filepath.Join(migrationsDir, "001_test.sql")
-		err = os.WriteFile(migrationPath, []byte("CREATE TABLE test;"), filePerm)
+		err = os.WriteFile(migrationPath, []byte("CREATE TABLE test;"), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Load migration set
@@ -370,17 +366,17 @@ func TestMigrationSet_IsValid(t *testing.T) {
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create a migration file
 		migrationContent := "CREATE DATABASE test_db ENGINE = Atomic;"
-		err = os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), filePerm)
+		err = os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Generate sum file that matches the migration
@@ -439,17 +435,17 @@ dir: migrations/test`
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create a migration file
 		migrationContent := "CREATE DATABASE test_db;"
-		err = os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), filePerm)
+		err = os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create a sum file with different content (mismatched hash)
@@ -488,17 +484,17 @@ dir: migrations/test`
 		configContent := `entrypoint: db/main.sql
 dir: migrations/test`
 
-		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), filePerm)
+		err := os.WriteFile(filepath.Join(tempDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create migrations directory
 		migrationsDir := filepath.Join(tempDir, "migrations", "test")
-		err = os.MkdirAll(migrationsDir, dirPerm)
+		err = os.MkdirAll(migrationsDir, consts.ModeDir)
 		require.NoError(t, err)
 
 		// Create migration file and sum file
 		migrationPath := filepath.Join(migrationsDir, "001_init.sql")
-		err = os.WriteFile(migrationPath, []byte("CREATE TABLE test;"), filePerm)
+		err = os.WriteFile(migrationPath, []byte("CREATE TABLE test;"), consts.ModeFile)
 		require.NoError(t, err)
 
 		// Create a sum file (content doesn't matter for this error test)

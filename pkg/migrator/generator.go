@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -258,7 +259,7 @@ func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (st
 	filename := timestamp + "_schema_update.sql"
 
 	// Ensure migration directory exists
-	if err := os.MkdirAll(migrationDir, 0o755); err != nil {
+	if err := os.MkdirAll(migrationDir, consts.ModeDir); err != nil {
 		return "", errors.Wrapf(err, "failed to create migration directory: %s", migrationDir)
 	}
 
@@ -266,7 +267,7 @@ func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (st
 	content := migration.SQL
 
 	migrationPath := filepath.Join(migrationDir, filename)
-	err = os.WriteFile(migrationPath, []byte(content), os.FileMode(0o644))
+	err = os.WriteFile(migrationPath, []byte(content), consts.ModeFile)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to write migration file: %s", migrationPath)
 	}

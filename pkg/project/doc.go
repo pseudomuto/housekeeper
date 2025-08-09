@@ -16,6 +16,7 @@
 //   - Schema compilation with recursive import processing
 //   - Template-based project bootstrapping
 //   - Integration with the ClickHouse DDL parser
+//   - Docker-based ClickHouse management for migration testing
 //
 // # Project Structure
 //
@@ -59,4 +60,15 @@
 //			fmt.Printf("Found table: %s\n", stmt.CreateTable.Name)
 //		}
 //	}
+//
+//	// Use Docker for migration testing
+//	dm := project.NewDockerManager()
+//	defer dm.Stop(ctx)
+//
+//	if err := dm.Start(ctx); err != nil {
+//		log.Fatal("Failed to start ClickHouse:", err)
+//	}
+//
+//	// Apply migrations and test schema
+//	dsn := dm.GetDSN() // localhost:9000
 package project

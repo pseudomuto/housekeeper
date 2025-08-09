@@ -58,7 +58,7 @@
 //	timestamp := time.Now().Format("20060102150405")
 //	migrationFile := fmt.Sprintf("%s_migration.sql", timestamp)
 //
-//	os.WriteFile(migrationFile, []byte(migration.SQL), 0644)
+//	os.WriteFile(migrationFile, []byte(migration.SQL), consts.ModeFile)
 //
 // The package will return errors for operations that cannot be safely
 // automated, such as database engine changes or cluster modifications.

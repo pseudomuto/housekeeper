@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 )
@@ -54,7 +55,7 @@ func initCmd() *cli.Command {
 				dir = path
 			}
 
-			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			if err := os.MkdirAll(dir, consts.ModeDir); err != nil {
 				return err
 			}
 
@@ -193,7 +194,7 @@ func overlayImage(targetDir string, fsImage fs.FS) error {
 
 		if d.IsDir() {
 			// Create directory if it doesn't exist
-			return os.MkdirAll(targetPath, os.ModePerm)
+			return os.MkdirAll(targetPath, consts.ModeDir)
 		}
 
 		// Check if file already exists
@@ -218,12 +219,12 @@ func overlayImage(targetDir string, fsImage fs.FS) error {
 		}
 
 		// Create directory for file if it doesn't exist
-		if err := os.MkdirAll(filepath.Dir(targetPath), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(targetPath), consts.ModeDir); err != nil {
 			return errors.Wrapf(err, "failed to create directory for %s", targetPath)
 		}
 
 		// Write file
-		if err := os.WriteFile(targetPath, data, os.FileMode(0o644)); err != nil {
+		if err := os.WriteFile(targetPath, data, consts.ModeFile); err != nil {
 			return errors.Wrapf(err, "failed to write file %s", targetPath)
 		}
 
