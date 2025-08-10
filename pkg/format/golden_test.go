@@ -33,7 +33,7 @@ func TestGoldenFiles(t *testing.T) {
 			require.NoError(t, err)
 
 			// Parse the SQL
-			sqlResult, err := parser.ParseSQL(string(inputSQL))
+			sqlResult, err := parser.ParseString(string(inputSQL))
 			require.NoError(t, err)
 
 			// Format all statements using the new API

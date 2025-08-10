@@ -11,11 +11,11 @@ import (
 
 //nolint:maintidx // Comprehensive test function covers all column parsing scenarios
 func TestColumnParsing(t *testing.T) {
-	// Helper function to parse a column definition via ParseSQL
+	// Helper function to parse a column definition via ParseString
 	parseColumn := func(colDef string) (*Column, error) {
 		// Wrap column definition in a CREATE TABLE statement
 		sql := fmt.Sprintf("CREATE TABLE test (%s) ENGINE = Memory();", colDef)
-		sqlResult, err := ParseSQL(sql)
+		sqlResult, err := ParseString(sql)
 		if err != nil {
 			return nil, err
 		}
@@ -290,11 +290,11 @@ func TestColumnParsing(t *testing.T) {
 }
 
 func TestComplexNestedTypes(t *testing.T) {
-	// Helper function to parse a column definition via ParseSQL
+	// Helper function to parse a column definition via ParseString
 	parseColumn := func(colDef string) (*Column, error) {
 		// Wrap column definition in a CREATE TABLE statement
 		sql := fmt.Sprintf("CREATE TABLE test (%s) ENGINE = Memory();", colDef)
-		sqlResult, err := ParseSQL(sql)
+		sqlResult, err := ParseString(sql)
 		if err != nil {
 			return nil, err
 		}

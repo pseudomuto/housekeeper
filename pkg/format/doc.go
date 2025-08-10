@@ -32,7 +32,7 @@
 //	err := format.Format(&buf, format.Defaults, statements...)
 //
 //	// Convenient SQL formatting
-//	sqlResult, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
+//	sqlResult, _ := parser.ParseString("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
 //	var buf bytes.Buffer
 //	err := format.FormatSQL(&buf, format.Defaults, sqlResult)
 //

@@ -99,7 +99,7 @@ var Defaults = FormatterOptions{
 //	})
 //
 //	// Parse SQL statement
-//	sqlResult, err := parser.ParseSQL("CREATE TABLE users (id UInt64, name String) ENGINE = MergeTree();")
+//	sqlResult, err := parser.ParseString("CREATE TABLE users (id UInt64, name String) ENGINE = MergeTree();")
 //	if err != nil {
 //		panic(err)
 //	}
@@ -152,7 +152,7 @@ func New(options FormatterOptions) *Formatter {
 //		"github.com/pseudomuto/housekeeper/pkg/parser"
 //	)
 //
-//	grammar, _ := parser.ParseSQL("CREATE DATABASE test;")
+//	grammar, _ := parser.ParseString("CREATE DATABASE test;")
 //	var buf bytes.Buffer
 //	err := format.Format(&buf, format.Defaults, sqlResult.Statements...)
 //	if err != nil {
@@ -175,7 +175,7 @@ func Format(w io.Writer, opts FormatterOptions, statements ...*parser.Statement)
 //		"github.com/pseudomuto/housekeeper/pkg/parser"
 //	)
 //
-//	sqlResult, _ := parser.ParseSQL("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
+//	sqlResult, _ := parser.ParseString("CREATE DATABASE test; CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();")
 //	var buf bytes.Buffer
 //	err := format.FormatSQL(&buf, format.Defaults, sqlResult)
 //	if err != nil {

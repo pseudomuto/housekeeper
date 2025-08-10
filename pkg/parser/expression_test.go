@@ -9,16 +9,16 @@ import (
 )
 
 func TestExpressionParsing(t *testing.T) {
-	// Helper function to test expressions via ParseSQL
+	// Helper function to test expressions via ParseString
 	testExpression := func(expr string) error {
 		// Wrap expression in a minimal SQL statement for parsing
 		sql := fmt.Sprintf("CREATE TABLE test (col String DEFAULT %s) ENGINE = Memory();", expr)
-		_, err := parser.ParseSQL(sql)
+		_, err := parser.ParseString(sql)
 		if err != nil {
 			// Try alternative contexts for expressions that may not work in DEFAULT
 			// Try in WHERE clause
 			sql = fmt.Sprintf("CREATE VIEW test AS SELECT * FROM table WHERE %s;", expr)
-			_, err = parser.ParseSQL(sql)
+			_, err = parser.ParseString(sql)
 		}
 		return err
 	}
@@ -186,7 +186,7 @@ func TestExpressionInContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sqlResult, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 			require.NotNil(t, sqlResult)
 			require.NotEmpty(t, sqlResult.Statements)

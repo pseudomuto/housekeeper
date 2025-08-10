@@ -46,7 +46,7 @@ func (p *Project) ParseSchema() (*parser.SQL, error) {
 		}
 
 		var err error
-		g, err = parser.ParseSQL(buf.String())
+		g, err = parser.ParseString(buf.String())
 		return errors.Wrap(err, "failed to parse schema SQL")
 	})
 

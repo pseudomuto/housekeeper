@@ -35,7 +35,7 @@ type databaseObjects struct {
 //
 // Example usage:
 //
-//	grammar, _ := parser.ParseSQL("CREATE DATABASE analytics; CREATE TABLE analytics.events (...);")
+//	grammar, _ := parser.ParseString("CREATE DATABASE analytics; CREATE TABLE analytics.events (...);"
 //	fsImage, err := project.GenerateImage(grammar)
 //	if err != nil {
 //		log.Fatal(err)

@@ -27,7 +27,7 @@
 // Basic usage:
 //
 //	// Parse SQL string with comprehensive DDL support
-//	grammar, err := parser.ParseSQL(`
+//	grammar, err := parser.ParseString(`
 //	    CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';
 //	    CREATE TABLE analytics.events (
 //	        id UUID DEFAULT generateUUIDv4(),

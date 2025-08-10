@@ -169,7 +169,7 @@ func TestFormatter_selectStatement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sqlResult, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, sqlResult.Statements, 1)
 			require.NotNil(t, sqlResult.Statements[0].SelectStatement)
@@ -222,7 +222,7 @@ func TestFormatter_SelectInView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sqlResult, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, sqlResult.Statements, 1)
 

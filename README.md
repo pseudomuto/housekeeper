@@ -732,7 +732,7 @@ func main() {
     // Parse SQL statements
     sql := `CREATE DATABASE analytics ENGINE = Atomic; CREATE TABLE analytics.events (id UUID, timestamp DateTime) ENGINE = MergeTree ORDER BY timestamp;`
     
-    grammar, err := parser.ParseSQL(sql)
+    grammar, err := parser.ParseString(sql)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
@@ -818,7 +818,7 @@ func main() {
     `
     
     // Parse the SQL
-    sql, err := parser.ParseSQL(sqlString)
+    sql, err := parser.ParseString(sqlString)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
@@ -863,7 +863,7 @@ func main() {
     }
     
     // Generate migrations
-    currentSQL, _ := parser.ParseSQL("CREATE DATABASE analytics;")
+    currentSQL, _ := parser.ParseString("CREATE DATABASE analytics;")
     targetSQL := sql
     
     diff, err := schemadiff.GenerateDiff(currentSQL, targetSQL)
@@ -931,7 +931,7 @@ func main() {
         SETTINGS max_threads = 8, max_memory_usage = 1000000000;
     `
     
-    grammar, err := parser.ParseSQL(selectSQL)
+    grammar, err := parser.ParseString(selectSQL)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
@@ -986,7 +986,7 @@ func main() {
         ORDER BY date DESC, events DESC;
     `
     
-    viewSQL, err := parser.ParseSQL(viewSQLString)
+    viewSQL, err := parser.ParseString(viewSQLString)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
@@ -1023,14 +1023,14 @@ import (
 
 func main() {
     // Define current and target schemas
-    currentSchema, err := parser.ParseSQL(`
+    currentSchema, err := parser.ParseString(`
         CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Old comment';
     `)
     if err != nil {
         log.Fatal(err)
     }
 
-    targetSchema, err := parser.ParseSQL(`
+    targetSchema, err := parser.ParseString(`
         CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Updated comment';
         CREATE TABLE analytics.events (
             id UInt64,

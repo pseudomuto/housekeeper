@@ -58,6 +58,25 @@ type (
 	}
 )
 
+// NewEngine creates a new Docker Engine instance for managing Docker operations.
+// The Docker client should be initialized and connected before passing to this constructor.
+//
+// Example:
+//
+//	// Create Docker client
+//	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer cli.Close()
+//
+//	// Create engine
+//	engine := docker.NewEngine(cli)
+//
+//	// Pull an image
+//	if err := engine.Pull(ctx, "clickhouse/clickhouse-server:latest"); err != nil {
+//		log.Fatal(err)
+//	}
 func NewEngine(cl DockerClient) *Engine {
 	return &Engine{
 		client: cl,

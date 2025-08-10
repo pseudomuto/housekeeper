@@ -151,7 +151,7 @@ func TestParserWithTestdata(t *testing.T) {
 			require.NoError(t, err)
 
 			// Parse SQL
-			grammar, err := ParseSQL(string(sqlData))
+			grammar, err := ParseString(string(sqlData))
 			require.NoError(t, err)
 
 			yamlPath := filepath.Join("testdata", yamlFile)

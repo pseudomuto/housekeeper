@@ -65,8 +65,8 @@ type (
 //		log.Fatal(err)
 //	}
 //
-//	// Parse project schema for specific environment
-//	grammar, err := proj.ParseSchema("production")
+//	// Parse project schema
+//	grammar, err := proj.ParseSchema()
 //	if err != nil {
 //		log.Fatal(err)
 //	}

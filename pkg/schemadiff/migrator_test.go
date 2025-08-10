@@ -84,7 +84,7 @@ func TestDiffGeneration(t *testing.T) {
 				if !strings.HasSuffix(currentSQLText, ";") {
 					currentSQLText += ";"
 				}
-				currentSQL, err = parser.ParseSQL(currentSQLText)
+				currentSQL, err = parser.ParseString(currentSQLText)
 				require.NoError(t, err)
 			}
 
@@ -95,7 +95,7 @@ func TestDiffGeneration(t *testing.T) {
 				if !strings.HasSuffix(targetSQLText, ";") {
 					targetSQLText += ";"
 				}
-				targetSQL, err = parser.ParseSQL(targetSQLText)
+				targetSQL, err = parser.ParseString(targetSQLText)
 				require.NoError(t, err)
 			}
 
@@ -140,10 +140,10 @@ func TestGenerateMigrationFile(t *testing.T) {
 		targetSQL := `CREATE DATABASE analytics ENGINE = Atomic COMMENT 'New comment';
 CREATE TABLE analytics.events (id UInt64, name String) ENGINE = MergeTree() ORDER BY id;`
 
-		current, err := parser.ParseSQL(currentSQL)
+		current, err := parser.ParseString(currentSQL)
 		require.NoError(t, err)
 
-		target, err := parser.ParseSQL(targetSQL)
+		target, err := parser.ParseString(targetSQL)
 		require.NoError(t, err)
 
 		// Generate migration file
@@ -182,10 +182,10 @@ CREATE TABLE analytics.events (id UInt64, name String) ENGINE = MergeTree() ORDE
 		targetSQL := `CREATE DATABASE test ENGINE = Atomic;
 CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 
-		current, err := parser.ParseSQL(currentSQL)
+		current, err := parser.ParseString(currentSQL)
 		require.NoError(t, err)
 
-		target, err := parser.ParseSQL(targetSQL)
+		target, err := parser.ParseString(targetSQL)
 		require.NoError(t, err)
 
 		// Generate migration - should create directory
@@ -211,10 +211,10 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 CREATE TABLE test.users (id UInt64, name String) ENGINE = MergeTree() ORDER BY id;`
 		targetSQL := `CREATE DATABASE test ENGINE = Atomic;`
 
-		current, err := parser.ParseSQL(currentSQL)
+		current, err := parser.ParseString(currentSQL)
 		require.NoError(t, err)
 
-		target, err := parser.ParseSQL(targetSQL)
+		target, err := parser.ParseString(targetSQL)
 		require.NoError(t, err)
 
 		// Generate UP migration (current -> target)
@@ -258,10 +258,10 @@ CREATE TABLE test.users (id UInt64, name String) ENGINE = MergeTree() ORDER BY i
 		sameSQL := `CREATE DATABASE test ENGINE = Atomic;
 CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 
-		current, err := parser.ParseSQL(sameSQL)
+		current, err := parser.ParseString(sameSQL)
 		require.NoError(t, err)
 
-		target, err := parser.ParseSQL(sameSQL)
+		target, err := parser.ParseString(sameSQL)
 		require.NoError(t, err)
 
 		// Try to generate migration with identical schemas
@@ -280,10 +280,10 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		currentSQL := `CREATE DATABASE test ENGINE = Atomic;`
 		targetSQL := `CREATE DATABASE test ENGINE = Atomic COMMENT 'Updated';`
 
-		current, err := parser.ParseSQL(currentSQL)
+		current, err := parser.ParseString(currentSQL)
 		require.NoError(t, err)
 
-		target, err := parser.ParseSQL(targetSQL)
+		target, err := parser.ParseString(targetSQL)
 		require.NoError(t, err)
 
 		// Generate multiple migrations rapidly
@@ -324,10 +324,10 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		currentSQL := `CREATE DATABASE test ENGINE = Atomic;`
 		targetSQL := `CREATE DATABASE test ENGINE = Atomic COMMENT 'New comment';`
 
-		current, err := parser.ParseSQL(currentSQL)
+		current, err := parser.ParseString(currentSQL)
 		require.NoError(t, err)
 
-		target, err := parser.ParseSQL(targetSQL)
+		target, err := parser.ParseString(targetSQL)
 		require.NoError(t, err)
 
 		// Try to generate migration - should fail due to write permission

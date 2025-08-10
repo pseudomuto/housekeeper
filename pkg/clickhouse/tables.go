@@ -96,7 +96,7 @@ func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
 	// Parse all statements into a SQL structure
 	combinedSQL := strings.Join(statements, "\n")
 
-	sqlResult, err := parser.ParseSQL(combinedSQL)
+	sqlResult, err := parser.ParseString(combinedSQL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse combined table DDL")
 	}

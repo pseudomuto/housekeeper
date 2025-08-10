@@ -86,7 +86,7 @@ func TestGenerateImage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse the SQL
-			grammar, err := parser.ParseSQL(tt.sql)
+			grammar, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 
 			// Generate the image
@@ -123,7 +123,7 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 		CREATE VIEW analytics.summary AS SELECT count() FROM events;
 	`
 
-	grammar, err := parser.ParseSQL(sql)
+	grammar, err := parser.ParseString(sql)
 	require.NoError(t, err)
 
 	fsImage, err := GenerateImage(grammar)

@@ -18,6 +18,6 @@ func cleanCreateStatement(createQuery string) string {
 
 // validateDDLStatement ensures the generated DDL statement is valid by parsing it
 func validateDDLStatement(ddl string) error {
-	_, err := parser.ParseSQL(ddl)
+	_, err := parser.ParseString(ddl)
 	return err
 }

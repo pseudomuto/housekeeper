@@ -39,7 +39,7 @@ func TestFormatter_Database(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sqlResult, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 			require.Len(t, sqlResult.Statements, 1)
 

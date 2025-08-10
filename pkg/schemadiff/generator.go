@@ -65,8 +65,8 @@ var (
 //		CREATE VIEW analytics.daily_stats AS SELECT date, count() FROM events GROUP BY date;
 //	`
 //
-//	current, _ := parser.ParseSQL(currentSQL)
-//	target, _ := parser.ParseSQL(targetSQL)
+//	current, _ := parser.ParseString(currentSQL)
+//	target, _ := parser.ParseString(targetSQL)
 //
 //	diff, err := GenerateDiff(current, target)
 //	if err != nil {
@@ -250,7 +250,7 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		return &parser.SQL{Statements: []*parser.Statement{}}, nil
 	}
 
-	parsedSQL, err := parser.ParseSQL(sql)
+	parsedSQL, err := parser.ParseString(sql)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse generated migration SQL")
 	}

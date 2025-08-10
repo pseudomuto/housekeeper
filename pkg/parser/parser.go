@@ -110,7 +110,7 @@ func GetLexer() lexer.Definition {
 	return clickhouseLexer
 }
 
-// ParseSQL parses ClickHouse DDL statements from a string and returns the parsed SQL structure.
+// ParseString parses ClickHouse DDL statements from a string and returns the parsed SQL structure.
 // This is the primary parsing function that converts SQL text into structured DDL statements.
 // It supports all implemented ClickHouse DDL operations including database creation,
 // modification, attachment, detachment, and deletion.
@@ -149,7 +149,7 @@ func GetLexer() lexer.Definition {
 //		RENAME TABLE analytics.old_view TO analytics.new_view;
 //	`
 //
-//	sqlResult, err := parser.ParseSQL(sql)
+//	sqlResult, err := parser.ParseString(sql)
 //	if err != nil {
 //		log.Fatalf("Parse error: %v", err)
 //	}
@@ -205,7 +205,7 @@ func GetLexer() lexer.Definition {
 //	}
 //
 // Returns an error if the SQL contains syntax errors or unsupported constructs.
-func ParseSQL(sql string) (*SQL, error) {
+func ParseString(sql string) (*SQL, error) {
 	return Parse(strings.NewReader(sql))
 }
 

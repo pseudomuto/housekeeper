@@ -19,7 +19,7 @@ func TestFormatter_Options(t *testing.T) {
 			AlignColumns:      true,
 		}
 
-		sqlResult, err := parser.ParseSQL(sql)
+		sqlResult, err := parser.ParseString(sql)
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
@@ -37,7 +37,7 @@ func TestFormatter_Options(t *testing.T) {
 			AlignColumns:      false,
 		}
 
-		sqlResult, err := parser.ParseSQL(sql)
+		sqlResult, err := parser.ParseString(sql)
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
@@ -63,7 +63,7 @@ func TestFormatter_Options(t *testing.T) {
 			AlignColumns:      false,
 		}
 
-		sqlResult, err := parser.ParseSQL(sql)
+		sqlResult, err := parser.ParseString(sql)
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
@@ -79,7 +79,7 @@ func TestFormatter_SQL(t *testing.T) {
 	sql := `CREATE DATABASE test;
 			CREATE TABLE test.users (id UInt64) ENGINE = MergeTree();`
 
-	sqlResult, err := parser.ParseSQL(sql)
+	sqlResult, err := parser.ParseString(sql)
 	require.NoError(t, err)
 	require.Len(t, sqlResult.Statements, 2)
 
@@ -93,7 +93,7 @@ func TestFormatter_SQL(t *testing.T) {
 
 func TestFormatter_FormatFunction(t *testing.T) {
 	sql := "CREATE DATABASE test;"
-	sqlResult, err := parser.ParseSQL(sql)
+	sqlResult, err := parser.ParseString(sql)
 	require.NoError(t, err)
 
 	// Test Format function with single statement
@@ -151,7 +151,7 @@ func TestFormatSQL_Function(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sqlResult, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 
 			var buf bytes.Buffer
@@ -177,7 +177,7 @@ func TestFormatSQL_Method(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sqlResult, err := parser.ParseSQL(tt.sql)
+			sqlResult, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 
 			formatter := New(FormatterOptions{
