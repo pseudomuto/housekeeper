@@ -866,15 +866,13 @@ func main() {
     currentSQL, _ := parser.ParseSQL("CREATE DATABASE analytics;")
     targetSQL := sql
     
-    migration, err := schemadiff.GenerateMigration(currentSQL, targetSQL, "add_tables_and_dicts")
+    diff, err := schemadiff.GenerateDiff(currentSQL, targetSQL)
     if err != nil {
         log.Fatalf("Migration error: %v", err)
     }
     
-    fmt.Println("UP Migration:")
-    fmt.Println(migration.Up)
-    fmt.Println("\nDOWN Migration:")
-    fmt.Println(migration.Down)
+    fmt.Println("Generated SQL:")
+    fmt.Println(diff.SQL)
 }
 
 func formatDataType(dataType parser.DataType) string {

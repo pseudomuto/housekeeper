@@ -35,8 +35,8 @@ import (
 //		log.Fatalf("Failed to get schema: %v", err)
 //	}
 //
-//	// Use with migration generation
-//	migration, err := schemadiff.GenerateMigration(currentSchema, targetSchema, "update")
+//	// Use with diff generation
+//	diff, err := schemadiff.GenerateDiff(currentSchema, targetSchema)
 //	if err != nil {
 //		log.Fatal(err)
 //	}

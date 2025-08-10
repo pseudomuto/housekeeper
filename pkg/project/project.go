@@ -212,6 +212,10 @@ func (p *Project) Initialize(options InitOptions) error {
 	return nil
 }
 
+func (p *Project) MigrationsDir() string {
+	return filepath.Join(p.root, "db", "migrations")
+}
+
 func (p *Project) ensureDirectory() error {
 	dir, err := os.Stat(p.root)
 	if err != nil {

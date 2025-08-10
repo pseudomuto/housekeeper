@@ -45,7 +45,10 @@ type (
 //
 // Example:
 //
-//	container := docker.New()
+//	container, err := docker.New()
+//	if err != nil {
+//		log.Fatal(err)
+//	}
 //
 //	// Start ClickHouse container
 //	if err := container.Start(ctx); err != nil {

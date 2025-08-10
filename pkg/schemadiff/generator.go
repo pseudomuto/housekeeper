@@ -31,13 +31,13 @@ var (
 )
 
 type (
-	// Migration represents a database migration with SQL statements
-	Migration struct {
+	// Diff represents a database schema difference with SQL statements
+	Diff struct {
 		SQL string // SQL contains the migration statements
 	}
 )
 
-// GenerateMigration creates a migration by comparing current and target schema states.
+// GenerateDiff creates a diff by comparing current and target schema states.
 // It analyzes the differences between the current schema and the desired target schema,
 // then generates appropriate DDL statements.
 //
@@ -72,10 +72,10 @@ type (
 //	current, _ := parser.ParseSQL(currentSQL)
 //	target, _ := parser.ParseSQL(targetSQL)
 //
-//	migration, err := GenerateMigration(current, target)
+//	diff, err := GenerateDiff(current, target)
 //
 //nolint:gocyclo,funlen,maintidx // Complex function handles multiple DDL statement types and migration ordering
-func GenerateMigration(current, target *parser.SQL) (*Migration, error) {
+func GenerateDiff(current, target *parser.SQL) (*Diff, error) {
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := compareDatabases(current, target)
 	if err != nil {
@@ -224,7 +224,7 @@ func GenerateMigration(current, target *parser.SQL) (*Migration, error) {
 
 	sql := strings.Join(statements, "\n\n")
 
-	return &Migration{
+	return &Diff{
 		SQL: sql,
 	}, nil
 }
@@ -247,8 +247,8 @@ func GenerateMigration(current, target *parser.SQL) (*Migration, error) {
 //	filename, err := GenerateMigrationFile("/path/to/migrations", currentSchema, targetSchema)
 //	// Creates: /path/to/migrations/20240806143022_schema_update.sql
 func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (string, error) {
-	// Generate migration using existing function
-	migration, err := GenerateMigration(current, target)
+	// Generate diff using existing function
+	diff, err := GenerateDiff(current, target)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate migration")
 	}
@@ -263,8 +263,8 @@ func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (st
 		return "", errors.Wrapf(err, "failed to create migration directory: %s", migrationDir)
 	}
 
-	// Write migration SQL to file
-	content := migration.SQL
+	// Write diff SQL to file
+	content := diff.SQL
 
 	migrationPath := filepath.Join(migrationDir, filename)
 	err = os.WriteFile(migrationPath, []byte(content), consts.ModeFile)

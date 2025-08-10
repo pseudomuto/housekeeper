@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
+	"github.com/pseudomuto/housekeeper/pkg/format"
+	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 )
@@ -182,7 +185,7 @@ func connectToClickHouse(ctx context.Context, container *docker.ClickHouseContai
 
 func applyAllMigrations(ctx context.Context, client *clickhouse.Client) error {
 	// Load the migration set from the current project
-	migrationSet, err := currentProject.LoadMigrationSet()
+	migrations, err := migrator.LoadMigrationDir(os.DirFS(currentProject.MigrationsDir()))
 	if err != nil {
 		// If the migrations directory doesn't exist, that's okay - just no migrations to apply
 		if os.IsNotExist(errors.Cause(err)) {
@@ -193,27 +196,23 @@ func applyAllMigrations(ctx context.Context, client *clickhouse.Client) error {
 	}
 
 	// Get migration files from the set
-	migrations := migrationSet.Files()
-	if len(migrations) == 0 {
+	if len(migrations.Migrations) == 0 {
 		fmt.Println("No migrations found")
 		return nil
 	}
 
-	// Optionally validate the migration set
-	isValid, err := migrationSet.IsValid()
-	if err != nil {
+	valid, err := migrations.Validate()
+	if !valid || err != nil {
 		fmt.Printf("Warning: could not validate migration set: %v\n", err)
-	} else if migrationSet.Sum() != nil && !isValid {
-		fmt.Println("Warning: Migration files have been modified since sum file was generated")
 	}
 
-	fmt.Printf("Applying %d migrations...\n", len(migrations))
+	fmt.Printf("Applying %d migrations...\n", len(migrations.Migrations))
 
-	for i, migrationFile := range migrations {
-		fmt.Printf("  [%d/%d] Applying %s\n", i+1, len(migrations), filepath.Base(migrationFile))
+	for i, migrationFile := range migrations.Migrations {
+		fmt.Printf("  [%d/%d] Applying %s.sql\n", i+1, len(migrations.Migrations), migrationFile.Version)
 
 		if err := applyMigration(ctx, client, migrationFile); err != nil {
-			return errors.Wrapf(err, "failed to apply migration: %s", migrationFile)
+			return errors.Wrapf(err, "failed to apply migration: %s.sql", migrationFile.Version)
 		}
 	}
 
@@ -293,25 +292,17 @@ func removeDevContainerInfo() error {
 	return nil
 }
 
-func applyMigration(ctx context.Context, client *clickhouse.Client, migrationFile string) error {
-	// Read migration file
-	content, err := os.ReadFile(migrationFile)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read migration file: %s", migrationFile)
-	}
-
-	// Split content into individual statements (basic splitting on semicolons)
-	statements := strings.SplitSeq(string(content), ";")
-
-	for stmt := range statements {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" {
-			continue
+func applyMigration(ctx context.Context, client *clickhouse.Client, migration *migrator.Migration) error {
+	fmtr := format.New(format.Defaults)
+	for _, stmt := range migration.Statements {
+		// Execute the statement
+		buf := new(bytes.Buffer)
+		if err := fmtr.Format(buf, stmt); err != nil {
+			return errors.Wrap(err, "failed to execute SQL statement")
 		}
 
-		// Execute the statement
-		if err := client.ExecuteMigration(ctx, stmt); err != nil {
-			return errors.Wrapf(err, "failed to execute statement: %s", stmt)
+		if err := client.ExecuteMigration(ctx, buf.String()); err != nil {
+			return errors.Wrapf(err, "failed to execute statement: %s", buf.String())
 		}
 	}
 

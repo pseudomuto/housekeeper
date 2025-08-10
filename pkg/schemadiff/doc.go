@@ -44,8 +44,8 @@
 //	// Parse target schema (from SQL files)
 //	targetSQL, _ := parser.ParseSQLFromDirectory("schema/")
 //
-//	// Generate migration
-//	migration, err := schemadiff.GenerateMigration(
+//	// Generate diff
+//	diff, err := schemadiff.GenerateDiff(
 //	    currentSQL,
 //	    targetSQL
 //	)
@@ -58,7 +58,7 @@
 //	timestamp := time.Now().Format("20060102150405")
 //	migrationFile := fmt.Sprintf("%s_migration.sql", timestamp)
 //
-//	os.WriteFile(migrationFile, []byte(migration.SQL), consts.ModeFile)
+//	os.WriteFile(migrationFile, []byte(diff.SQL), consts.ModeFile)
 //
 // The package will return errors for operations that cannot be safely
 // automated, such as database engine changes or cluster modifications.

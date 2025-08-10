@@ -1,8 +1,10 @@
 package parser
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
@@ -206,12 +208,7 @@ func GetLexer() lexer.Definition {
 //
 // Returns an error if the SQL contains syntax errors or unsupported constructs.
 func ParseSQL(sql string) (*SQL, error) {
-	sqlResult, err := parser.ParseString("", sql)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse SQL")
-	}
-
-	return sqlResult, nil
+	return Parse(strings.NewReader(sql))
 }
 
 // ParseSQLFromFile parses ClickHouse DDL statements from a file and returns the parsed SQL structure.
@@ -231,12 +228,67 @@ func ParseSQL(sql string) (*SQL, error) {
 //
 // Returns an error if the file cannot be read or contains invalid SQL.
 func ParseSQLFromFile(path string) (*SQL, error) {
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read SQL file")
 	}
+	defer func() { _ = file.Close() }()
 
-	return ParseSQL(string(data))
+	return Parse(file)
+}
+
+// Parse parses ClickHouse DDL statements from an io.Reader and returns the parsed SQL structure.
+// This function allows parsing SQL from any source that implements io.Reader, including files,
+// strings, network connections, or in-memory buffers.
+//
+// Example usage:
+//
+//	// Parse from a string
+//	reader := strings.NewReader("CREATE DATABASE test ENGINE = Atomic;")
+//	sqlResult, err := parser.Parse(reader)
+//	if err != nil {
+//		log.Fatalf("Parse error: %v", err)
+//	}
+//
+//	// Parse from a file
+//	file, err := os.Open("schema.sql")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer file.Close()
+//
+//	sqlResult, err = parser.Parse(file)
+//	if err != nil {
+//		log.Fatalf("Parse error: %v", err)
+//	}
+//
+//	// Parse from an HTTP response
+//	resp, err := http.Get("https://example.com/schema.sql")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer resp.Body.Close()
+//
+//	sqlResult, err = parser.Parse(resp.Body)
+//	if err != nil {
+//		log.Fatalf("Parse error: %v", err)
+//	}
+//
+//	// Access parsed statements
+//	for _, stmt := range sqlResult.Statements {
+//		if stmt.CreateDatabase != nil {
+//			fmt.Printf("CREATE DATABASE: %s\n", stmt.CreateDatabase.Name)
+//		}
+//	}
+//
+// Returns an error if the reader cannot be read or contains invalid SQL.
+func Parse(reader io.Reader) (*SQL, error) {
+	sqlResult, err := parser.Parse("", reader)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse SQL")
+	}
+
+	return sqlResult, nil
 }
 
 // ParseSQLFromDirectory parses all .sql files in a directory and returns combined SQL structure.
@@ -270,7 +322,7 @@ func ParseSQLFromDirectory(dir string) (*SQL, error) {
 	for _, file := range files {
 		sqlResult, err := ParseSQLFromFile(file)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse %s", file)
+			return nil, err
 		}
 
 		// Combine all statements
@@ -279,6 +331,3 @@ func ParseSQLFromDirectory(dir string) (*SQL, error) {
 
 	return &SQL{Statements: allStatements}, nil
 }
-
-// parseBalancedParentheses parses content within balanced parentheses
-// starting from the given position in the input string

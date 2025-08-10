@@ -17,7 +17,7 @@ import (
 	"gotest.tools/v3/golden"
 )
 
-func TestMigrationGeneration(t *testing.T) {
+func TestDiffGeneration(t *testing.T) {
 	// Find all *.in.sql test files
 	inputFiles, err := filepath.Glob("testdata/*.in.sql")
 	require.NoError(t, err)
@@ -99,8 +99,8 @@ func TestMigrationGeneration(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// Generate migration
-			migration, err := GenerateMigration(currentSQL, targetSQL)
+			// Generate diff
+			diff, err := GenerateDiff(currentSQL, targetSQL)
 			// Handle expected errors for unsupported operations
 			if err != nil {
 				if errors.Is(err, ErrNoDiff) {
@@ -117,10 +117,10 @@ func TestMigrationGeneration(t *testing.T) {
 				}
 			}
 
-			// Format the migration SQL
-			formattedSQL := formatMigrationSQL(migration.SQL)
+			// Format the diff SQL
+			formattedSQL := formatMigrationSQL(diff.SQL)
 
-			// Compare formatted migration SQL with golden file
+			// Compare formatted diff SQL with golden file
 			golden.Assert(t, formattedSQL, testName+".sql")
 		})
 	}
@@ -353,13 +353,13 @@ func formatMigrationSQL(sql string) string {
 	formattedSQL := strings.Join(lines, "\n\n")
 
 	// Try to parse and format the SQL, but fall back to raw SQL if it fails
-	parsedMigration, err := parser.ParseSQL(formattedSQL)
+	parsedDiff, err := parser.ParseSQL(formattedSQL)
 	if err != nil {
 		return formattedSQL
 	}
 
 	var formattedBuf bytes.Buffer
-	if err := format.FormatSQL(&formattedBuf, format.Defaults, parsedMigration); err != nil {
+	if err := format.FormatSQL(&formattedBuf, format.Defaults, parsedDiff); err != nil {
 		return formattedSQL
 	}
 
