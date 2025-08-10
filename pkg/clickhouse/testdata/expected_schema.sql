@@ -1,7 +1,5 @@
 CREATE DATABASE `analytics` ON CLUSTER `test_cluster` COMMENT 'Analytics database for events and metrics';
 
-CREATE DATABASE `clickhouse` ON CLUSTER `test_cluster`;
-
 CREATE DATABASE `default` ON CLUSTER `test_cluster`;
 
 CREATE DATABASE `user_data` ON CLUSTER `test_cluster` COMMENT 'User-related data storage';

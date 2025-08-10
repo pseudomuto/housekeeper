@@ -28,7 +28,7 @@ func skipIfNoDocker(t *testing.T) {
 }
 
 // setupDockerContainer creates a Docker container for testing
-func setupDockerContainer(t *testing.T, tmpDir string) *docker.Container {
+func setupDockerContainer(t *testing.T, tmpDir string, containerName string) *docker.ClickHouseContainer {
 	t.Helper()
 
 	// Create config directory structure
@@ -54,16 +54,19 @@ func setupDockerContainer(t *testing.T, tmpDir string) *docker.Container {
 	opts := docker.DockerOptions{
 		Version:   "25.7",
 		ConfigDir: configDir,
+		Name:      containerName,
 	}
 
-	return docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(opts)
+	require.NoError(t, err)
+	return container
 }
 
 func TestDockerContainer_StartStop(t *testing.T) {
 	skipIfNoDocker(t)
 
 	tmpDir := t.TempDir()
-	container := setupDockerContainer(t, tmpDir)
+	container := setupDockerContainer(t, tmpDir, "test-clickhouse-start-stop")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -81,11 +84,11 @@ func TestDockerContainer_StartStop(t *testing.T) {
 	require.NoError(t, err, "Failed to start ClickHouse container")
 
 	// Verify DSN is available
-	dsn, err := container.GetDSN()
+	dsn, err := container.GetDSN(ctx)
 	require.NoError(t, err)
 	require.Contains(t, dsn, ":", "DSN should contain host:port")
 
-	httpDSN, err := container.GetHTTPDSN()
+	httpDSN, err := container.GetHTTPDSN(ctx)
 	require.NoError(t, err)
 	require.Contains(t, httpDSN, "http://", "HTTP DSN should start with http://")
 
@@ -126,8 +129,10 @@ func TestDockerContainer_WithCustomOptions(t *testing.T) {
 	opts := docker.DockerOptions{
 		Version:   "24.3", // Different version for testing
 		ConfigDir: configDir,
+		Name:      "test-clickhouse-custom",
 	}
-	container := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(opts)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -141,15 +146,15 @@ func TestDockerContainer_WithCustomOptions(t *testing.T) {
 	}()
 
 	// Start the container
-	err := container.Start(ctx)
+	err = container.Start(ctx)
 	require.NoError(t, err)
 
 	// Verify DSN is available (testcontainers assigns dynamic ports)
-	dsn, err := container.GetDSN()
+	dsn, err := container.GetDSN(ctx)
 	require.NoError(t, err)
 	require.Contains(t, dsn, ":", "DSN should contain host:port")
 
-	httpDSN, err := container.GetHTTPDSN()
+	httpDSN, err := container.GetHTTPDSN(ctx)
 	require.NoError(t, err)
 	require.Contains(t, httpDSN, "http://", "HTTP DSN should start with http://")
 }
@@ -160,13 +165,15 @@ func TestDockerContainer_StopNonExistent(t *testing.T) {
 	// Use custom version for testing without config
 	opts := docker.DockerOptions{
 		Version: "24.3",
+		Name:    "test-clickhouse-stop-nonexistent",
 	}
-	container := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(opts)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 
 	// Stop should not error if container doesn't exist
-	err := container.Stop(ctx)
+	err = container.Stop(ctx)
 	require.NoError(t, err)
 }
 
@@ -206,8 +213,10 @@ func TestDockerContainer_RelativeConfigDir(t *testing.T) {
 	opts := docker.DockerOptions{
 		Version:   "24.3",
 		ConfigDir: relativeConfigDir, // Use relative path
+		Name:      "test-clickhouse-relative",
 	}
-	container := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(opts)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -221,11 +230,11 @@ func TestDockerContainer_RelativeConfigDir(t *testing.T) {
 	}()
 
 	// Start should work with relative ConfigDir (converted to absolute internally)
-	err := container.Start(ctx)
+	err = container.Start(ctx)
 	require.NoError(t, err, "Failed to start ClickHouse container with relative ConfigDir")
 
 	// Verify DSN is available
-	dsn, err := container.GetDSN()
+	dsn, err := container.GetDSN(ctx)
 	require.NoError(t, err)
 	require.Contains(t, dsn, ":", "DSN should contain host:port")
 }

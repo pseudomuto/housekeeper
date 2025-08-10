@@ -42,10 +42,11 @@ func TestDumpSchema(t *testing.T) {
 	require.NoError(t, os.WriteFile(configFile, configContent, consts.ModeFile))
 
 	// Start ClickHouse container using our Docker package
-	container := docker.NewWithOptions(docker.DockerOptions{
+	container, err := docker.NewWithOptions(docker.DockerOptions{
 		Version:   project.DefaultClickHouseVersion,
 		ConfigDir: configDir,
 	})
+	require.NoError(t, err)
 
 	// Clean up at end
 	defer func() { _ = container.Stop(ctx) }()
@@ -54,7 +55,7 @@ func TestDumpSchema(t *testing.T) {
 	require.NoError(t, container.Start(ctx), "Failed to start ClickHouse container")
 
 	// Get DSN and create client
-	dsn, err := container.GetDSN()
+	dsn, err := container.GetDSN(ctx)
 	require.NoError(t, err)
 
 	// Create client with cluster support

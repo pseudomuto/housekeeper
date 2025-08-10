@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
@@ -59,7 +58,15 @@ database state and generating appropriate migration files.`,
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			_, err := os.Stat(filepath.Join(cmd.String("dir"), "housekeeper.yaml"))
+			projectDir := cmd.String("dir")
+
+			// Change to project directory first
+			if err := os.Chdir(projectDir); err != nil {
+				return ctx, err
+			}
+
+			// Check if this is a housekeeper project
+			_, err := os.Stat("housekeeper.yaml")
 			if os.IsNotExist(err) {
 				return ctx, nil
 			}
@@ -68,11 +75,14 @@ database state and generating appropriate migration files.`,
 				return ctx, err
 			}
 
-			currentProject = project.New(cmd.String("dir"))
+			// Create project instance using current directory (since we've already changed to it)
+			pwd, _ := os.Getwd()
+			currentProject = project.New(pwd)
 			return ctx, nil
 		},
 		Commands: []*cli.Command{
 			bootstrap(),
+			dev(),
 			initCmd(),
 			schema(),
 		},
