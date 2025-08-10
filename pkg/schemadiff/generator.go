@@ -1,6 +1,7 @@
 package schemadiff
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -30,13 +32,6 @@ var (
 	ErrInvalidType = errors.New("invalid type combination")
 )
 
-type (
-	// Diff represents a database schema difference with SQL statements
-	Diff struct {
-		SQL string // SQL contains the migration statements
-	}
-)
-
 // GenerateDiff creates a diff by comparing current and target schema states.
 // It analyzes the differences between the current schema and the desired target schema,
 // then generates appropriate DDL statements.
@@ -51,10 +46,11 @@ type (
 //   - Regular Views: CREATE OR REPLACE for modifications
 //   - Materialized Views: ALTER TABLE MODIFY QUERY for query changes
 //
-// The function returns an error if:
+// The function returns a *parser.SQL containing the migration statements, or an error if:
 //   - No differences are found between current and target schemas (returns ErrNoDiff)
 //   - An unsupported operation is detected (e.g., engine or cluster changes)
 //   - Schema comparison fails for any object type
+//   - Generated SQL cannot be parsed back into statements
 //
 // Example:
 //
@@ -73,9 +69,17 @@ type (
 //	target, _ := parser.ParseSQL(targetSQL)
 //
 //	diff, err := GenerateDiff(current, target)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Format the migration SQL for output
+//	var buf bytes.Buffer
+//	format.FormatSQL(&buf, format.Defaults, diff)
+//	fmt.Println(buf.String())
 //
 //nolint:gocyclo,funlen,maintidx // Complex function handles multiple DDL statement types and migration ordering
-func GenerateDiff(current, target *parser.SQL) (*Diff, error) {
+func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := compareDatabases(current, target)
 	if err != nil {
@@ -222,11 +226,36 @@ func GenerateDiff(current, target *parser.SQL) (*Diff, error) {
 		statements = append(statements, diff.UpSQL)
 	}
 
-	sql := strings.Join(statements, "\n\n")
+	// Split any statements that contain multiple SQL statements (separated by \n\n)
+	// and ensure each individual SQL statement ends with a semicolon
+	var processedStatements []string
+	for _, stmt := range statements {
+		// Split on \n\n in case a single statement contains multiple SQL statements
+		subStatements := strings.Split(stmt, "\n\n")
+		for _, subStmt := range subStatements {
+			subStmt = strings.TrimSpace(subStmt)
+			if subStmt != "" {
+				if !strings.HasSuffix(subStmt, ";") {
+					subStmt = subStmt + ";"
+				}
+				processedStatements = append(processedStatements, subStmt)
+			}
+		}
+	}
 
-	return &Diff{
-		SQL: sql,
-	}, nil
+	sql := strings.Join(processedStatements, "\n\n")
+
+	// Parse the generated SQL back into *parser.SQL
+	if strings.TrimSpace(sql) == "" {
+		return &parser.SQL{Statements: []*parser.Statement{}}, nil
+	}
+
+	parsedSQL, err := parser.ParseSQL(sql)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse generated migration SQL")
+	}
+
+	return parsedSQL, nil
 }
 
 // GenerateMigrationFile creates a timestamped migration file by comparing current and target schemas.
@@ -263,8 +292,14 @@ func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (st
 		return "", errors.Wrapf(err, "failed to create migration directory: %s", migrationDir)
 	}
 
-	// Write diff SQL to file
-	content := diff.SQL
+	// Format the generated SQL using the formatter
+	var buf bytes.Buffer
+	err = format.FormatSQL(&buf, format.Defaults, diff)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to format migration SQL")
+	}
+
+	content := buf.String()
 
 	migrationPath := filepath.Join(migrationDir, filename)
 	err = os.WriteFile(migrationPath, []byte(content), consts.ModeFile)

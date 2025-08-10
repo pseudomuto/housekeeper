@@ -118,7 +118,10 @@ func TestDiffGeneration(t *testing.T) {
 			}
 
 			// Format the diff SQL
-			formattedSQL := formatMigrationSQL(diff.SQL)
+			var buf bytes.Buffer
+			err = format.FormatSQL(&buf, format.Defaults, diff)
+			require.NoError(t, err)
+			formattedSQL := buf.String()
 
 			// Compare formatted diff SQL with golden file
 			golden.Assert(t, formattedSQL, testName+".sql")
@@ -160,9 +163,9 @@ CREATE TABLE analytics.events (id UInt64, name String) ENGINE = MergeTree() ORDE
 		require.NoError(t, err)
 		contentStr := string(content)
 
-		// Should contain the migration SQL without header comments
-		require.Contains(t, contentStr, "ALTER DATABASE analytics MODIFY COMMENT 'New comment';")
-		require.Contains(t, contentStr, "CREATE TABLE analytics.events")
+		// Should contain the migration SQL (now with proper formatting and backticks)
+		require.Contains(t, contentStr, "ALTER DATABASE `analytics` MODIFY COMMENT 'New comment';")
+		require.Contains(t, contentStr, "CREATE TABLE `analytics`.`events`")
 	})
 
 	t.Run("creates migration directory if it doesn't exist", func(t *testing.T) {
@@ -238,9 +241,9 @@ CREATE TABLE test.users (id UInt64, name String) ENGINE = MergeTree() ORDER BY i
 		upStr := string(upContent)
 		downStr := string(downContent)
 
-		// Both migrations should contain table operations
-		require.Contains(t, upStr, "test.users")
-		require.Contains(t, downStr, "test.users")
+		// Both migrations should contain table operations (with formatted identifiers)
+		require.Contains(t, upStr, "`test`.`users`")
+		require.Contains(t, downStr, "`test`.`users`")
 
 		// At minimum, verify the filenames are different (since they're timestamped)
 		require.NotEqual(t, upFilename, downFilename)
@@ -332,36 +335,4 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to write migration file")
 	})
-}
-
-// formatMigrationSQL formats migration SQL for consistent output
-func formatMigrationSQL(sql string) string {
-	if strings.TrimSpace(sql) == "" {
-		return sql
-	}
-
-	// Ensure each statement ends with a semicolon
-	lines := strings.Split(sql, "\n\n")
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasSuffix(line, ";") {
-			lines[i] = line + ";"
-		} else {
-			lines[i] = line
-		}
-	}
-	formattedSQL := strings.Join(lines, "\n\n")
-
-	// Try to parse and format the SQL, but fall back to raw SQL if it fails
-	parsedDiff, err := parser.ParseSQL(formattedSQL)
-	if err != nil {
-		return formattedSQL
-	}
-
-	var formattedBuf bytes.Buffer
-	if err := format.FormatSQL(&formattedBuf, format.Defaults, parsedDiff); err != nil {
-		return formattedSQL
-	}
-
-	return formattedBuf.String()
 }

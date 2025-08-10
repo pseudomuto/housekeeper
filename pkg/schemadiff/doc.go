@@ -54,11 +54,13 @@
 //	    log.Fatalf("Migration generation failed: %v", err)
 //	}
 //
-//	// Write timestamped migration file
+//	// Format and write timestamped migration file
 //	timestamp := time.Now().Format("20060102150405")
 //	migrationFile := fmt.Sprintf("%s_migration.sql", timestamp)
 //
-//	os.WriteFile(migrationFile, []byte(diff.SQL), consts.ModeFile)
+//	var buf bytes.Buffer
+//	format.FormatSQL(&buf, format.Defaults, diff)
+//	os.WriteFile(migrationFile, buf.Bytes(), consts.ModeFile)
 //
 // The package will return errors for operations that cannot be safely
 // automated, such as database engine changes or cluster modifications.
