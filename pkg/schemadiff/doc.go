@@ -41,8 +41,8 @@
 //	// Parse current schema (from ClickHouse or existing SQL files)
 //	currentSQL, _ := parser.ParseSQL("CREATE DATABASE analytics;")
 //
-//	// Parse target schema (from SQL files)
-//	targetSQL, _ := parser.ParseSQLFromDirectory("schema/")
+//	// Parse target schema (from SQL string or file)
+//	targetSQL, _ := parser.ParseSQL(targetSchemaString)
 //
 //	// Generate diff
 //	diff, err := schemadiff.GenerateDiff(

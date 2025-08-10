@@ -53,11 +53,13 @@
 //	    FROM analytics.events GROUP BY date;
 //	`)
 //
-//	// Parse from file
-//	grammar, err := parser.ParseSQLFromFile("schema.sql")
-//
-//	// Parse from directory (combines all .sql files)
-//	grammar, err := parser.ParseSQLFromDirectory("schemas/")
+//	// Parse from file using io.Reader
+//	file, err := os.Open("schema.sql")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer file.Close()
+//	grammar, err := parser.Parse(file)
 //
 // The parser returns a SQL struct containing all parsed statements,
 // which can be used for schema analysis, migration generation, validation,

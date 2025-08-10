@@ -2,8 +2,6 @@ package parser
 
 import (
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/participle/v2"
@@ -211,32 +209,6 @@ func ParseSQL(sql string) (*SQL, error) {
 	return Parse(strings.NewReader(sql))
 }
 
-// ParseSQLFromFile parses ClickHouse DDL statements from a file and returns the parsed SQL structure.
-// This is a convenience function that reads a file and calls ParseSQL on its contents.
-//
-// Example usage:
-//
-//	sqlResult, err := parser.ParseSQLFromFile("schema.sql")
-//	if err != nil {
-//		log.Fatalf("Failed to parse schema file: %v", err)
-//	}
-//
-//	// Process the parsed statements
-//	for _, stmt := range sqlResult.Statements {
-//		// Process each statement
-//	}
-//
-// Returns an error if the file cannot be read or contains invalid SQL.
-func ParseSQLFromFile(path string) (*SQL, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read SQL file")
-	}
-	defer func() { _ = file.Close() }()
-
-	return Parse(file)
-}
-
 // Parse parses ClickHouse DDL statements from an io.Reader and returns the parsed SQL structure.
 // This function allows parsing SQL from any source that implements io.Reader, including files,
 // strings, network connections, or in-memory buffers.
@@ -289,45 +261,4 @@ func Parse(reader io.Reader) (*SQL, error) {
 	}
 
 	return sqlResult, nil
-}
-
-// ParseSQLFromDirectory parses all .sql files in a directory and returns combined SQL structure.
-// This function is useful for projects that split their schema definitions across multiple files.
-// It automatically discovers all .sql files in the specified directory and combines their
-// parsed results into a unified SQL representation.
-//
-// Example usage:
-//
-//	sqlResult, err := parser.ParseSQLFromDirectory("./schemas")
-//	if err != nil {
-//		log.Fatalf("Failed to parse schema directory: %v", err)
-//	}
-//
-//	// The sqlResult now contains all statements from all .sql files in the directory
-//	fmt.Printf("Parsed %d statements from directory\n", len(sqlResult.Statements))
-//
-//	for _, stmt := range sqlResult.Statements {
-//		// Process each statement
-//	}
-//
-// Returns an error if the directory cannot be read or any SQL file contains errors.
-func ParseSQLFromDirectory(dir string) (*SQL, error) {
-	var allStatements []*Statement
-
-	files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
-	if err != nil {
-		return nil, err
-	}
-
-	for _, file := range files {
-		sqlResult, err := ParseSQLFromFile(file)
-		if err != nil {
-			return nil, err
-		}
-
-		// Combine all statements
-		allStatements = append(allStatements, sqlResult.Statements...)
-	}
-
-	return &SQL{Statements: allStatements}, nil
 }
