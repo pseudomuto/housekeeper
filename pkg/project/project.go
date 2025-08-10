@@ -220,7 +220,7 @@ func (p *Project) ensureDirectory() error {
 	return nil
 }
 
-// WithConfig executes the provided function with access to the project's configuration.
+// withConfig executes the provided function with access to the project's configuration.
 // This method ensures the working directory is set to the project root during execution
 // and automatically restores the original working directory when complete.
 //
@@ -239,7 +239,7 @@ func (p *Project) ensureDirectory() error {
 //		log.Fatal(err)
 //	}
 //	fmt.Printf("ClickHouse version: %s\n", version)
-func (p *Project) WithConfig(fn func(*Config) error) error {
+func (p *Project) withConfig(fn func(*Config) error) error {
 	if p.config == nil {
 		return errors.New("project not initialized - call Initialize() first")
 	}
@@ -252,8 +252,4 @@ func (p *Project) WithConfig(fn func(*Config) error) error {
 	}
 
 	return fn(p.config)
-}
-
-func (p *Project) withConfig(fn func(*Config) error) error {
-	return p.WithConfig(fn)
 }
