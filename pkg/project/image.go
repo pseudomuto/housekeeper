@@ -46,9 +46,26 @@ type databaseObjects struct {
 //	content, _ := io.ReadAll(file)
 //	fmt.Println(string(content))
 func GenerateImage(sql *parser.SQL) (fs.FS, error) {
-	// Track databases and their objects for organizing files
+	dbObjects := organizeStatementsByDatabase(sql)
+	fsMap := make(fstest.MapFS)
+
+	mainImports, err := generateDatabaseFiles(fsMap, dbObjects)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create main.sql with imports
+	mainContent := generateMainSchemaContent(mainImports)
+	fsMap[filepath.Join("db", "main.sql")] = &fstest.MapFile{
+		Data: []byte(mainContent),
+	}
+
+	return fsMap, nil
+}
+
+// organizeStatementsByDatabase groups SQL statements by database
+func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 	dbObjects := make(map[string]*databaseObjects)
-	mainImports := []string{}
 
 	ensureDB := func(name string) {
 		if dbObjects[name] == nil {
@@ -60,7 +77,7 @@ func GenerateImage(sql *parser.SQL) (fs.FS, error) {
 		}
 	}
 
-	// First pass: organize statements by database
+	// Organize statements by database
 	for _, stmt := range sql.Statements {
 		if stmt.CreateDatabase != nil {
 			dbName := stmt.CreateDatabase.Name
@@ -81,10 +98,17 @@ func GenerateImage(sql *parser.SQL) (fs.FS, error) {
 		}
 	}
 
-	// Create the file system map
-	fsMap := make(fstest.MapFS)
+	// Ensure housekeeper database is always included
+	ensureDB("housekeeper")
 
-	// Second pass: create files for each database
+	return dbObjects
+}
+
+// generateDatabaseFiles creates files for each database and returns import list
+func generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string]*databaseObjects) ([]string, error) {
+	mainImports := make([]string, 0, len(dbObjects))
+
+	// Get sorted database names for consistent ordering
 	dbNames := make([]string, 0, len(dbObjects))
 	for dbName := range dbObjects {
 		dbNames = append(dbNames, dbName)
@@ -93,6 +117,15 @@ func GenerateImage(sql *parser.SQL) (fs.FS, error) {
 
 	for _, dbName := range dbNames {
 		objects := dbObjects[dbName]
+
+		// Special handling for housekeeper database
+		if dbName == "housekeeper" {
+			fsMap[filepath.Join("db", "schemas", dbName, "housekeeper.sql")] = &fstest.MapFile{
+				Data: defaultHousekeeperSQL,
+			}
+			mainImports = append(mainImports, fmt.Sprintf("schemas/%s/housekeeper.sql", dbName))
+			continue
+		}
 
 		// Create database schema file
 		schemaContent, err := generateDatabaseSchemaContent(objects)
@@ -114,18 +147,10 @@ func GenerateImage(sql *parser.SQL) (fs.FS, error) {
 			return nil, errors.Wrapf(err, "failed to add view files for %s", dbName)
 		}
 
-		// Add import to main.sql
-		relativeImport := fmt.Sprintf("schemas/%s/schema.sql", dbName)
-		mainImports = append(mainImports, relativeImport)
+		mainImports = append(mainImports, fmt.Sprintf("schemas/%s/schema.sql", dbName))
 	}
 
-	// Create main.sql with imports
-	mainContent := generateMainSchemaContent(mainImports)
-	fsMap[filepath.Join("db", "main.sql")] = &fstest.MapFile{
-		Data: []byte(mainContent),
-	}
-
-	return fsMap, nil
+	return mainImports, nil
 }
 
 // getDatabase extracts the database name from a pointer, defaulting to "default"

@@ -22,14 +22,19 @@ var (
 	//go:embed embed/_clickhouse.xml
 	defaultClickHouseXML []byte
 
+	//go:embed embed/housekeeper.sql
+	defaultHousekeeperSQL []byte
+
 	image = fstest.MapFS{
-		"db":                          {Mode: os.ModeDir | consts.ModeDir},
-		"db/config.d":                 {Mode: os.ModeDir | consts.ModeDir},
-		"db/config.d/_clickhouse.xml": {Data: defaultClickHouseXML},
-		"db/main.sql":                 {Data: defaultMainSQL},
-		"db/migrations":               {Mode: os.ModeDir | consts.ModeDir},
-		"db/schemas":                  {Mode: os.ModeDir | consts.ModeDir},
-		"housekeeper.yaml":            {Data: defaultHouseKeeper},
+		"db":                                     {Mode: os.ModeDir | consts.ModeDir},
+		"db/config.d":                            {Mode: os.ModeDir | consts.ModeDir},
+		"db/config.d/_clickhouse.xml":            {Data: defaultClickHouseXML},
+		"db/main.sql":                            {Data: defaultMainSQL},
+		"db/migrations":                          {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas":                             {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas/housekeeper":                 {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas/housekeeper/housekeeper.sql": {Data: defaultHousekeeperSQL},
+		"housekeeper.yaml":                       {Data: defaultHouseKeeper},
 	}
 )
 
