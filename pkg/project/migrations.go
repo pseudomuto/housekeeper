@@ -150,7 +150,10 @@ func (p *Project) LoadMigrationSet() (*MigrationSet, error) {
 				continue
 			}
 
-			ms.files = append(ms.files, filepath.Join(migrationsDir, entry.Name()))
+			// Only add .sql files to the migration set
+			if strings.HasSuffix(entry.Name(), ".sql") {
+				ms.files = append(ms.files, filepath.Join(migrationsDir, entry.Name()))
+			}
 		}
 
 		// Sort files in lexicographical order for consistent sum file generation

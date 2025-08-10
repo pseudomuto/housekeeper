@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/docker/docker/client"
@@ -182,34 +181,30 @@ func connectToClickHouse(ctx context.Context, container *docker.ClickHouseContai
 }
 
 func applyAllMigrations(ctx context.Context, client *clickhouse.Client) error {
-	// Load configuration to get migrations directory
-	cfg, err := project.LoadConfigFile("housekeeper.yaml")
+	// Load the migration set from the current project
+	migrationSet, err := currentProject.LoadMigrationSet()
 	if err != nil {
-		return errors.Wrap(err, "failed to load project configuration")
-	}
-
-	// Read migrations directory directly
-	migrationsDir := cfg.Dir
-	entries, err := os.ReadDir(migrationsDir)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read migrations directory: %s", migrationsDir)
-	}
-
-	// Filter and sort migration files
-	var migrations []string // nolint: prealloc
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
+		// If the migrations directory doesn't exist, that's okay - just no migrations to apply
+		if os.IsNotExist(errors.Cause(err)) {
+			fmt.Println("No migrations directory found - skipping migrations")
+			return nil
 		}
-		migrations = append(migrations, filepath.Join(migrationsDir, entry.Name()))
+		return errors.Wrap(err, "failed to load migration set")
 	}
 
-	// Sort migrations lexicographically (same as MigrationSet)
-	sort.Strings(migrations)
-
+	// Get migration files from the set
+	migrations := migrationSet.Files()
 	if len(migrations) == 0 {
 		fmt.Println("No migrations found")
 		return nil
+	}
+
+	// Optionally validate the migration set
+	isValid, err := migrationSet.IsValid()
+	if err != nil {
+		fmt.Printf("Warning: could not validate migration set: %v\n", err)
+	} else if migrationSet.Sum() != nil && !isValid {
+		fmt.Println("Warning: Migration files have been modified since sum file was generated")
 	}
 
 	fmt.Printf("Applying %d migrations...\n", len(migrations))
