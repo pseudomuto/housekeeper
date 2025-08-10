@@ -1,11 +1,11 @@
-package migrator_test
+package schemadiff_test
 
 import (
 	"bytes"
 	"strings"
 	"testing"
 
-	. "github.com/pseudomuto/housekeeper/pkg/migrator"
+	. "github.com/pseudomuto/housekeeper/pkg/schemadiff"
 	"github.com/stretchr/testify/require"
 )
 

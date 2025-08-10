@@ -1,4 +1,4 @@
-// Package migrator provides schema migration generation for ClickHouse.
+// Package schemadiff provides schema migration generation for ClickHouse.
 //
 // This package compares current and target schemas to generate executable
 // migration files with SQL statements. It supports all major ClickHouse
@@ -45,7 +45,7 @@
 //	targetSQL, _ := parser.ParseSQLFromDirectory("schema/")
 //
 //	// Generate migration
-//	migration, err := migrator.GenerateMigration(
+//	migration, err := schemadiff.GenerateMigration(
 //	    currentSQL,
 //	    targetSQL
 //	)
@@ -65,4 +65,4 @@
 // For integration engines and materialized views, it automatically uses
 // DROP+CREATE strategies instead of reporting errors, ensuring migrations
 // are both safe and executable.
-package migrator
+package schemadiff

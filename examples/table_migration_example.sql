@@ -1,5 +1,5 @@
 -- Example demonstrating ClickHouse table migration scenarios
--- These examples show various table operations that the migrator can handle
+-- These examples show various table operations that the schemadiff can handle
 
 -- =================================================================
 -- TABLE CREATION: From empty schema to tables with various features
@@ -68,7 +68,7 @@ COMMENT 'User events table';
 -- TABLE RENAMING: Intelligent rename detection
 -- =================================================================
 
--- The migrator detects when tables with identical structure 
+-- The schemadiff detects when tables with identical structure 
 -- are renamed rather than dropped and recreated
 -- FROM: old_users → TO: users (same structure)
 -- Generated: RENAME TABLE old_users TO users;

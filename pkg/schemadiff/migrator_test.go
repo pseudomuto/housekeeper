@@ -1,4 +1,4 @@
-package migrator_test
+package schemadiff_test
 
 import (
 	"bytes"
@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/format"
-	. "github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	. "github.com/pseudomuto/housekeeper/pkg/schemadiff"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/golden"
 )

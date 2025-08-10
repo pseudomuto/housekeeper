@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/pseudomuto/housekeeper/pkg/consts"
-	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/project"
+	"github.com/pseudomuto/housekeeper/pkg/schemadiff"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,8 +79,8 @@ dir: migrations`
 		migrationContent := "CREATE DATABASE test_db;"
 		require.NoError(t, os.WriteFile(filepath.Join(migrationsDir, "001_init.sql"), []byte(migrationContent), consts.ModeFile))
 
-		// Create and write proper sum file using migrator
-		sumFile := migrator.NewSumFile()
+		// Create and write proper sum file using schemadiff
+		sumFile := schemadiff.NewSumFile()
 		sumFile.AddFile("001_init.sql", []byte(migrationContent))
 
 		sumFilePath := filepath.Join(migrationsDir, "housekeeper.sum")
@@ -119,7 +119,7 @@ dir: migrations/test`
 		require.NoError(t, err)
 
 		// Create sum file with different case
-		sumFile := migrator.NewSumFile()
+		sumFile := schemadiff.NewSumFile()
 		sumFile.AddFile("test.sql", []byte("CREATE TABLE test (id UInt64);"))
 
 		sumFilePath := filepath.Join(migrationsDir, "HOUSEKEEPER.SUM")
@@ -380,7 +380,7 @@ dir: migrations/test`
 		require.NoError(t, err)
 
 		// Generate sum file that matches the migration
-		sumFile := migrator.NewSumFile()
+		sumFile := schemadiff.NewSumFile()
 		sumFile.AddFile("001_init.sql", []byte(migrationContent))
 
 		sumFilePath := filepath.Join(migrationsDir, "housekeeper.sum")
@@ -449,7 +449,7 @@ dir: migrations/test`
 		require.NoError(t, err)
 
 		// Create a sum file with different content (mismatched hash)
-		wrongSumFile := migrator.NewSumFile()
+		wrongSumFile := schemadiff.NewSumFile()
 		wrongSumFile.AddFile("001_init.sql", []byte("CREATE DATABASE wrong_db;"))
 
 		sumFilePath := filepath.Join(migrationsDir, "housekeeper.sum")
@@ -498,7 +498,7 @@ dir: migrations/test`
 		require.NoError(t, err)
 
 		// Create a sum file (content doesn't matter for this error test)
-		sumFile := migrator.NewSumFile()
+		sumFile := schemadiff.NewSumFile()
 		sumFile.AddFile("001_init.sql", []byte("CREATE TABLE test;"))
 
 		sumFilePath := filepath.Join(migrationsDir, "housekeeper.sum")

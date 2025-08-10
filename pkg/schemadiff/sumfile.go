@@ -1,4 +1,4 @@
-package migrator
+package schemadiff
 
 import (
 	"bufio"
@@ -55,7 +55,7 @@ func NewSumFile() *SumFile {
 //	}
 //	defer file.Close()
 //
-//	sumFile, err := migrator.LoadSumFile(file)
+//	sumFile, err := schemadiff.LoadSumFile(file)
 //	if err != nil {
 //		log.Fatal(err)
 //	}

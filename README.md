@@ -787,7 +787,7 @@ import (
     "log"
     
     "github.com/pseudomuto/housekeeper/pkg/parser"
-    "github.com/pseudomuto/housekeeper/pkg/migrator"
+    "github.com/pseudomuto/housekeeper/pkg/schemadiff"
 )
 
 func main() {
@@ -866,7 +866,7 @@ func main() {
     currentSQL, _ := parser.ParseSQL("CREATE DATABASE analytics;")
     targetSQL := sql
     
-    migration, err := migrator.GenerateMigration(currentSQL, targetSQL, "add_tables_and_dicts")
+    migration, err := schemadiff.GenerateMigration(currentSQL, targetSQL, "add_tables_and_dicts")
     if err != nil {
         log.Fatalf("Migration error: %v", err)
     }
@@ -1019,7 +1019,7 @@ import (
     "fmt"
     "log"
     
-    "github.com/pseudomuto/housekeeper/pkg/migrator"
+    "github.com/pseudomuto/housekeeper/pkg/schemadiff"
     "github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -1045,9 +1045,9 @@ func main() {
     }
 
     // Generate timestamped migration file
-    filename, err := migrator.GenerateMigrationFile("/path/to/migrations", currentSchema, targetSchema)
+    filename, err := schemadiff.GenerateMigrationFile("/path/to/migrations", currentSchema, targetSchema)
     if err != nil {
-        if errors.Is(err, migrator.ErrNoDiff) {
+        if errors.Is(err, schemadiff.ErrNoDiff) {
             fmt.Println("No differences found between schemas")
             return
         }
@@ -1058,9 +1058,9 @@ func main() {
     // Output: Generated migration: 20240806143022_schema_update.sql
 
     // Generate down migration by swapping parameters
-    downFilename, err := migrator.GenerateMigrationFile("/path/to/migrations", targetSchema, currentSchema)
+    downFilename, err := schemadiff.GenerateMigrationFile("/path/to/migrations", targetSchema, currentSchema)
     if err != nil {
-        if errors.Is(err, migrator.ErrNoDiff) {
+        if errors.Is(err, schemadiff.ErrNoDiff) {
             fmt.Println("No differences found for down migration")
             return
         }
@@ -1282,7 +1282,7 @@ pkg/parser/
     ├── *.sql              # SQL test inputs
     └── *.yaml             # Expected parsing results
 
-pkg/migrator/
+pkg/schemadiff/
 ├── generator.go           # Migration generation logic
 ├── database.go            # Database comparison and migration
 ├── dictionary.go          # Dictionary comparison and migration

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/pseudomuto/housekeeper/pkg/migrator"
+	"github.com/pseudomuto/housekeeper/pkg/schemadiff"
 )
 
 const sumFileName = "housekeeper.sum"
@@ -15,7 +15,7 @@ const sumFileName = "housekeeper.sum"
 type (
 	MigrationSet struct {
 		files []string
-		sum   *migrator.SumFile
+		sum   *schemadiff.SumFile
 	}
 )
 
@@ -25,15 +25,15 @@ func (ms *MigrationSet) Files() []string {
 }
 
 // Sum returns the loaded SumFile if present, otherwise nil.
-func (ms *MigrationSet) Sum() *migrator.SumFile {
+func (ms *MigrationSet) Sum() *schemadiff.SumFile {
 	return ms.sum
 }
 
 // GenerateSumFile creates a new SumFile based on the current migration files in the set.
 // Files are processed in lexicographical order to ensure consistent hash generation.
 // Returns an error if any file cannot be read.
-func (ms *MigrationSet) GenerateSumFile() (*migrator.SumFile, error) {
-	sumFile := migrator.NewSumFile()
+func (ms *MigrationSet) GenerateSumFile() (*schemadiff.SumFile, error) {
+	sumFile := schemadiff.NewSumFile()
 
 	for _, filePath := range ms.files {
 		content, err := os.ReadFile(filePath)
@@ -141,7 +141,7 @@ func (p *Project) LoadMigrationSet() (*MigrationSet, error) {
 				}
 				defer func() { _ = file.Close() }()
 
-				sumFile, err := migrator.LoadSumFile(file)
+				sumFile, err := schemadiff.LoadSumFile(file)
 				if err != nil {
 					return errors.Wrapf(err, "failed to load sum file: %s", sumPath)
 				}

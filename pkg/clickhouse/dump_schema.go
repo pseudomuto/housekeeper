@@ -36,7 +36,7 @@ import (
 //	}
 //
 //	// Use with migration generation
-//	migration, err := migrator.GenerateMigration(currentSchema, targetSchema, "update")
+//	migration, err := schemadiff.GenerateMigration(currentSchema, targetSchema, "update")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
