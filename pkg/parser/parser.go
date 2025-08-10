@@ -81,33 +81,58 @@ type (
 	}
 )
 
-// GetLexer returns the ClickHouse lexer definition used by the parser.
-// This function is primarily useful for testing and debugging purposes,
-// allowing access to the underlying lexer configuration.
+// Parse parses ClickHouse DDL statements from an io.Reader and returns the parsed SQL structure.
+// This function allows parsing SQL from any source that implements io.Reader, including files,
+// strings, network connections, or in-memory buffers.
 //
-// The returned lexer includes rules for ClickHouse-specific tokens including:
-//   - Comments (single-line with -- and multi-line with /* */)
-//   - String literals with escape sequences
-//   - Backtick identifiers for reserved words and special characters
-//   - Numeric literals (integers and decimals)
-//   - Operators and punctuation
-//   - ClickHouse keywords and reserved words
+// Example usage:
 //
-// Example usage for testing:
-//
-//	lexer := parser.GetLexer()
-//	tokens, err := lexer.Tokenise("", "SELECT * FROM users WHERE active = 1")
+//	// Parse from a string
+//	reader := strings.NewReader("CREATE DATABASE test ENGINE = Atomic;")
+//	sqlResult, err := parser.Parse(reader)
 //	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	for _, token := range tokens {
-//	    fmt.Printf("Token: %s = %q\n", token.Type, token.Value)
+//		log.Fatalf("Parse error: %v", err)
 //	}
 //
-// This will output the tokenized representation of the SQL string, showing
-// how the lexer breaks down the input into individual tokens for parsing.
-func GetLexer() lexer.Definition {
-	return clickhouseLexer
+//	// Parse from a file
+//	file, err := os.Open("schema.sql")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer file.Close()
+//
+//	sqlResult, err = parser.Parse(file)
+//	if err != nil {
+//		log.Fatalf("Parse error: %v", err)
+//	}
+//
+//	// Parse from an HTTP response
+//	resp, err := http.Get("https://example.com/schema.sql")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer resp.Body.Close()
+//
+//	sqlResult, err = parser.Parse(resp.Body)
+//	if err != nil {
+//		log.Fatalf("Parse error: %v", err)
+//	}
+//
+//	// Access parsed statements
+//	for _, stmt := range sqlResult.Statements {
+//		if stmt.CreateDatabase != nil {
+//			fmt.Printf("CREATE DATABASE: %s\n", stmt.CreateDatabase.Name)
+//		}
+//	}
+//
+// Returns an error if the reader cannot be read or contains invalid SQL.
+func Parse(reader io.Reader) (*SQL, error) {
+	sqlResult, err := parser.Parse("", reader)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse SQL")
+	}
+
+	return sqlResult, nil
 }
 
 // ParseString parses ClickHouse DDL statements from a string and returns the parsed SQL structure.
@@ -207,58 +232,4 @@ func GetLexer() lexer.Definition {
 // Returns an error if the SQL contains syntax errors or unsupported constructs.
 func ParseString(sql string) (*SQL, error) {
 	return Parse(strings.NewReader(sql))
-}
-
-// Parse parses ClickHouse DDL statements from an io.Reader and returns the parsed SQL structure.
-// This function allows parsing SQL from any source that implements io.Reader, including files,
-// strings, network connections, or in-memory buffers.
-//
-// Example usage:
-//
-//	// Parse from a string
-//	reader := strings.NewReader("CREATE DATABASE test ENGINE = Atomic;")
-//	sqlResult, err := parser.Parse(reader)
-//	if err != nil {
-//		log.Fatalf("Parse error: %v", err)
-//	}
-//
-//	// Parse from a file
-//	file, err := os.Open("schema.sql")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer file.Close()
-//
-//	sqlResult, err = parser.Parse(file)
-//	if err != nil {
-//		log.Fatalf("Parse error: %v", err)
-//	}
-//
-//	// Parse from an HTTP response
-//	resp, err := http.Get("https://example.com/schema.sql")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer resp.Body.Close()
-//
-//	sqlResult, err = parser.Parse(resp.Body)
-//	if err != nil {
-//		log.Fatalf("Parse error: %v", err)
-//	}
-//
-//	// Access parsed statements
-//	for _, stmt := range sqlResult.Statements {
-//		if stmt.CreateDatabase != nil {
-//			fmt.Printf("CREATE DATABASE: %s\n", stmt.CreateDatabase.Name)
-//		}
-//	}
-//
-// Returns an error if the reader cannot be read or contains invalid SQL.
-func Parse(reader io.Reader) (*SQL, error) {
-	sqlResult, err := parser.Parse("", reader)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse SQL")
-	}
-
-	return sqlResult, nil
 }
