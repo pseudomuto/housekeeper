@@ -1,6 +1,11 @@
 package migrator
 
-import "time"
+import (
+	"context"
+	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+)
 
 // RevisionKind constants define the types of migration revisions that can be recorded.
 // These constants categorize different kinds of migration executions for tracking
@@ -19,6 +24,10 @@ const (
 )
 
 type (
+	ClickHouse interface {
+		Query(context.Context, string, ...any) (driver.Rows, error)
+	}
+
 	// Revision represents a record of migration execution history, capturing
 	// detailed information about when and how a migration was applied to
 	// a ClickHouse database.
@@ -100,3 +109,61 @@ type (
 	// validation requirements, and execution priorities.
 	RevisionKind string
 )
+
+func LoadRevisions(ctx context.Context, ch ClickHouse) ([]*Revision, error) {
+	rows, err := ch.Query(ctx, `
+		SELECT
+			version,
+			executed_at,
+			execution_time_ms,
+			kind,
+			error,
+			applied,
+			total,
+			hash,
+			partial_hashes,
+			housekeeper_version
+		FROM housekeeper.revisions
+		ORDER BY version ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var revisions []*Revision
+	for rows.Next() {
+		revision := &Revision{}
+		var executionTimeMs int64
+		var errorStr *string
+
+		err := rows.Scan(
+			&revision.Version,
+			&revision.ExecutedAt,
+			&executionTimeMs,
+			&revision.Kind,
+			&errorStr,
+			&revision.Applied,
+			&revision.Total,
+			&revision.Hash,
+			&revision.PartialHashes,
+			&revision.HousekeeperVersion,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		revision.ExecutionTime = time.Duration(executionTimeMs) * time.Millisecond
+		if errorStr != nil {
+			revision.Error = errorStr
+		}
+
+		revisions = append(revisions, revision)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return revisions, nil
+}
