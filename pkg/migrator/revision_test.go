@@ -8,6 +8,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
+	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,32 +72,46 @@ func TestLoadRevisions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		revisions, err := migrator.LoadRevisions(ctx, mockCH)
+		revisionSet, err := migrator.LoadRevisions(ctx, mockCH)
 
 		require.NoError(t, err)
-		require.Len(t, revisions, 2)
+		require.Equal(t, 2, revisionSet.Count())
 
-		// Check first revision
-		rev1 := revisions[0]
+		// Check first revision via RevisionSet
+		require.True(t, revisionSet.HasRevision("20240101120000_init"))
+		migration1 := &migrator.Migration{
+			Version:    "20240101120000_init",
+			Statements: make([]*parser.Statement, 5), // 5 statements to match revision
+		}
+		rev1 := revisionSet.GetRevision(migration1)
+		require.NotNil(t, rev1)
 		require.Equal(t, "20240101120000_init", rev1.Version)
 		require.Equal(t, executedAt, rev1.ExecutedAt)
 		require.Equal(t, 2500*time.Millisecond, rev1.ExecutionTime)
 		require.Equal(t, migrator.StandardRevision, rev1.Kind)
 		require.Nil(t, rev1.Error)
+		require.True(t, revisionSet.IsCompleted(migration1))
 		require.Equal(t, 5, rev1.Applied)
 		require.Equal(t, 5, rev1.Total)
 		require.Equal(t, "abc123hash", rev1.Hash)
 		require.Equal(t, []string{"h1", "h2"}, rev1.PartialHashes)
 		require.Equal(t, "1.0.0", rev1.HousekeeperVersion)
 
-		// Check second revision
-		rev2 := revisions[1]
+		// Check second revision via RevisionSet
+		require.True(t, revisionSet.HasRevision("20240102120000_users"))
+		migration2 := &migrator.Migration{
+			Version:    "20240102120000_users",
+			Statements: make([]*parser.Statement, 5), // 5 statements to match revision
+		}
+		rev2 := revisionSet.GetRevision(migration2)
+		require.NotNil(t, rev2)
 		require.Equal(t, "20240102120000_users", rev2.Version)
 		require.Equal(t, executedAt.Add(time.Hour), rev2.ExecutedAt)
 		require.Equal(t, 1200*time.Millisecond, rev2.ExecutionTime)
 		require.Equal(t, migrator.CheckpointRevision, rev2.Kind)
 		require.NotNil(t, rev2.Error)
 		require.Equal(t, "some error", *rev2.Error)
+		require.False(t, revisionSet.IsCompleted(migration2)) // Checkpoint not considered completed
 		require.Equal(t, 3, rev2.Applied)
 		require.Equal(t, 5, rev2.Total)
 		require.Equal(t, "def456hash", rev2.Hash)
@@ -114,11 +129,11 @@ func TestLoadRevisions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		revisions, err := migrator.LoadRevisions(ctx, mockCH)
+		revisionSet, err := migrator.LoadRevisions(ctx, mockCH)
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "database connection failed")
-		require.Nil(t, revisions)
+		require.Nil(t, revisionSet)
 	})
 
 	t.Run("scan_error", func(t *testing.T) {
@@ -136,11 +151,11 @@ func TestLoadRevisions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		revisions, err := migrator.LoadRevisions(ctx, mockCH)
+		revisionSet, err := migrator.LoadRevisions(ctx, mockCH)
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "scan failed")
-		require.Nil(t, revisions)
+		require.Nil(t, revisionSet)
 	})
 
 	t.Run("rows_error", func(t *testing.T) {
@@ -156,11 +171,11 @@ func TestLoadRevisions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		revisions, err := migrator.LoadRevisions(ctx, mockCH)
+		revisionSet, err := migrator.LoadRevisions(ctx, mockCH)
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "rows iteration failed")
-		require.Nil(t, revisions)
+		require.Nil(t, revisionSet)
 	})
 
 	t.Run("empty_result", func(t *testing.T) {
@@ -175,10 +190,10 @@ func TestLoadRevisions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		revisions, err := migrator.LoadRevisions(ctx, mockCH)
+		revisionSet, err := migrator.LoadRevisions(ctx, mockCH)
 
 		require.NoError(t, err)
-		require.Empty(t, revisions)
+		require.Equal(t, 0, revisionSet.Count())
 		require.True(t, mockRows.closed)
 	})
 }
@@ -282,4 +297,354 @@ func (m *mockRows) Columns() []string {
 		"version", "executed_at", "execution_time_ms", "kind", "error",
 		"applied", "total", "hash", "partial_hashes", "housekeeper_version",
 	}
+}
+
+// RevisionSet Tests
+
+func TestNewRevisionSet(t *testing.T) {
+	revisions := []*migrator.Revision{
+		{Version: "001_create_users", Kind: migrator.StandardRevision, Error: nil},
+		{Version: "002_add_email", Kind: migrator.StandardRevision, Error: stringPtr("failed")},
+		{Version: "checkpoint_001", Kind: migrator.CheckpointRevision, Error: nil},
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	require.Equal(t, 3, revisionSet.Count())
+	require.True(t, revisionSet.HasRevision("001_create_users"))
+	require.True(t, revisionSet.HasRevision("002_add_email"))
+	require.True(t, revisionSet.HasRevision("checkpoint_001"))
+	require.False(t, revisionSet.HasRevision("nonexistent"))
+}
+
+func TestRevisionSet_IsCompleted(t *testing.T) {
+	now := time.Now()
+	revisions := []*migrator.Revision{
+		{
+			Version:       "001_create_users",
+			ExecutedAt:    now,
+			Kind:          migrator.StandardRevision,
+			Error:         nil, // successful
+			Applied:       3,
+			Total:         3,
+			PartialHashes: []string{"hash1", "hash2", "hash3"},
+		},
+		{
+			Version:       "002_add_email",
+			ExecutedAt:    now,
+			Kind:          migrator.StandardRevision,
+			Error:         stringPtr("syntax error"), // failed
+			Applied:       2,
+			Total:         3,
+			PartialHashes: []string{"hash1", "hash2"},
+		},
+		{
+			Version:       "003_partial_apply",
+			ExecutedAt:    now,
+			Kind:          migrator.StandardRevision,
+			Error:         nil, // no error but partially applied
+			Applied:       2,
+			Total:         3,
+			PartialHashes: []string{"hash1", "hash2"},
+		},
+		{
+			Version:       "004_statement_mismatch",
+			ExecutedAt:    now,
+			Kind:          migrator.StandardRevision,
+			Error:         nil,
+			Applied:       3,
+			Total:         3, // 3 statements in revision, but migration only has 2
+			PartialHashes: []string{"hash1", "hash2", "hash3"},
+		},
+		{
+			Version:       "checkpoint_001",
+			ExecutedAt:    now,
+			Kind:          migrator.CheckpointRevision,
+			Error:         nil, // checkpoint
+			Applied:       1,
+			Total:         1,
+			PartialHashes: []string{"checkpoint_hash"},
+		},
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	tests := []struct {
+		name      string
+		migration *migrator.Migration
+		expected  bool
+		reason    string
+	}{
+		{
+			name: "fully_completed_migration",
+			migration: &migrator.Migration{
+				Version:    "001_create_users",
+				Statements: make([]*parser.Statement, 3), // 3 statements to match revision.Total
+			},
+			expected: true,
+			reason:   "Migration with matching applied==total and partial hashes should be completed",
+		},
+		{
+			name: "failed_standard_revision",
+			migration: &migrator.Migration{
+				Version:    "002_add_email",
+				Statements: make([]*parser.Statement, 3), // 3 statements
+			},
+			expected: false,
+			reason:   "Standard revision with error should not be completed",
+		},
+		{
+			name: "partially_applied_migration",
+			migration: &migrator.Migration{
+				Version:    "003_partial_apply",
+				Statements: make([]*parser.Statement, 3), // 3 statements (but only 2 applied)
+			},
+			expected: false,
+			reason:   "Migration with applied < total should not be completed",
+		},
+		{
+			name: "statement_count_mismatch",
+			migration: &migrator.Migration{
+				Version:    "004_statement_mismatch",
+				Statements: make([]*parser.Statement, 2), // 2 statements, but revision has 3 total
+			},
+			expected: false,
+			reason:   "Migration with mismatched statement count should not be completed",
+		},
+		{
+			name: "checkpoint_revision",
+			migration: &migrator.Migration{
+				Version:    "checkpoint_001",
+				Statements: make([]*parser.Statement, 1), // 1 statement
+			},
+			expected: false,
+			reason:   "Checkpoint revisions should not be considered completed migrations",
+		},
+		{
+			name: "no_revision_exists",
+			migration: &migrator.Migration{
+				Version:    "005_create_orders",
+				Statements: make([]*parser.Statement, 1), // 1 statement
+			},
+			expected: false,
+			reason:   "Migration with no revision should not be completed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := revisionSet.IsCompleted(tt.migration)
+			require.Equal(t, tt.expected, result, tt.reason)
+		})
+	}
+}
+
+func TestRevisionSet_IsPending(t *testing.T) {
+	now := time.Now()
+	revisions := []*migrator.Revision{
+		{
+			Version:    "001_create_users",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      nil, // successful
+		},
+		{
+			Version:    "002_add_email",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      stringPtr("syntax error"), // failed
+		},
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	tests := []struct {
+		name      string
+		migration *migrator.Migration
+		expected  bool
+		reason    string
+	}{
+		{
+			name: "completed_migration",
+			migration: &migrator.Migration{
+				Version:    "001_create_users",
+				Statements: make([]*parser.Statement, 0), // Empty statements
+			},
+			expected: false,
+			reason:   "Completed migration should not be pending",
+		},
+		{
+			name: "failed_migration",
+			migration: &migrator.Migration{
+				Version:    "002_add_email",
+				Statements: make([]*parser.Statement, 0), // Empty statements
+			},
+			expected: true,
+			reason:   "Failed migration should be pending for retry",
+		},
+		{
+			name: "no_revision_exists",
+			migration: &migrator.Migration{
+				Version:    "003_create_orders",
+				Statements: make([]*parser.Statement, 0), // Empty statements
+			},
+			expected: true,
+			reason:   "Migration with no revision should be pending",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := revisionSet.IsPending(tt.migration)
+			require.Equal(t, tt.expected, result, tt.reason)
+		})
+	}
+}
+
+func TestRevisionSet_GetPending_NilMigrationDir(t *testing.T) {
+	revisions := []*migrator.Revision{}
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	pending := revisionSet.GetPending(nil)
+
+	require.NotNil(t, pending)
+	require.Empty(t, pending)
+}
+
+func TestRevisionSet_EmptySet(t *testing.T) {
+	revisionSet := migrator.NewRevisionSet([]*migrator.Revision{})
+
+	migration := &migrator.Migration{
+		Version:    "001_test",
+		Statements: make([]*parser.Statement, 0), // Empty statements
+	}
+
+	require.Equal(t, 0, revisionSet.Count())
+	require.False(t, revisionSet.HasRevision("001_test"))
+	require.False(t, revisionSet.IsCompleted(migration))
+	require.False(t, revisionSet.IsFailed(migration))
+	require.True(t, revisionSet.IsPending(migration))
+	require.Nil(t, revisionSet.GetRevision(migration))
+}
+
+// Helper function for creating string pointers
+func TestRevisionSet_GetCompleted(t *testing.T) {
+	now := time.Now()
+	revisions := []*migrator.Revision{
+		{
+			Version:    "001_create_users",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      nil, // completed
+		},
+		{
+			Version:    "002_add_email",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      stringPtr("failed"), // failed, not completed
+		},
+	}
+
+	migrations := []*migrator.Migration{
+		{Version: "001_create_users", Statements: nil},
+		{Version: "002_add_email", Statements: nil},
+		{Version: "003_create_orders", Statements: nil}, // no revision
+	}
+
+	migrationDir := &migrator.MigrationDir{
+		Migrations: migrations,
+		SumFile:    migrator.NewSumFile(),
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	completed := revisionSet.GetCompleted(migrationDir)
+
+	require.Len(t, completed, 1)
+	require.Equal(t, "001_create_users", completed[0].Version)
+}
+
+func TestRevisionSet_GetFailed(t *testing.T) {
+	now := time.Now()
+	revisions := []*migrator.Revision{
+		{
+			Version:    "001_create_users",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      nil, // completed
+		},
+		{
+			Version:    "002_add_email",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      stringPtr("syntax error"), // failed
+		},
+		{
+			Version:    "003_create_orders",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      stringPtr("connection timeout"), // failed
+		},
+	}
+
+	migrations := []*migrator.Migration{
+		{Version: "001_create_users", Statements: nil},
+		{Version: "002_add_email", Statements: nil},
+		{Version: "003_create_orders", Statements: nil},
+		{Version: "004_add_indexes", Statements: nil}, // no revision
+	}
+
+	migrationDir := &migrator.MigrationDir{
+		Migrations: migrations,
+		SumFile:    migrator.NewSumFile(),
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	failed := revisionSet.GetFailed(migrationDir)
+
+	require.Len(t, failed, 2)
+	require.Equal(t, "002_add_email", failed[0].Version)
+	require.Equal(t, "003_create_orders", failed[1].Version)
+}
+
+func TestRevisionSet_GetExecutedVersions(t *testing.T) {
+	now := time.Now()
+	revisions := []*migrator.Revision{
+		{
+			Version:    "001_create_users",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      nil, // executed
+		},
+		{
+			Version:    "002_add_email",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      stringPtr("failed"), // failed, not executed
+		},
+		{
+			Version:    "003_create_orders",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      nil, // executed
+		},
+		{
+			Version:    "checkpoint_001",
+			ExecutedAt: now,
+			Kind:       migrator.CheckpointRevision,
+			Error:      nil, // checkpoint, not counted
+		},
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	executed := revisionSet.GetExecutedVersions()
+
+	expectedVersions := []string{"001_create_users", "003_create_orders"}
+	require.Equal(t, expectedVersions, executed)
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
