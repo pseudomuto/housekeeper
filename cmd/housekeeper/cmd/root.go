@@ -83,7 +83,7 @@ database state and generating appropriate migration files.`,
 		},
 		Commands: []*cli.Command{
 			bootstrap(),
-			checkpoint(),
+			snapshot(),
 			dev(),
 			initCmd(),
 			schema(),

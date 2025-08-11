@@ -15,8 +15,8 @@ import (
 //go:embed testdata/*.sql
 var testdataFS embed.FS
 
-//go:embed testdata/003_checkpoint.sql
-var checkpointFile string
+//go:embed testdata/003_snapshot.sql
+var snapshotFile string
 
 func TestLoadMigration(t *testing.T) {
 	tests := []struct {
@@ -772,14 +772,14 @@ func TestMigrationDir_Validate_ComplexMigrations(t *testing.T) {
 	require.True(t, isValid, "Complex migrations should validate successfully")
 }
 
-func TestMigrationDir_CheckpointIntegration(t *testing.T) {
-	// Test loading migrations with checkpoint present
-	t.Run("load directory with checkpoint and regular migrations", func(t *testing.T) {
+func TestMigrationDir_SnapshotIntegration(t *testing.T) {
+	// Test loading migrations with snapshot present
+	t.Run("load directory with snapshot and regular migrations", func(t *testing.T) {
 		files := map[string]string{
-			"001_init.sql":       "CREATE DATABASE test ENGINE = Atomic;",
-			"002_users.sql":      "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
-			"003_checkpoint.sql": checkpointFile,
-			"004_products.sql":   "CREATE TABLE test.products (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+			"001_init.sql":     "CREATE DATABASE test ENGINE = Atomic;",
+			"002_users.sql":    "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+			"003_snapshot.sql": snapshotFile,
+			"004_products.sql": "CREATE TABLE test.products (id UInt64) ENGINE = MergeTree() ORDER BY id;",
 		}
 
 		fsys := make(fstest.MapFS)
@@ -790,24 +790,24 @@ func TestMigrationDir_CheckpointIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		// Should have loaded 3 regular migrations and 1 checkpoint
+		// Should have loaded 3 regular migrations and 1 snapshot
 		require.Len(t, migDir.Migrations, 3) // 001, 002, 004
-		require.True(t, migDir.HasCheckpoint())
+		require.True(t, migDir.HasSnapshot())
 
-		checkpoint := migDir.GetCheckpoint()
-		require.NotNil(t, checkpoint)
-		require.Equal(t, "003_checkpoint", checkpoint.Version)
-		require.Equal(t, "Test checkpoint for initial migrations", checkpoint.Description)
-		require.Equal(t, []string{"001_init", "002_users"}, checkpoint.IncludedMigrations)
+		snapshot := migDir.GetSnapshot()
+		require.NotNil(t, snapshot)
+		require.Equal(t, "003_snapshot", snapshot.Version)
+		require.Equal(t, "Test snapshot for initial migrations", snapshot.Description)
+		require.Equal(t, []string{"001_init", "002_users"}, snapshot.IncludedMigrations)
 	})
 
-	t.Run("get migrations after checkpoint", func(t *testing.T) {
+	t.Run("get migrations after snapshot", func(t *testing.T) {
 		files := map[string]string{
-			"001_init.sql":       "CREATE DATABASE test ENGINE = Atomic;",
-			"002_users.sql":      "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
-			"003_checkpoint.sql": checkpointFile,
-			"004_products.sql":   "CREATE TABLE test.products (id UInt64) ENGINE = MergeTree() ORDER BY id;",
-			"005_orders.sql":     "CREATE TABLE test.orders (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+			"001_init.sql":     "CREATE DATABASE test ENGINE = Atomic;",
+			"002_users.sql":    "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+			"003_snapshot.sql": snapshotFile,
+			"004_products.sql": "CREATE TABLE test.products (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+			"005_orders.sql":   "CREATE TABLE test.orders (id UInt64) ENGINE = MergeTree() ORDER BY id;",
 		}
 
 		fsys := make(fstest.MapFS)
@@ -818,13 +818,13 @@ func TestMigrationDir_CheckpointIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		afterCheckpoint := migDir.GetMigrationsAfterCheckpoint()
-		require.Len(t, afterCheckpoint, 2)
-		require.Equal(t, "004_products", afterCheckpoint[0].Version)
-		require.Equal(t, "005_orders", afterCheckpoint[1].Version)
+		afterSnapshot := migDir.GetMigrationsAfterSnapshot()
+		require.Len(t, afterSnapshot, 2)
+		require.Equal(t, "004_products", afterSnapshot[0].Version)
+		require.Equal(t, "005_orders", afterSnapshot[1].Version)
 	})
 
-	t.Run("create new checkpoint", func(t *testing.T) {
+	t.Run("create new snapshot", func(t *testing.T) {
 		files := map[string]string{
 			"001_init.sql":     "CREATE DATABASE test ENGINE = Atomic;",
 			"002_users.sql":    "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
@@ -839,24 +839,24 @@ func TestMigrationDir_CheckpointIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		// Create checkpoint from all migrations
-		checkpoint, err := migDir.CreateCheckpoint(
-			"20240810120000_checkpoint",
-			"Test checkpoint creation",
+		// Create snapshot from all migrations
+		snapshot, err := migDir.CreateSnapshot(
+			"20240810120000_snapshot",
+			"Test snapshot creation",
 		)
 		require.NoError(t, err)
-		require.NotNil(t, checkpoint)
-		require.Equal(t, "20240810120000_checkpoint", checkpoint.Version)
-		require.Equal(t, "Test checkpoint creation", checkpoint.Description)
-		require.Equal(t, []string{"001_init", "002_users", "003_products"}, checkpoint.IncludedMigrations)
-		require.Len(t, checkpoint.Statements, 3)
+		require.NotNil(t, snapshot)
+		require.Equal(t, "20240810120000_snapshot", snapshot.Version)
+		require.Equal(t, "Test snapshot creation", snapshot.Description)
+		require.Equal(t, []string{"001_init", "002_users", "003_products"}, snapshot.IncludedMigrations)
+		require.Len(t, snapshot.Statements, 3)
 	})
 
-	t.Run("no new migrations to checkpoint", func(t *testing.T) {
+	t.Run("no new migrations to snapshot", func(t *testing.T) {
 		files := map[string]string{
-			"001_init.sql":       "CREATE DATABASE test ENGINE = Atomic;",
-			"002_users.sql":      "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
-			"003_checkpoint.sql": checkpointFile, // Already includes 001_init and 002_users
+			"001_init.sql":     "CREATE DATABASE test ENGINE = Atomic;",
+			"002_users.sql":    "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+			"003_snapshot.sql": snapshotFile, // Already includes 001_init and 002_users
 		}
 
 		fsys := make(fstest.MapFS)
@@ -867,13 +867,13 @@ func TestMigrationDir_CheckpointIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		// Try to create checkpoint - should fail because all migrations are already included
-		_, err = migDir.CreateCheckpoint(
-			"20240810120100_checkpoint",
-			"Another checkpoint",
+		// Try to create snapshot - should fail because all migrations are already included
+		_, err = migDir.CreateSnapshot(
+			"20240810120100_snapshot",
+			"Another snapshot",
 		)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "no new migrations to checkpoint")
+		require.Contains(t, err.Error(), "no new migrations to snapshot")
 	})
 
 	t.Run("directory without migrations", func(t *testing.T) {
@@ -882,19 +882,19 @@ func TestMigrationDir_CheckpointIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		// Should not have any migrations or checkpoint
+		// Should not have any migrations or snapshot
 		require.Empty(t, migDir.Migrations)
-		require.False(t, migDir.HasCheckpoint())
-		require.Nil(t, migDir.GetCheckpoint())
+		require.False(t, migDir.HasSnapshot())
+		require.Nil(t, migDir.GetSnapshot())
 
-		// GetMigrationsAfterCheckpoint should return empty slice
-		afterCheckpoint := migDir.GetMigrationsAfterCheckpoint()
-		require.Empty(t, afterCheckpoint)
+		// GetMigrationsAfterSnapshot should return empty slice
+		afterSnapshot := migDir.GetMigrationsAfterSnapshot()
+		require.Empty(t, afterSnapshot)
 
-		// CreateCheckpoint should fail
-		_, err = migDir.CreateCheckpoint("test", "description")
+		// CreateSnapshot should fail
+		_, err = migDir.CreateSnapshot("test", "description")
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "no migrations to checkpoint")
+		require.Contains(t, err.Error(), "no migrations to snapshot")
 	})
 }
 
@@ -903,28 +903,28 @@ func TestMigrationDir_LoadFromTestdata(t *testing.T) {
 	migDir, err := migrator.LoadMigrationDir(testdataFS)
 	require.NoError(t, err)
 
-	// Should find regular migrations and checkpoint
+	// Should find regular migrations and snapshot
 	require.NotEmpty(t, migDir.Migrations)
-	require.True(t, migDir.HasCheckpoint())
+	require.True(t, migDir.HasSnapshot())
 
-	// Validate the loaded checkpoint
-	checkpoint := migDir.GetCheckpoint()
-	require.NotNil(t, checkpoint)
-	require.Equal(t, "003_checkpoint", checkpoint.Version)
-	require.Contains(t, checkpoint.IncludedMigrations, "001_init")
-	require.Contains(t, checkpoint.IncludedMigrations, "002_users")
+	// Validate the loaded snapshot
+	snapshot := migDir.GetSnapshot()
+	require.NotNil(t, snapshot)
+	require.Equal(t, "003_snapshot", snapshot.Version)
+	require.Contains(t, snapshot.IncludedMigrations, "001_init")
+	require.Contains(t, snapshot.IncludedMigrations, "002_users")
 
-	// Should have migrations after checkpoint
-	afterCheckpoint := migDir.GetMigrationsAfterCheckpoint()
-	require.NotEmpty(t, afterCheckpoint)
+	// Should have migrations after snapshot
+	afterSnapshot := migDir.GetMigrationsAfterSnapshot()
+	require.NotEmpty(t, afterSnapshot)
 
-	// Validate that we can get a migration that comes after the checkpoint
+	// Validate that we can get a migration that comes after the snapshot
 	found := false
-	for _, mig := range afterCheckpoint {
+	for _, mig := range afterSnapshot {
 		if mig.Version == "004_products" {
 			found = true
 			break
 		}
 	}
-	require.True(t, found, "Should find 004_products migration after checkpoint")
+	require.True(t, found, "Should find 004_products migration after snapshot")
 }

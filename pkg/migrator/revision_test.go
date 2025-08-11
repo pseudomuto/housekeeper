@@ -52,7 +52,7 @@ func TestLoadRevisions(t *testing.T) {
 					"20240102120000_users",
 					executedAt.Add(time.Hour),
 					int64(1200),
-					"checkpoint",
+					"snapshot",
 					errorMsg, // error (not null)
 					3,
 					5,
@@ -108,10 +108,10 @@ func TestLoadRevisions(t *testing.T) {
 		require.Equal(t, "20240102120000_users", rev2.Version)
 		require.Equal(t, executedAt.Add(time.Hour), rev2.ExecutedAt)
 		require.Equal(t, 1200*time.Millisecond, rev2.ExecutionTime)
-		require.Equal(t, migrator.CheckpointRevision, rev2.Kind)
+		require.Equal(t, migrator.SnapshotRevision, rev2.Kind)
 		require.NotNil(t, rev2.Error)
 		require.Equal(t, "some error", *rev2.Error)
-		require.False(t, revisionSet.IsCompleted(migration2)) // Checkpoint not considered completed
+		require.False(t, revisionSet.IsCompleted(migration2)) // Snapshot not considered completed
 		require.Equal(t, 3, rev2.Applied)
 		require.Equal(t, 5, rev2.Total)
 		require.Equal(t, "def456hash", rev2.Hash)
@@ -305,7 +305,7 @@ func TestNewRevisionSet(t *testing.T) {
 	revisions := []*migrator.Revision{
 		{Version: "001_create_users", Kind: migrator.StandardRevision, Error: nil},
 		{Version: "002_add_email", Kind: migrator.StandardRevision, Error: stringPtr("failed")},
-		{Version: "checkpoint_001", Kind: migrator.CheckpointRevision, Error: nil},
+		{Version: "snapshot_001", Kind: migrator.SnapshotRevision, Error: nil},
 	}
 
 	revisionSet := migrator.NewRevisionSet(revisions)
@@ -313,7 +313,7 @@ func TestNewRevisionSet(t *testing.T) {
 	require.Equal(t, 3, revisionSet.Count())
 	require.True(t, revisionSet.HasRevision("001_create_users"))
 	require.True(t, revisionSet.HasRevision("002_add_email"))
-	require.True(t, revisionSet.HasRevision("checkpoint_001"))
+	require.True(t, revisionSet.HasRevision("snapshot_001"))
 	require.False(t, revisionSet.HasRevision("nonexistent"))
 }
 
@@ -357,13 +357,13 @@ func TestRevisionSet_IsCompleted(t *testing.T) {
 			PartialHashes: []string{"hash1", "hash2", "hash3"},
 		},
 		{
-			Version:       "checkpoint_001",
+			Version:       "snapshot_001",
 			ExecutedAt:    now,
-			Kind:          migrator.CheckpointRevision,
-			Error:         nil, // checkpoint
+			Kind:          migrator.SnapshotRevision,
+			Error:         nil, // snapshot
 			Applied:       1,
 			Total:         1,
-			PartialHashes: []string{"checkpoint_hash"},
+			PartialHashes: []string{"snapshot_hash"},
 		},
 	}
 
@@ -412,13 +412,13 @@ func TestRevisionSet_IsCompleted(t *testing.T) {
 			reason:   "Migration with mismatched statement count should not be completed",
 		},
 		{
-			name: "checkpoint_revision",
+			name: "snapshot_revision",
 			migration: &migrator.Migration{
-				Version:    "checkpoint_001",
+				Version:    "snapshot_001",
 				Statements: make([]*parser.Statement, 1), // 1 statement
 			},
 			expected: false,
-			reason:   "Checkpoint revisions should not be considered completed migrations",
+			reason:   "Snapshot revisions should not be considered completed migrations",
 		},
 		{
 			name: "no_revision_exists",
@@ -630,10 +630,10 @@ func TestRevisionSet_GetExecutedVersions(t *testing.T) {
 			Error:      nil, // executed
 		},
 		{
-			Version:    "checkpoint_001",
+			Version:    "snapshot_001",
 			ExecutedAt: now,
-			Kind:       migrator.CheckpointRevision,
-			Error:      nil, // checkpoint, not counted
+			Kind:       migrator.SnapshotRevision,
+			Error:      nil, // snapshot, not counted
 		},
 	}
 
@@ -645,7 +645,7 @@ func TestRevisionSet_GetExecutedVersions(t *testing.T) {
 	require.Equal(t, expectedVersions, executed)
 }
 
-func TestRevisionSet_CheckpointMethods(t *testing.T) {
+func TestRevisionSet_SnapshotMethods(t *testing.T) {
 	now := time.Now()
 
 	revisions := []*migrator.Revision{
@@ -662,9 +662,9 @@ func TestRevisionSet_CheckpointMethods(t *testing.T) {
 			Error:      nil,
 		},
 		{
-			Version:    "003_checkpoint",
+			Version:    "003_snapshot",
 			ExecutedAt: now.Add(-time.Hour),
-			Kind:       migrator.CheckpointRevision,
+			Kind:       migrator.SnapshotRevision,
 			Error:      nil,
 		},
 		{
@@ -683,33 +683,33 @@ func TestRevisionSet_CheckpointMethods(t *testing.T) {
 
 	revisionSet := migrator.NewRevisionSet(revisions)
 
-	t.Run("HasCheckpoint", func(t *testing.T) {
-		require.True(t, revisionSet.HasCheckpoint())
+	t.Run("HasSnapshot", func(t *testing.T) {
+		require.True(t, revisionSet.HasSnapshot())
 
-		// Test with no checkpoints
-		noCheckpointRevisions := []*migrator.Revision{
+		// Test with no snapshots
+		noSnapshotRevisions := []*migrator.Revision{
 			{
 				Version: "001_init",
 				Kind:    migrator.StandardRevision,
 				Error:   nil,
 			},
 		}
-		noCheckpointSet := migrator.NewRevisionSet(noCheckpointRevisions)
-		require.False(t, noCheckpointSet.HasCheckpoint())
+		noSnapshotSet := migrator.NewRevisionSet(noSnapshotRevisions)
+		require.False(t, noSnapshotSet.HasSnapshot())
 	})
 
-	t.Run("GetLastCheckpoint", func(t *testing.T) {
-		checkpoint := revisionSet.GetLastCheckpoint()
-		require.NotNil(t, checkpoint)
-		require.Equal(t, "003_checkpoint", checkpoint.Version)
-		require.Equal(t, migrator.CheckpointRevision, checkpoint.Kind)
+	t.Run("GetLastSnapshot", func(t *testing.T) {
+		snapshot := revisionSet.GetLastSnapshot()
+		require.NotNil(t, snapshot)
+		require.Equal(t, "003_snapshot", snapshot.Version)
+		require.Equal(t, migrator.SnapshotRevision, snapshot.Kind)
 
-		// Test with multiple checkpoints - should return the last one
-		multiCheckpointRevisions := []*migrator.Revision{
+		// Test with multiple snapshots - should return the last one
+		multiSnapshotRevisions := []*migrator.Revision{
 			{
-				Version:    "001_checkpoint_old",
+				Version:    "001_snapshot_old",
 				ExecutedAt: now.Add(-time.Hour * 2),
-				Kind:       migrator.CheckpointRevision,
+				Kind:       migrator.SnapshotRevision,
 				Error:      nil,
 			},
 			{
@@ -719,38 +719,38 @@ func TestRevisionSet_CheckpointMethods(t *testing.T) {
 				Error:      nil,
 			},
 			{
-				Version:    "003_checkpoint_new",
+				Version:    "003_snapshot_new",
 				ExecutedAt: now,
-				Kind:       migrator.CheckpointRevision,
+				Kind:       migrator.SnapshotRevision,
 				Error:      nil,
 			},
 		}
-		multiCheckpointSet := migrator.NewRevisionSet(multiCheckpointRevisions)
-		lastCheckpoint := multiCheckpointSet.GetLastCheckpoint()
-		require.NotNil(t, lastCheckpoint)
-		require.Equal(t, "003_checkpoint_new", lastCheckpoint.Version)
+		multiSnapshotSet := migrator.NewRevisionSet(multiSnapshotRevisions)
+		lastSnapshot := multiSnapshotSet.GetLastSnapshot()
+		require.NotNil(t, lastSnapshot)
+		require.Equal(t, "003_snapshot_new", lastSnapshot.Version)
 
-		// Test with no checkpoints
-		noCheckpointRevisions := []*migrator.Revision{
+		// Test with no snapshots
+		noSnapshotRevisions := []*migrator.Revision{
 			{
 				Version: "001_init",
 				Kind:    migrator.StandardRevision,
 				Error:   nil,
 			},
 		}
-		noCheckpointSet := migrator.NewRevisionSet(noCheckpointRevisions)
-		require.Nil(t, noCheckpointSet.GetLastCheckpoint())
+		noSnapshotSet := migrator.NewRevisionSet(noSnapshotRevisions)
+		require.Nil(t, noSnapshotSet.GetLastSnapshot())
 	})
 
-	t.Run("GetMigrationsAfterCheckpoint", func(t *testing.T) {
-		migrationsAfter := revisionSet.GetMigrationsAfterCheckpoint()
+	t.Run("GetMigrationsAfterSnapshot", func(t *testing.T) {
+		migrationsAfter := revisionSet.GetMigrationsAfterSnapshot()
 
-		// Should return migrations after the last checkpoint
+		// Should return migrations after the last snapshot
 		expected := []string{"004_products", "005_orders"}
 		require.Equal(t, expected, migrationsAfter)
 
-		// Test with no checkpoints - should return all executed versions
-		noCheckpointRevisions := []*migrator.Revision{
+		// Test with no snapshots - should return all executed versions
+		noSnapshotRevisions := []*migrator.Revision{
 			{
 				Version: "001_init",
 				Kind:    migrator.StandardRevision,
@@ -762,15 +762,15 @@ func TestRevisionSet_CheckpointMethods(t *testing.T) {
 				Error:   nil,
 			},
 		}
-		noCheckpointSet := migrator.NewRevisionSet(noCheckpointRevisions)
-		allMigrations := noCheckpointSet.GetMigrationsAfterCheckpoint()
+		noSnapshotSet := migrator.NewRevisionSet(noSnapshotRevisions)
+		allMigrations := noSnapshotSet.GetMigrationsAfterSnapshot()
 		require.Equal(t, []string{"001_init", "002_users"}, allMigrations)
 
-		// Test with failed migrations after checkpoint - should be excluded
+		// Test with failed migrations after snapshot - should be excluded
 		withFailedRevisions := []*migrator.Revision{
 			{
-				Version: "001_checkpoint",
-				Kind:    migrator.CheckpointRevision,
+				Version: "001_snapshot",
+				Kind:    migrator.SnapshotRevision,
 				Error:   nil,
 			},
 			{
@@ -785,7 +785,7 @@ func TestRevisionSet_CheckpointMethods(t *testing.T) {
 			},
 		}
 		withFailedSet := migrator.NewRevisionSet(withFailedRevisions)
-		afterFailed := withFailedSet.GetMigrationsAfterCheckpoint()
+		afterFailed := withFailedSet.GetMigrationsAfterSnapshot()
 		require.Equal(t, []string{"002_success"}, afterFailed)
 	})
 }

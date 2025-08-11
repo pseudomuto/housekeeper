@@ -17,11 +17,11 @@ const (
 	// revision type for typical migration operations.
 	StandardRevision RevisionKind = "migration"
 
-	// CheckpointRevision represents a checkpoint marker in the migration
+	// SnapshotRevision represents a snapshot marker in the migration
 	// history, typically used for marking safe rollback points or
-	// significant migration milestones. Checkpoints may not contain
+	// significant migration milestones. Snapshots may not contain
 	// actual DDL statements but serve as metadata markers.
-	CheckpointRevision RevisionKind = "checkpoint"
+	SnapshotRevision RevisionKind = "snapshot"
 )
 
 type (
@@ -66,7 +66,7 @@ type (
 		// monitoring and identifying slow migrations.
 		ExecutionTime time.Duration
 
-		// Kind categorizes the type of revision (migration, checkpoint, etc.).
+		// Kind categorizes the type of revision (migration, snapshot, etc.).
 		// Determines how the revision should be processed during rollbacks
 		// and migration analysis.
 		Kind RevisionKind
@@ -254,7 +254,7 @@ func LoadRevisions(ctx context.Context, ch ClickHouse) (*RevisionSet, error) {
 //   - All statements were applied (applied == total)
 //   - The number of statements matches the revision total count
 //
-// Failed migrations, partially applied migrations, and checkpoint revisions are not considered completed.
+// Failed migrations, partially applied migrations, and snapshot revisions are not considered completed.
 //
 // Example usage:
 //
@@ -432,7 +432,7 @@ func (rs *RevisionSet) GetFailed(migrationDir *MigrationDir) []*Migration {
 // successfully executed.
 //
 // Only successful StandardRevision entries are included. Failed migrations
-// and checkpoint revisions are excluded from the results.
+// and snapshot revisions are excluded from the results.
 //
 // The versions are returned in the order they appear in the original revisions
 // slice, which typically corresponds to execution order.
@@ -467,9 +467,9 @@ func (rs *RevisionSet) HasRevision(version string) bool {
 	return exists
 }
 
-// GetLastCheckpoint returns the most recent checkpoint revision.
+// GetLastSnapshot returns the most recent snapshot revision.
 //
-// Returns nil if no checkpoint revision exists in the set.
+// Returns nil if no snapshot revision exists in the set.
 //
 // Example usage:
 //
@@ -478,28 +478,28 @@ func (rs *RevisionSet) HasRevision(version string) bool {
 //		log.Fatal(err)
 //	}
 //
-//	if checkpoint := revisionSet.GetLastCheckpoint(); checkpoint != nil {
-//		fmt.Printf("Last checkpoint: %s at %s\n",
-//			checkpoint.Version, checkpoint.ExecutedAt.Format("2006-01-02"))
+//	if snapshot := revisionSet.GetLastSnapshot(); snapshot != nil {
+//		fmt.Printf("Last snapshot: %s at %s\n",
+//			snapshot.Version, snapshot.ExecutedAt.Format("2006-01-02"))
 //	}
-func (rs *RevisionSet) GetLastCheckpoint() *Revision {
-	var lastCheckpoint *Revision
+func (rs *RevisionSet) GetLastSnapshot() *Revision {
+	var lastSnapshot *Revision
 
-	// Iterate through ordered versions to find the last checkpoint
+	// Iterate through ordered versions to find the last snapshot
 	for i := len(rs.orderedVersions) - 1; i >= 0; i-- {
 		revision := rs.revisions[rs.orderedVersions[i]]
-		if revision.Kind == CheckpointRevision && revision.Error == nil {
-			lastCheckpoint = revision
+		if revision.Kind == SnapshotRevision && revision.Error == nil {
+			lastSnapshot = revision
 			break
 		}
 	}
 
-	return lastCheckpoint
+	return lastSnapshot
 }
 
-// GetMigrationsAfterCheckpoint returns all successfully executed migrations after the last checkpoint.
+// GetMigrationsAfterSnapshot returns all successfully executed migrations after the last snapshot.
 //
-// If no checkpoint exists, returns all successfully executed migrations.
+// If no snapshot exists, returns all successfully executed migrations.
 //
 // Example usage:
 //
@@ -508,31 +508,31 @@ func (rs *RevisionSet) GetLastCheckpoint() *Revision {
 //		log.Fatal(err)
 //	}
 //
-//	migrationsAfterCheckpoint := revisionSet.GetMigrationsAfterCheckpoint()
-//	fmt.Printf("Found %d migrations after checkpoint\n", len(migrationsAfterCheckpoint))
-func (rs *RevisionSet) GetMigrationsAfterCheckpoint() []string {
-	lastCheckpoint := rs.GetLastCheckpoint()
-	if lastCheckpoint == nil {
+//	migrationsAfterSnapshot := revisionSet.GetMigrationsAfterSnapshot()
+//	fmt.Printf("Found %d migrations after snapshot\n", len(migrationsAfterSnapshot))
+func (rs *RevisionSet) GetMigrationsAfterSnapshot() []string {
+	lastSnapshot := rs.GetLastSnapshot()
+	if lastSnapshot == nil {
 		return rs.GetExecutedVersions()
 	}
 
-	// Find the index of the checkpoint
-	checkpointIndex := -1
+	// Find the index of the snapshot
+	snapshotIndex := -1
 	for i, version := range rs.orderedVersions {
-		if version == lastCheckpoint.Version {
-			checkpointIndex = i
+		if version == lastSnapshot.Version {
+			snapshotIndex = i
 			break
 		}
 	}
 
-	if checkpointIndex == -1 {
+	if snapshotIndex == -1 {
 		// Shouldn't happen, but return all executed versions as fallback
 		return rs.GetExecutedVersions()
 	}
 
-	// Collect successful migrations after the checkpoint
+	// Collect successful migrations after the snapshot
 	var migrationsAfter []string
-	for i := checkpointIndex + 1; i < len(rs.orderedVersions); i++ {
+	for i := snapshotIndex + 1; i < len(rs.orderedVersions); i++ {
 		revision := rs.revisions[rs.orderedVersions[i]]
 		if revision.Kind == StandardRevision && revision.Error == nil {
 			migrationsAfter = append(migrationsAfter, revision.Version)
@@ -542,16 +542,16 @@ func (rs *RevisionSet) GetMigrationsAfterCheckpoint() []string {
 	return migrationsAfter
 }
 
-// HasCheckpoint returns true if there is at least one checkpoint revision.
+// HasSnapshot returns true if there is at least one snapshot revision.
 //
 // Example usage:
 //
-//	if revisionSet.HasCheckpoint() {
-//		fmt.Println("Database has checkpoint revisions")
+//	if revisionSet.HasSnapshot() {
+//		fmt.Println("Database has snapshot revisions")
 //	}
-func (rs *RevisionSet) HasCheckpoint() bool {
+func (rs *RevisionSet) HasSnapshot() bool {
 	for _, revision := range rs.revisions {
-		if revision.Kind == CheckpointRevision && revision.Error == nil {
+		if revision.Kind == SnapshotRevision && revision.Error == nil {
 			return true
 		}
 	}

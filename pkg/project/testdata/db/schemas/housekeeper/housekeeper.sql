@@ -12,7 +12,7 @@ CREATE TABLE `housekeeper`.`revisions` (
     `version` String COMMENT 'The version (e.g. 20250101123045)',
     `executed_at` DateTime(3, 'UTC') COMMENT 'The UTC time at which this attempt was executed',
     `execution_time_ms` UInt64 COMMENT 'How long the migration took to run',
-    `type` String COMMENT 'The type of migration this is (normal, checkpoint, etc)',
+    `type` String COMMENT 'The type of migration this is (normal, snapshot, etc)',
     `error` Nullable(String) COMMENT 'The error message from the last attempt (if any)',
     `applied` UInt32 COMMENT 'The number of applied statements',
     `total` UInt32 COMMENT 'The total number of statements in the migration',
