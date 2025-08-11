@@ -268,13 +268,13 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 //   - target: Target schema state
 //
 // Returns:
-//   - filename: The generated migration filename (e.g., "20240806143022_schema_update.sql")
+//   - filename: The generated migration filename (e.g., "20240806143022.sql")
 //   - error: Any error encountered during generation or file writing (returns ErrNoDiff if no differences found)
 //
 // Example:
 //
 //	filename, err := GenerateMigrationFile("/path/to/migrations", currentSchema, targetSchema)
-//	// Creates: /path/to/migrations/20240806143022_schema_update.sql
+//	// Creates: /path/to/migrations/20240806143022.sql
 func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (string, error) {
 	// Generate diff using existing function
 	diff, err := GenerateDiff(current, target)
@@ -283,9 +283,7 @@ func GenerateMigrationFile(migrationDir string, current, target *parser.SQL) (st
 	}
 
 	// Create timestamped filename using UTC
-	now := time.Now().UTC()
-	timestamp := now.Format("20060102150405")
-	filename := timestamp + "_schema_update.sql"
+	filename := time.Now().UTC().Format("20060102150405") + ".sql"
 
 	// Ensure migration directory exists
 	if err := os.MkdirAll(migrationDir, consts.ModeDir); err != nil {

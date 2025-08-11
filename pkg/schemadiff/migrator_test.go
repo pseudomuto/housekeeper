@@ -152,7 +152,7 @@ CREATE TABLE analytics.events (id UInt64, name String) ENGINE = MergeTree() ORDE
 		require.NotEmpty(t, filename)
 
 		// Verify filename format: yyyyMMddhhmmss_schema_update.sql
-		require.Regexp(t, `^\d{14}_schema_update\.sql$`, filename)
+		require.Regexp(t, `^\d{14}\.sql$`, filename)
 
 		// Verify file was created
 		migrationPath := filepath.Join(migrationDir, filename)

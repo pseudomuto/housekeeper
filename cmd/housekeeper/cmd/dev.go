@@ -22,15 +22,9 @@ import (
 
 func dev() *cli.Command {
 	return &cli.Command{
-		Name:  "dev",
-		Usage: "Manage local ClickHouse development server",
-		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			if currentProject == nil {
-				return ctx, errors.New("not a housekeeper project")
-			}
-
-			return ctx, nil
-		},
+		Name:   "dev",
+		Usage:  "Manage local ClickHouse development server",
+		Before: requireProject,
 		Commands: []*cli.Command{
 			devUp(),
 			devDown(),

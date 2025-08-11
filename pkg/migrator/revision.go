@@ -466,3 +466,94 @@ func (rs *RevisionSet) HasRevision(version string) bool {
 	_, exists := rs.revisions[version]
 	return exists
 }
+
+// GetLastCheckpoint returns the most recent checkpoint revision.
+//
+// Returns nil if no checkpoint revision exists in the set.
+//
+// Example usage:
+//
+//	revisionSet, err := migrator.LoadRevisions(ctx, client)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	if checkpoint := revisionSet.GetLastCheckpoint(); checkpoint != nil {
+//		fmt.Printf("Last checkpoint: %s at %s\n",
+//			checkpoint.Version, checkpoint.ExecutedAt.Format("2006-01-02"))
+//	}
+func (rs *RevisionSet) GetLastCheckpoint() *Revision {
+	var lastCheckpoint *Revision
+
+	// Iterate through ordered versions to find the last checkpoint
+	for i := len(rs.orderedVersions) - 1; i >= 0; i-- {
+		revision := rs.revisions[rs.orderedVersions[i]]
+		if revision.Kind == CheckpointRevision && revision.Error == nil {
+			lastCheckpoint = revision
+			break
+		}
+	}
+
+	return lastCheckpoint
+}
+
+// GetMigrationsAfterCheckpoint returns all successfully executed migrations after the last checkpoint.
+//
+// If no checkpoint exists, returns all successfully executed migrations.
+//
+// Example usage:
+//
+//	revisionSet, err := migrator.LoadRevisions(ctx, client)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	migrationsAfterCheckpoint := revisionSet.GetMigrationsAfterCheckpoint()
+//	fmt.Printf("Found %d migrations after checkpoint\n", len(migrationsAfterCheckpoint))
+func (rs *RevisionSet) GetMigrationsAfterCheckpoint() []string {
+	lastCheckpoint := rs.GetLastCheckpoint()
+	if lastCheckpoint == nil {
+		return rs.GetExecutedVersions()
+	}
+
+	// Find the index of the checkpoint
+	checkpointIndex := -1
+	for i, version := range rs.orderedVersions {
+		if version == lastCheckpoint.Version {
+			checkpointIndex = i
+			break
+		}
+	}
+
+	if checkpointIndex == -1 {
+		// Shouldn't happen, but return all executed versions as fallback
+		return rs.GetExecutedVersions()
+	}
+
+	// Collect successful migrations after the checkpoint
+	var migrationsAfter []string
+	for i := checkpointIndex + 1; i < len(rs.orderedVersions); i++ {
+		revision := rs.revisions[rs.orderedVersions[i]]
+		if revision.Kind == StandardRevision && revision.Error == nil {
+			migrationsAfter = append(migrationsAfter, revision.Version)
+		}
+	}
+
+	return migrationsAfter
+}
+
+// HasCheckpoint returns true if there is at least one checkpoint revision.
+//
+// Example usage:
+//
+//	if revisionSet.HasCheckpoint() {
+//		fmt.Println("Database has checkpoint revisions")
+//	}
+func (rs *RevisionSet) HasCheckpoint() bool {
+	for _, revision := range rs.revisions {
+		if revision.Kind == CheckpointRevision && revision.Error == nil {
+			return true
+		}
+	}
+	return false
+}

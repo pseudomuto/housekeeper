@@ -65,6 +65,10 @@ type (
 		// verification of migration file contents.
 		SumFile *SumFile
 
+		// checkpoint stores the loaded checkpoint if one exists in the directory.
+		// This is kept private and accessed through HasCheckpoint() and GetCheckpoint().
+		checkpoint *Checkpoint
+
 		// fs stores the filesystem reference for reloading operations.
 		// This is kept private to ensure controlled access through methods.
 		fs fs.FS
@@ -78,8 +82,11 @@ type (
 // as migrations and any .sum files for integrity verification. The filesystem can be
 // a regular directory, embedded filesystem, or any implementation of fs.FS.
 //
+// Checkpoint files (marked with -- housekeeper:checkpoint) are automatically detected
+// and stored separately from regular migrations.
+//
 // Supported file extensions:
-//   - .sql: Migration files containing ClickHouse DDL statements
+//   - .sql: Migration files containing ClickHouse DDL statements or checkpoint data
 //   - .sum: Sum files containing integrity hashes (currently loaded but not processed)
 //
 // Example usage:
@@ -106,6 +113,12 @@ type (
 //				fmt.Printf("  CREATE TABLE: %s\n", stmt.CreateTable.Name)
 //			}
 //		}
+//	}
+//
+//	// Check for checkpoint
+//	if migDir.HasCheckpoint() {
+//		checkpoint, _ := migDir.GetCheckpoint()
+//		fmt.Printf("Found checkpoint: %s\n", checkpoint.Version)
 //	}
 //
 // Returns an error if the directory cannot be read or any migration file
@@ -141,12 +154,31 @@ func LoadMigrationDir(dir fs.FS) (*MigrationDir, error) {
 				return errors.Wrapf(err, "failed to read migration: %s", path)
 			}
 
-			m, err := LoadMigration(path[:strings.Index(path, ".")], strings.NewReader(string(content)))
+			// Check if this is a checkpoint file
+			reader := strings.NewReader(string(content))
+			isCheckpoint, err := IsCheckpoint(reader)
 			if err != nil {
-				return errors.Wrapf(err, "failed to load migration: %s", path)
+				return errors.Wrapf(err, "failed to check if file is checkpoint: %s", path)
 			}
 
-			mig.Migrations = append(mig.Migrations, m)
+			if isCheckpoint {
+				// Load as checkpoint
+				reader := strings.NewReader(string(content))
+				checkpoint, err := LoadCheckpoint(reader)
+				if err != nil {
+					return errors.Wrapf(err, "failed to load checkpoint: %s", path)
+				}
+				mig.checkpoint = checkpoint
+			} else {
+				// Load as regular migration - extract filename without extension as version
+				filename := filepath.Base(path)
+				version := filename[:strings.Index(filename, ".")]
+				m, err := LoadMigration(version, strings.NewReader(string(content)))
+				if err != nil {
+					return errors.Wrapf(err, "failed to load migration: %s", path)
+				}
+				mig.Migrations = append(mig.Migrations, m)
+			}
 
 			// Add to sum file
 			err = mig.SumFile.Add(path, strings.NewReader(string(content)))
@@ -312,7 +344,9 @@ func (m *MigrationDir) Rehash() error {
 		}
 		defer func() { _ = f.Close() }()
 
-		migration, err := LoadMigration(path[:strings.Index(path, ".")], f)
+		filename := filepath.Base(path)
+		version := filename[:strings.Index(filename, ".")]
+		migration, err := LoadMigration(version, f)
 		if err != nil {
 			return errors.Wrapf(err, "failed to load migration: %s", path)
 		}
@@ -430,6 +464,139 @@ func (m *MigrationDir) Validate() (bool, error) {
 
 	// Compare the computed hashes
 	return equalHashes(tempHash, storedHash), nil
+}
+
+// HasCheckpoint returns true if a checkpoint was loaded from the migration directory.
+//
+// Example usage:
+//
+//	migDir, err := migrator.LoadMigrationDir(os.DirFS("./migrations"))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	if migDir.HasCheckpoint() {
+//		fmt.Println("Directory contains a checkpoint")
+//	}
+func (m *MigrationDir) HasCheckpoint() bool {
+	return m.checkpoint != nil
+}
+
+// GetCheckpoint returns the loaded checkpoint, if one exists.
+//
+// Returns nil if no checkpoint was found in the migration directory.
+//
+// Example usage:
+//
+//	migDir, err := migrator.LoadMigrationDir(os.DirFS("./migrations"))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	if checkpoint := migDir.GetCheckpoint(); checkpoint != nil {
+//		fmt.Printf("Found checkpoint: %s (%s)\n",
+//			checkpoint.Version, checkpoint.Description)
+//		fmt.Printf("Includes %d migrations\n", len(checkpoint.IncludedMigrations))
+//	}
+func (m *MigrationDir) GetCheckpoint() *Checkpoint {
+	return m.checkpoint
+}
+
+// CreateCheckpoint generates a new checkpoint from all current migrations.
+//
+// This method creates a checkpoint that consolidates all migrations currently
+// in the directory. The checkpoint can then be written to a file and the old
+// migration files can be safely removed.
+//
+// Example usage:
+//
+//	migDir, err := migrator.LoadMigrationDir(os.DirFS("./migrations"))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	checkpoint, err := migDir.CreateCheckpoint(
+//		"20240810120000_checkpoint",
+//		"Q3 2024 Release",
+//	)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Write checkpoint to file
+//	file, err := os.Create("migrations/20240810120000_checkpoint.sql")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer file.Close()
+//
+//	_, err = checkpoint.WriteTo(file)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+func (m *MigrationDir) CreateCheckpoint(version, description string) (*Checkpoint, error) {
+	if len(m.Migrations) == 0 {
+		return nil, errors.New("no migrations to checkpoint")
+	}
+
+	// If there's an existing checkpoint, only include migrations after it
+	var migrationsToInclude []*Migration
+	if m.checkpoint != nil {
+		// Find migrations not already in the checkpoint
+		checkpointVersions := make(map[string]bool)
+		for _, v := range m.checkpoint.IncludedMigrations {
+			checkpointVersions[v] = true
+		}
+
+		for _, mig := range m.Migrations {
+			if !checkpointVersions[mig.Version] {
+				migrationsToInclude = append(migrationsToInclude, mig)
+			}
+		}
+
+		if len(migrationsToInclude) == 0 {
+			return nil, errors.New("no new migrations to checkpoint")
+		}
+	} else {
+		migrationsToInclude = m.Migrations
+	}
+
+	return GenerateCheckpoint(version, description, migrationsToInclude)
+}
+
+// GetMigrationsAfterCheckpoint returns all migrations that are not included in the checkpoint.
+//
+// If no checkpoint exists, returns all migrations.
+//
+// Example usage:
+//
+//	migDir, err := migrator.LoadMigrationDir(os.DirFS("./migrations"))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	newMigrations := migDir.GetMigrationsAfterCheckpoint()
+//	fmt.Printf("Found %d migrations after checkpoint\n", len(newMigrations))
+func (m *MigrationDir) GetMigrationsAfterCheckpoint() []*Migration {
+	if m.checkpoint == nil {
+		return m.Migrations
+	}
+
+	// Create a set of checkpoint migration versions for quick lookup
+	checkpointVersions := make(map[string]bool)
+	for _, v := range m.checkpoint.IncludedMigrations {
+		checkpointVersions[v] = true
+	}
+
+	// Filter out migrations that are in the checkpoint
+	var afterCheckpoint []*Migration
+	for _, mig := range m.Migrations {
+		if !checkpointVersions[mig.Version] {
+			afterCheckpoint = append(afterCheckpoint, mig)
+		}
+	}
+
+	return afterCheckpoint
 }
 
 // computeSumFileHash computes a SHA256 hash of all the entry hashes in a SumFile.

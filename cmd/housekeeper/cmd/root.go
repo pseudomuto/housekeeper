@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 )
@@ -82,6 +83,7 @@ database state and generating appropriate migration files.`,
 		},
 		Commands: []*cli.Command{
 			bootstrap(),
+			checkpoint(),
 			dev(),
 			initCmd(),
 			schema(),
@@ -89,4 +91,12 @@ database state and generating appropriate migration files.`,
 	}
 
 	return app.Run(ctx, args)
+}
+
+func requireProject(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+	if currentProject == nil {
+		return ctx, errors.New("not a housekeeper project")
+	}
+
+	return ctx, nil
 }

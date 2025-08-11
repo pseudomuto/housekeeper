@@ -645,6 +645,151 @@ func TestRevisionSet_GetExecutedVersions(t *testing.T) {
 	require.Equal(t, expectedVersions, executed)
 }
 
+func TestRevisionSet_CheckpointMethods(t *testing.T) {
+	now := time.Now()
+
+	revisions := []*migrator.Revision{
+		{
+			Version:    "001_init",
+			ExecutedAt: now.Add(-time.Hour * 3),
+			Kind:       migrator.StandardRevision,
+			Error:      nil,
+		},
+		{
+			Version:    "002_users",
+			ExecutedAt: now.Add(-time.Hour * 2),
+			Kind:       migrator.StandardRevision,
+			Error:      nil,
+		},
+		{
+			Version:    "003_checkpoint",
+			ExecutedAt: now.Add(-time.Hour),
+			Kind:       migrator.CheckpointRevision,
+			Error:      nil,
+		},
+		{
+			Version:    "004_products",
+			ExecutedAt: now.Add(-time.Minute * 30),
+			Kind:       migrator.StandardRevision,
+			Error:      nil,
+		},
+		{
+			Version:    "005_orders",
+			ExecutedAt: now,
+			Kind:       migrator.StandardRevision,
+			Error:      nil,
+		},
+	}
+
+	revisionSet := migrator.NewRevisionSet(revisions)
+
+	t.Run("HasCheckpoint", func(t *testing.T) {
+		require.True(t, revisionSet.HasCheckpoint())
+
+		// Test with no checkpoints
+		noCheckpointRevisions := []*migrator.Revision{
+			{
+				Version: "001_init",
+				Kind:    migrator.StandardRevision,
+				Error:   nil,
+			},
+		}
+		noCheckpointSet := migrator.NewRevisionSet(noCheckpointRevisions)
+		require.False(t, noCheckpointSet.HasCheckpoint())
+	})
+
+	t.Run("GetLastCheckpoint", func(t *testing.T) {
+		checkpoint := revisionSet.GetLastCheckpoint()
+		require.NotNil(t, checkpoint)
+		require.Equal(t, "003_checkpoint", checkpoint.Version)
+		require.Equal(t, migrator.CheckpointRevision, checkpoint.Kind)
+
+		// Test with multiple checkpoints - should return the last one
+		multiCheckpointRevisions := []*migrator.Revision{
+			{
+				Version:    "001_checkpoint_old",
+				ExecutedAt: now.Add(-time.Hour * 2),
+				Kind:       migrator.CheckpointRevision,
+				Error:      nil,
+			},
+			{
+				Version:    "002_migration",
+				ExecutedAt: now.Add(-time.Hour),
+				Kind:       migrator.StandardRevision,
+				Error:      nil,
+			},
+			{
+				Version:    "003_checkpoint_new",
+				ExecutedAt: now,
+				Kind:       migrator.CheckpointRevision,
+				Error:      nil,
+			},
+		}
+		multiCheckpointSet := migrator.NewRevisionSet(multiCheckpointRevisions)
+		lastCheckpoint := multiCheckpointSet.GetLastCheckpoint()
+		require.NotNil(t, lastCheckpoint)
+		require.Equal(t, "003_checkpoint_new", lastCheckpoint.Version)
+
+		// Test with no checkpoints
+		noCheckpointRevisions := []*migrator.Revision{
+			{
+				Version: "001_init",
+				Kind:    migrator.StandardRevision,
+				Error:   nil,
+			},
+		}
+		noCheckpointSet := migrator.NewRevisionSet(noCheckpointRevisions)
+		require.Nil(t, noCheckpointSet.GetLastCheckpoint())
+	})
+
+	t.Run("GetMigrationsAfterCheckpoint", func(t *testing.T) {
+		migrationsAfter := revisionSet.GetMigrationsAfterCheckpoint()
+
+		// Should return migrations after the last checkpoint
+		expected := []string{"004_products", "005_orders"}
+		require.Equal(t, expected, migrationsAfter)
+
+		// Test with no checkpoints - should return all executed versions
+		noCheckpointRevisions := []*migrator.Revision{
+			{
+				Version: "001_init",
+				Kind:    migrator.StandardRevision,
+				Error:   nil,
+			},
+			{
+				Version: "002_users",
+				Kind:    migrator.StandardRevision,
+				Error:   nil,
+			},
+		}
+		noCheckpointSet := migrator.NewRevisionSet(noCheckpointRevisions)
+		allMigrations := noCheckpointSet.GetMigrationsAfterCheckpoint()
+		require.Equal(t, []string{"001_init", "002_users"}, allMigrations)
+
+		// Test with failed migrations after checkpoint - should be excluded
+		withFailedRevisions := []*migrator.Revision{
+			{
+				Version: "001_checkpoint",
+				Kind:    migrator.CheckpointRevision,
+				Error:   nil,
+			},
+			{
+				Version: "002_success",
+				Kind:    migrator.StandardRevision,
+				Error:   nil,
+			},
+			{
+				Version: "003_failed",
+				Kind:    migrator.StandardRevision,
+				Error:   stringPtr("migration failed"),
+			},
+		}
+		withFailedSet := migrator.NewRevisionSet(withFailedRevisions)
+		afterFailed := withFailedSet.GetMigrationsAfterCheckpoint()
+		require.Equal(t, []string{"002_success"}, afterFailed)
+	})
+}
+
 func stringPtr(s string) *string {
 	return &s
 }
