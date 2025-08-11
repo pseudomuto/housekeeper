@@ -20,13 +20,24 @@ import (
 //
 // Example:
 //
-//	project := project.New("/path/to/project")
-//	if err := project.Initialize(); err != nil {
+//	// For new projects
+//	proj, err := project.Initialize("/path/to/project", project.InitOptions{})
+//	if err != nil {
 //		log.Fatal(err)
 //	}
 //
+//	// Or for existing projects
+//	config, err := project.LoadConfigFile("/path/to/project/housekeeper.yaml")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	proj := project.New(project.NewProjectParams{
+//		Dir:    "/path/to/project",
+//		Config: config,
+//	})
+//
 //	// Parse project schema
-//	grammar, err := project.ParseSchema()
+//	grammar, err := proj.ParseSchema()
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}

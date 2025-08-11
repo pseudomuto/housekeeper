@@ -43,13 +43,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
 
-	"github.com/pseudomuto/housekeeper/cmd/housekeeper/cmd"
-	"github.com/urfave/cli/v3"
+	"github.com/pseudomuto/housekeeper/pkg/cmd"
+	"github.com/pseudomuto/housekeeper/pkg/project"
+	"go.uber.org/fx"
 )
 
 // Build-time variables set by GoReleaser during release builds.
@@ -60,13 +60,26 @@ var (
 )
 
 func main() {
-	cli.VersionPrinter = func(cmd *cli.Command) {
-		fmt.Fprintln(cmd.Writer, "Version:", version)
-		fmt.Fprintln(cmd.Writer, "Commit:", commit)
-		fmt.Fprintln(cmd.Writer, "Date:", date)
-	}
+	app := fx.New(
+		fx.Supply(
+			os.Args,
+			&cmd.Version{
+				Version:   version,
+				Commit:    commit,
+				Timestamp: date,
+			},
+		),
+		fx.Provide(
+			context.Background,
+		),
+		cmd.Module,
+		project.Module,
+		fx.NopLogger,
+	)
 
-	if err := cmd.Run(context.Background(), version, os.Args); err != nil {
+	app.Run()
+
+	if err := app.Err(); err != nil {
 		log.Fatal(err)
 	}
 }

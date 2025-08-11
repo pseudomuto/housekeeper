@@ -26,8 +26,8 @@ func TestProjectParseSchema(t *testing.T) {
 		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
 
 		// Initialize project
-		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize(project.InitOptions{}))
+		p, err := project.Initialize(tmpDir, project.InitOptions{})
+		require.NoError(t, err)
 
 		return p
 	}
@@ -66,8 +66,8 @@ dir: db/migrations`
 		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
 
-		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize(project.InitOptions{}))
+		p, err := project.Initialize(tmpDir, project.InitOptions{})
+		require.NoError(t, err)
 
 		grammar, err := p.ParseSchema()
 		require.NoError(t, err)
@@ -103,8 +103,8 @@ dir: db/migrations`
 		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 		require.NoError(t, copyDir("testdata/db", filepath.Join(tmpDir, "db")))
 
-		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize(project.InitOptions{}))
+		p, err := project.Initialize(tmpDir, project.InitOptions{})
+		require.NoError(t, err)
 
 		grammar, err := p.ParseSchema()
 		require.NoError(t, err)
@@ -132,10 +132,10 @@ dir: ""`
 
 		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile))
 
-		p := project.New(tmpDir)
-		require.NoError(t, p.Initialize(project.InitOptions{}))
+		p, err := project.Initialize(tmpDir, project.InitOptions{})
+		require.NoError(t, err)
 
-		_, err := p.ParseSchema()
+		_, err = p.ParseSchema()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to load schema from")
 	})
@@ -150,8 +150,7 @@ dir: db/migrations`
 		err := os.WriteFile(filepath.Join(tmpDir, "housekeeper.yaml"), []byte(configContent), consts.ModeFile)
 		require.NoError(t, err)
 
-		p := project.New(tmpDir)
-		err = p.Initialize(project.InitOptions{})
+		p, err := project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		_, err = p.ParseSchema()
@@ -175,14 +174,18 @@ dir: db/migrations`
 		require.Len(t, grammar2.Statements, len(grammar1.Statements))
 	})
 
-	t.Run("returns error when project is not initialized", func(t *testing.T) {
+	t.Run("returns error when project config is nil", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		p := project.New(tmpDir)
+		// Create project with nil config to test error handling
+		p := project.New(project.NewProjectParams{
+			Dir:    tmpDir,
+			Config: nil,
+		})
 
-		// Don't initialize - config will be nil
+		// Config is nil - should error
 		_, err := p.ParseSchema()
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "project not initialized")
+		require.Contains(t, err.Error(), "project configuration not loaded")
 	})
 }
 

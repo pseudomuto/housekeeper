@@ -43,13 +43,23 @@
 // # Usage Example
 //
 //	// Initialize a new project
-//	project := project.New("/path/to/my/project")
-//	if err := project.Initialize(); err != nil {
+//	proj, err := project.Initialize("/path/to/my/project", project.InitOptions{})
+//	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
-//	// Parse schema for production environment
-//	grammar, err := project.ParseSchema("production")
+//	// Or load existing project
+//	config, err := project.LoadConfigFile("/path/to/housekeeper.yaml")
+//	if err != nil {
+//		log.Fatal("Failed to load config:", err)
+//	}
+//	proj := project.New(project.NewProjectParams{
+//		Dir:    "/path/to/my/project",
+//		Config: config,
+//	})
+//
+//	// Parse schema
+//	grammar, err := proj.ParseSchema()
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}
