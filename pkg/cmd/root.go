@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
@@ -110,7 +111,10 @@ database state and generating appropriate migration files.`,
 				return ctx, errors.Wrap(err, "failed to get current working directory")
 			}
 
-			currentProject = project.New(pwd)
+			currentProject = project.New(project.ProjectParams{
+				Dir:       pwd,
+				Formatter: format.New(format.Defaults),
+			})
 			return ctx, nil
 		},
 		Commands: p.Commands,

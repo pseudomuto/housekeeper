@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
@@ -49,7 +48,7 @@ import (
 //
 // The command handles all ClickHouse object types and uses the cluster configuration
 // from the existing project for proper ON CLUSTER injection.
-func bootstrap() *cli.Command {
+func bootstrap(p *project.Project) *cli.Command {
 	return &cli.Command{
 		Name:  "bootstrap",
 		Usage: "Extract schema from an existing ClickHouse server into initialized project",
@@ -63,19 +62,13 @@ func bootstrap() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			dir := "."
-			if path := cmd.String("dir"); path != "" {
-				dir = path
-			}
-
 			// Load existing project configuration
-			configPath := filepath.Join(dir, "housekeeper.yaml")
-			if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			if _, err := os.Stat("housekeeper.yaml"); os.IsNotExist(err) {
 				return errors.New("housekeeper.yaml not found - please run 'housekeeper init' first to initialize the project")
 			}
 
 			// Load configuration to get cluster info
-			cfg, err := config.LoadConfigFile(configPath)
+			cfg, err := config.LoadConfigFile("housekeeper.yaml")
 			if err != nil {
 				return errors.Wrap(err, "failed to load project configuration")
 			}
@@ -99,8 +92,7 @@ func bootstrap() *cli.Command {
 			}
 
 			// Create project instance and bootstrap from the extracted schema
-			proj := project.New(dir)
-			return proj.BootstrapFromSchema(schema)
+			return p.BootstrapFromSchema(schema)
 		},
 	}
 }

@@ -219,7 +219,10 @@ func TestMigrations(t *testing.T) {
         t.Skip("Docker not available")
     }
     
-    proj := project.New(t.TempDir())
+    proj := project.New(project.ProjectParams{
+        Dir:       t.TempDir(),
+        Formatter: format.New(format.Defaults),
+    })
     
     // Initialize project to create config directory
     if err := proj.Initialize(project.InitOptions{}); err != nil {
@@ -246,7 +249,10 @@ func TestMigrations(t *testing.T) {
 
 ```go
 // Initialize project with full configuration
-proj := project.New("/path/to/project")
+proj := project.New(project.ProjectParams{
+    Dir:       "/path/to/project",
+    Formatter: format.New(format.Defaults),
+})
 if err := proj.Initialize(project.InitOptions{}); err != nil {
     return fmt.Errorf("project initialization failed: %w", err)
 }

@@ -1081,12 +1081,16 @@ import (
     "fmt"
     "log"
     
+    "github.com/pseudomuto/housekeeper/pkg/format"
     "github.com/pseudomuto/housekeeper/pkg/project"
 )
 
 func main() {
     // Initialize project
-    proj := project.New("/path/to/project")
+    proj := project.New(project.ProjectParams{
+        Dir:       "/path/to/project",
+        Formatter: format.New(format.Defaults),
+    })
     err := proj.Initialize(project.InitOptions{})
     if err != nil {
         log.Fatal(err)

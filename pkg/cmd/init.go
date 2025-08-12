@@ -31,7 +31,7 @@ import (
 // The command will create the necessary files and directories while
 // preserving any existing content, making it safe to run in populated
 // directories.
-func initCmd() *cli.Command {
+func initCmd(p *project.Project) *cli.Command {
 	return &cli.Command{
 		Name:  "init",
 		Usage: "Initialize a project in the current directory",
@@ -43,8 +43,7 @@ func initCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			proj := project.New(".")
-			return proj.Initialize(project.InitOptions{
+			return p.Initialize(project.InitOptions{
 				Cluster: cmd.String("cluster"),
 			})
 		},

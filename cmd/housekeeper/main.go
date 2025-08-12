@@ -49,6 +49,8 @@ import (
 
 	"github.com/pseudomuto/housekeeper/pkg/cmd"
 	"github.com/pseudomuto/housekeeper/pkg/config"
+	"github.com/pseudomuto/housekeeper/pkg/format"
+	"github.com/pseudomuto/housekeeper/pkg/project"
 	"go.uber.org/fx"
 )
 
@@ -62,7 +64,9 @@ var (
 type Params struct {
 	fx.Out
 
-	Version *cmd.Version
+	Dir           string `name:"project_dir"`
+	FormatOptions format.FormatterOptions
+	Version       *cmd.Version
 }
 
 func main() {
@@ -72,10 +76,14 @@ func main() {
 		}
 	}
 
+	pwd, _ := os.Getwd()
+
 	app := fx.New(
 		fx.Supply(
 			os.Args,
 			Params{
+				Dir:           pwd,
+				FormatOptions: format.Defaults,
 				Version: &cmd.Version{
 					Version:   version,
 					Commit:    commit,
@@ -88,7 +96,9 @@ func main() {
 		),
 		cmd.Module,
 		config.Module,
-		// fx.NopLogger,
+		format.Module,
+		project.Module,
+		fx.NopLogger,
 	)
 
 	app.Run()

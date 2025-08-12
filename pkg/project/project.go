@@ -12,7 +12,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"go.uber.org/fx"
 )
 
 var (
@@ -58,6 +60,14 @@ type (
 	// The project operates within the specified root directory.
 	Project struct {
 		RootDir string
+		fmtr    *format.Formatter
+	}
+
+	ProjectParams struct {
+		fx.In
+
+		Dir       string `name:"project_dir"`
+		Formatter *format.Formatter
 	}
 )
 
@@ -78,9 +88,10 @@ type (
 //	// Get migrations directory path
 //	migrationsDir := proj.MigrationsDir()
 //	fmt.Printf("Migrations directory: %s\n", migrationsDir)
-func New(rootDir string) *Project {
+func New(p ProjectParams) *Project {
 	return &Project{
-		RootDir: rootDir,
+		RootDir: p.Dir,
+		fmtr:    p.Formatter,
 	}
 }
 
@@ -93,14 +104,20 @@ func New(rootDir string) *Project {
 // Example:
 //
 //	// Create and initialize a new project
-//	proj := project.New("/path/to/my/project")
+//	proj := project.New(project.ProjectParams{
+//		Dir:       "/path/to/my/project",
+//		Formatter: format.New(format.Defaults),
+//	})
 //	err := proj.Initialize(project.InitOptions{})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
 //	// Initialize with custom cluster
-//	proj := project.New("/path/to/my/project")
+//	proj := project.New(project.ProjectParams{
+//		Dir:       "/path/to/my/project",
+//		Formatter: format.New(format.Defaults),
+//	})
 //	err := proj.Initialize(project.InitOptions{
 //		Cluster: "production",
 //	})

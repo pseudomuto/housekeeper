@@ -43,14 +43,20 @@
 // # Usage Example
 //
 //	// Initialize a new project
-//	proj := project.New("/path/to/my/project")
+//	proj := project.New(project.ProjectParams{
+//		Dir:       "/path/to/my/project",
+//		Formatter: format.New(format.Defaults),
+//	})
 //	err := proj.Initialize(project.InitOptions{})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
 //	// Create a project instance for the directory
-//	proj := project.New("/path/to/my/project")
+//	proj := project.New(project.ProjectParams{
+//		Dir:       "/path/to/my/project",
+//		Formatter: format.New(format.Defaults),
+//	})
 //
 //	// Load configuration and compile schema
 //	cfg, err := config.LoadConfigFile("housekeeper.yaml")

@@ -8,6 +8,7 @@ import (
 
 	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +17,10 @@ func TestProjectInitialize_CreatesDirectoriesAndFiles(t *testing.T) {
 	t.Run("creates all missing directories and files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -70,7 +74,10 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, os.WriteFile(clickhouseXMLPath, existingXMLContent, consts.ModeFile))
 
 		// Initialize the project
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -96,7 +103,10 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, os.WriteFile(customFile, []byte("custom"), consts.ModeFile))
 
 		// Initialize the project
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -114,7 +124,10 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// First initialization
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -127,7 +140,10 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, os.WriteFile(housekeeperPath, modifiedContent, consts.ModeFile))
 
 		// Second initialization
-		proj = project.New(tmpDir)
+		proj = project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -145,7 +161,10 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		err := os.MkdirAll(dbDir, consts.ModeDir)
 		require.NoError(t, err)
 
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err = proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -165,7 +184,10 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 		err := os.WriteFile(filePath, []byte("content"), consts.ModeFile)
 		require.NoError(t, err)
 
-		proj := project.New(filePath)
+		proj := project.New(project.ProjectParams{
+			Dir:       filePath,
+			Formatter: format.New(format.Defaults),
+		})
 		err = proj.Initialize(project.InitOptions{})
 		require.Error(t, err)
 		// The error should indicate that the path is not a directory
@@ -178,7 +200,10 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 	t.Run("returns error if root does not exist", func(t *testing.T) {
 		nonExistentPath := "/non/existent/path"
 
-		proj := project.New(nonExistentPath)
+		proj := project.New(project.ProjectParams{
+			Dir:       nonExistentPath,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(project.InitOptions{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to create project directory")
@@ -196,7 +221,10 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 		err := os.MkdirAll(readOnlyDir, os.FileMode(0o555))
 		require.NoError(t, err)
 
-		proj := project.New(readOnlyDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       readOnlyDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err = proj.Initialize(project.InitOptions{})
 		require.Error(t, err)
 		// The error should be about failing to create a directory or file
@@ -208,7 +236,10 @@ func TestProjectInitialize_DefaultConfiguration(t *testing.T) {
 	t.Run("creates default ClickHouse config directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(project.InitOptions{})
 		require.NoError(t, err)
 
@@ -234,7 +265,10 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 			Cluster: "production",
 		}
 
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(options)
 		require.NoError(t, err)
 
@@ -276,7 +310,10 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 			Cluster: "prod_cluster_01",
 		}
 
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(options)
 		require.NoError(t, err)
 
@@ -305,7 +342,10 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 			Cluster: "", // Empty cluster should use default
 		}
 
-		proj := project.New(tmpDir)
+		proj := project.New(project.ProjectParams{
+			Dir:       tmpDir,
+			Formatter: format.New(format.Defaults),
+		})
 		err := proj.Initialize(options)
 		require.NoError(t, err)
 
