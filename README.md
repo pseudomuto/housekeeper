@@ -732,7 +732,7 @@ func main() {
     // Parse SQL statements
     sql := `CREATE DATABASE analytics ENGINE = Atomic; CREATE TABLE analytics.events (id UUID, timestamp DateTime) ENGINE = MergeTree ORDER BY timestamp;`
     
-    grammar, err := parser.ParseString(sql)
+    parsed, err := parser.ParseString(sql)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
@@ -745,7 +745,7 @@ func main() {
     })
     
     var buf bytes.Buffer
-    err = formatter.Format(&buf, grammar.Statements...)
+    err = formatter.Format(&buf, parsed.Statements...)
     if err != nil {
         log.Fatalf("Format error: %v", err)
     }
@@ -763,14 +763,14 @@ func main() {
     
     // Or use the convenience function with defaults
     var buf2 bytes.Buffer
-    err = format.Format(&buf2, format.Defaults, grammar.Statements...)
+    err = format.Format(&buf2, format.Defaults, parsed.Statements...)
     if err != nil {
         log.Fatalf("Format error: %v", err)
     }
     
-    // Or format the entire grammar at once
+    // Or format the entire SQL at once
     var buf3 bytes.Buffer
-    err = format.FormatSQL(&buf3, format.Defaults, grammar)
+    err = format.FormatSQL(&buf3, format.Defaults, parsed)
     if err != nil {
         log.Fatalf("Format error: %v", err)
     }
@@ -931,13 +931,13 @@ func main() {
         SETTINGS max_threads = 8, max_memory_usage = 1000000000;
     `
     
-    grammar, err := parser.ParseString(selectSQL)
+    parsed, err := parser.ParseString(selectSQL)
     if err != nil {
         log.Fatalf("Parse error: %v", err)
     }
     
     // Access parsed SELECT statement
-    if stmt := grammar.Statements[0].SelectStatement; stmt != nil {
+    if stmt := parsed.Statements[0].SelectStatement; stmt != nil {
         fmt.Printf("Parsed SELECT statement:\n")
         fmt.Printf("- Columns: %d\n", len(stmt.Columns))
         fmt.Printf("- Has DISTINCT: %t\n", stmt.Distinct)

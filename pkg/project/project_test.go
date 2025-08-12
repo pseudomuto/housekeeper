@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ func TestProjectInitialize_CreatesDirectoriesAndFiles(t *testing.T) {
 	t.Run("creates all missing directories and files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		_, err := project.Initialize(tmpDir, project.InitOptions{})
+		err := project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify directories were created)
@@ -68,7 +69,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, os.WriteFile(clickhouseXMLPath, existingXMLContent, consts.ModeFile))
 
 		// Initialize the project
-		_, err := project.Initialize(tmpDir, project.InitOptions{})
+		err := project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify the existing file was not overwritten
@@ -93,7 +94,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, os.WriteFile(customFile, []byte("custom"), consts.ModeFile))
 
 		// Initialize the project
-		_, err := project.Initialize(tmpDir, project.InitOptions{})
+		err := project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify the custom file still exists
@@ -110,7 +111,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// First initialization
-		_, err := project.Initialize(tmpDir, project.InitOptions{})
+		err := project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Modify a file
@@ -122,7 +123,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		require.NoError(t, os.WriteFile(housekeeperPath, modifiedContent, consts.ModeFile))
 
 		// Second initialization
-		_, err = project.Initialize(tmpDir, project.InitOptions{})
+		err = project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify the modified file was not overwritten
@@ -139,7 +140,7 @@ func TestProjectInitialize_PreservesExisting(t *testing.T) {
 		err := os.MkdirAll(dbDir, consts.ModeDir)
 		require.NoError(t, err)
 
-		_, err = project.Initialize(tmpDir, project.InitOptions{})
+		err = project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify nested directories were created for the file
@@ -158,9 +159,9 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 		err := os.WriteFile(filePath, []byte("content"), consts.ModeFile)
 		require.NoError(t, err)
 
-		_, err = project.Initialize(filePath, project.InitOptions{})
+		err = project.Initialize(filePath, project.InitOptions{})
 		require.Error(t, err)
-		// The error can be either from ensureDirectory or from trying to create subdirectories
+		// The error should indicate that the path is not a directory
 		require.True(t,
 			strings.Contains(err.Error(), "is not a directory") ||
 				strings.Contains(err.Error(), "not a directory"),
@@ -170,9 +171,9 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 	t.Run("returns error if root does not exist", func(t *testing.T) {
 		nonExistentPath := "/non/existent/path"
 
-		_, err := project.Initialize(nonExistentPath, project.InitOptions{})
+		err := project.Initialize(nonExistentPath, project.InitOptions{})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to stat dir")
+		require.Contains(t, err.Error(), "failed to change to directory")
 	})
 
 	t.Run("handles permission errors gracefully", func(t *testing.T) {
@@ -187,7 +188,7 @@ func TestProjectInitialize_ErrorHandling(t *testing.T) {
 		err := os.MkdirAll(readOnlyDir, os.FileMode(0o555))
 		require.NoError(t, err)
 
-		_, err = project.Initialize(readOnlyDir, project.InitOptions{})
+		err = project.Initialize(readOnlyDir, project.InitOptions{})
 		require.Error(t, err)
 		// The error should be about failing to create a directory or file
 		require.Contains(t, err.Error(), "failed to")
@@ -210,7 +211,7 @@ dir: db/migrations
 		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
 		require.NoError(t, os.WriteFile(configPath, []byte(configContent), consts.ModeFile))
 
-		_, err := project.Initialize(tmpDir, project.InitOptions{})
+		err := project.Initialize(tmpDir, project.InitOptions{})
 		require.NoError(t, err)
 
 		// Verify custom config directory was created
@@ -226,7 +227,7 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 			Cluster: "production",
 		}
 
-		_, err := project.Initialize(tmpDir, options)
+		err := project.Initialize(tmpDir, options)
 		require.NoError(t, err)
 
 		// Verify config file was created and updated with custom cluster
@@ -234,11 +235,11 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 		require.FileExists(t, configPath)
 
 		// Load and verify the config contains the custom cluster
-		config, err := project.LoadConfigFile(configPath)
+		cfg, err := config.LoadConfigFile(configPath)
 		require.NoError(t, err)
-		require.Equal(t, "production", config.ClickHouse.Cluster)
-		require.Equal(t, project.DefaultClickHouseVersion, config.ClickHouse.Version)
-		require.Equal(t, project.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, "production", cfg.ClickHouse.Cluster)
+		require.Equal(t, consts.DefaultClickHouseVersion, cfg.ClickHouse.Version)
+		require.Equal(t, consts.DefaultClickHouseConfigDir, cfg.ClickHouse.ConfigDir)
 
 		// Verify the ClickHouse XML file was created with the custom cluster name
 		clickhouseXMLPath := filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml")
@@ -267,7 +268,7 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 			Cluster: "prod_cluster_01",
 		}
 
-		_, err := project.Initialize(tmpDir, options)
+		err := project.Initialize(tmpDir, options)
 		require.NoError(t, err)
 
 		// Verify the ClickHouse XML file was created with the cluster name with special chars
@@ -295,15 +296,15 @@ func TestProjectInitialize_ClusterConfiguration(t *testing.T) {
 			Cluster: "", // Empty cluster should use default
 		}
 
-		_, err := project.Initialize(tmpDir, options)
+		err := project.Initialize(tmpDir, options)
 		require.NoError(t, err)
 
 		// Verify config file was created with default cluster
 		configPath := filepath.Join(tmpDir, "housekeeper.yaml")
-		config, err := project.LoadConfigFile(configPath)
+		cfg, err := config.LoadConfigFile(configPath)
 		require.NoError(t, err)
-		require.Equal(t, project.DefaultClickHouseCluster, config.ClickHouse.Cluster)
-		require.Equal(t, "cluster", config.ClickHouse.Cluster)
+		require.Equal(t, consts.DefaultClickHouseCluster, cfg.ClickHouse.Cluster)
+		require.Equal(t, "cluster", cfg.ClickHouse.Cluster)
 
 		// Verify the ClickHouse XML file was created with the default cluster name
 		clickhouseXMLPath := filepath.Join(tmpDir, "db", "config.d", "_clickhouse.xml")

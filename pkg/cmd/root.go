@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
@@ -107,13 +108,12 @@ database state and generating appropriate migration files.`,
 
 			// Load configuration and create project instance
 			pwd, _ := os.Getwd()
-			cfg, err := project.LoadConfigFile(filepath.Join(pwd, "housekeeper.yaml"))
+			cfg, err := config.LoadConfigFile(filepath.Join(pwd, "housekeeper.yaml"))
 			if err != nil {
 				return ctx, errors.Wrap(err, "failed to load project configuration")
 			}
 
 			currentProject = project.New(project.NewProjectParams{
-				Dir:    pwd,
 				Config: cfg,
 			})
 			return ctx, nil

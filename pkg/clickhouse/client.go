@@ -48,13 +48,13 @@ type (
 //	defer client.Close()
 //
 //	// Get current schema (databases and dictionaries)
-//	grammar, err := client.GetSchema(context.Background())
+//	sql, err := client.GetSchema(context.Background())
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //
 //	// Print all parsed statements
-//	for _, stmt := range grammar.Statements {
+//	for _, stmt := range sql.Statements {
 //	    if stmt.CreateDatabase != nil {
 //	        fmt.Printf("Database: %s\n", stmt.CreateDatabase.Name)
 //	    }

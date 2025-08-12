@@ -98,12 +98,12 @@ func TestSelectParsing(t *testing.T) {
 				query += ";"
 			}
 
-			grammar, err := ParseString(query)
+			sql, err := ParseString(query)
 			if tt.valid {
 				require.NoError(t, err)
-				require.NotNil(t, grammar)
-				if len(grammar.Statements) > 0 {
-					require.NotNil(t, grammar.Statements[0].SelectStatement)
+				require.NotNil(t, sql)
+				if len(sql.Statements) > 0 {
+					require.NotNil(t, sql.Statements[0].SelectStatement)
 				}
 			} else {
 				require.Error(t, err)
@@ -180,11 +180,11 @@ func TestSelectStatementFixture(t *testing.T) {
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.description, func(t *testing.T) {
-			grammar, err := ParseString(fixture.query)
+			sql, err := ParseString(fixture.query)
 			require.NoError(t, err)
-			require.NotNil(t, grammar)
-			require.Len(t, grammar.Statements, 1)
-			require.NotNil(t, grammar.Statements[0].SelectStatement)
+			require.NotNil(t, sql)
+			require.Len(t, sql.Statements, 1)
+			require.NotNil(t, sql.Statements[0].SelectStatement)
 		})
 	}
 }
@@ -213,11 +213,11 @@ func TestSemicolonRequirement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			grammar, err := ParseString(tt.sql)
+			sql, err := ParseString(tt.sql)
 			if tt.shouldWork {
 				require.NoError(t, err)
-				require.NotNil(t, grammar)
-				require.NotEmpty(t, grammar.Statements)
+				require.NotNil(t, sql)
+				require.NotEmpty(t, sql.Statements)
 			} else {
 				require.Error(t, err)
 			}
@@ -258,12 +258,12 @@ func TestParseSelectStatement(t *testing.T) {
 				query += ";"
 			}
 
-			grammar, err := ParseString(query)
+			sql, err := ParseString(query)
 			if tt.valid {
 				require.NoError(t, err)
-				require.NotNil(t, grammar)
-				if len(grammar.Statements) > 0 {
-					require.NotNil(t, grammar.Statements[0].SelectStatement)
+				require.NotNil(t, sql)
+				if len(sql.Statements) > 0 {
+					require.NotNil(t, sql.Statements[0].SelectStatement)
 				}
 			} else {
 				require.Error(t, err)

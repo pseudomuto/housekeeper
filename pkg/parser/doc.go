@@ -27,7 +27,7 @@
 // Basic usage:
 //
 //	// Parse SQL string with comprehensive DDL support
-//	grammar, err := parser.ParseString(`
+//	sql, err := parser.ParseString(`
 //	    CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics DB';
 //	    CREATE TABLE analytics.events (
 //	        id UUID DEFAULT generateUUIDv4(),
@@ -59,7 +59,7 @@
 //		log.Fatal(err)
 //	}
 //	defer file.Close()
-//	grammar, err := parser.Parse(file)
+//	sql, err := parser.Parse(file)
 //
 // The parser returns a SQL struct containing all parsed statements,
 // which can be used for schema analysis, migration generation, validation,

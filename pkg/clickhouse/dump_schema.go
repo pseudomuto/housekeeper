@@ -36,7 +36,7 @@ import (
 //	}
 //
 //	// Use with diff generation
-//	diff, err := schemadiff.GenerateDiff(currentSchema, targetSchema)
+//	diff, err := schema.GenerateDiff(currentSchema, targetSchema)
 //	if err != nil {
 //		log.Fatal(err)
 //	}

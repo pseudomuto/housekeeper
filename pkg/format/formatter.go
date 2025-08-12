@@ -152,7 +152,7 @@ func New(options FormatterOptions) *Formatter {
 //		"github.com/pseudomuto/housekeeper/pkg/parser"
 //	)
 //
-//	grammar, _ := parser.ParseString("CREATE DATABASE test;")
+//	sql, _ := parser.ParseString("CREATE DATABASE test;")
 //	var buf bytes.Buffer
 //	err := format.Format(&buf, format.Defaults, sqlResult.Statements...)
 //	if err != nil {

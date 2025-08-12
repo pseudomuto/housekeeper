@@ -1,1 +1,0 @@
-ALTER DATABASE `analytics` MODIFY COMMENT 'Updated comment';

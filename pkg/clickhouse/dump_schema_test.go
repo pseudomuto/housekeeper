@@ -16,7 +16,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
 	"github.com/pseudomuto/housekeeper/pkg/format"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/golden"
 )
@@ -43,7 +42,7 @@ func TestDumpSchema(t *testing.T) {
 
 	// Start ClickHouse container using our Docker package
 	container, err := docker.NewWithOptions(docker.DockerOptions{
-		Version:   project.DefaultClickHouseVersion,
+		Version:   consts.DefaultClickHouseVersion,
 		ConfigDir: configDir,
 	})
 	require.NoError(t, err)

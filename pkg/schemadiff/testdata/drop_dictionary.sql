@@ -1,1 +1,0 @@
-DROP DICTIONARY IF EXISTS `analytics`.`temp_dict`;

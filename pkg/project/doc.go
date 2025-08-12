@@ -43,29 +43,34 @@
 // # Usage Example
 //
 //	// Initialize a new project
-//	proj, err := project.Initialize("/path/to/my/project", project.InitOptions{})
+//	err := project.Initialize("/path/to/my/project", project.InitOptions{})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
-//	// Or load existing project
-//	config, err := project.LoadConfigFile("/path/to/housekeeper.yaml")
+//	// Change to project directory and load existing project
+//	os.Chdir("/path/to/my/project")
+//	cfg, err := config.LoadConfigFile("housekeeper.yaml")
 //	if err != nil {
 //		log.Fatal("Failed to load config:", err)
 //	}
 //	proj := project.New(project.NewProjectParams{
-//		Dir:    "/path/to/my/project",
-//		Config: config,
+//		Config: cfg,
 //	})
 //
-//	// Parse schema
-//	grammar, err := proj.ParseSchema()
+//	// Compile and parse schema using the schema package
+//	var buf bytes.Buffer
+//	if err := schema.Compile(cfg.Entrypoint, &buf); err != nil {
+//		log.Fatal("Failed to compile schema:", err)
+//	}
+//
+//	sql, err := parser.ParseString(buf.String())
 //	if err != nil {
 //		log.Fatal("Failed to parse schema:", err)
 //	}
 //
 //	// Process the parsed DDL statements
-//	for _, stmt := range grammar.Statements {
+//	for _, stmt := range sql.Statements {
 //		if stmt.CreateTable != nil {
 //			fmt.Printf("Found table: %s\n", stmt.CreateTable.Name)
 //		}

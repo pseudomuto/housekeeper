@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"os"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/format"
+	"github.com/pseudomuto/housekeeper/pkg/parser"
+	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
 	"github.com/urfave/cli/v3"
 )
 
@@ -180,9 +183,16 @@ func schemaParse() *cli.Command {
 			return ctx, nil
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			sql, err := currentProject.ParseSchema()
+			// Compile schema using new schema.Compile function
+			var buf bytes.Buffer
+			if err := schemapkg.Compile(currentProject.Config.Entrypoint, &buf); err != nil {
+				return errors.Wrapf(err, "failed to compile schema from: %s", currentProject.Config.Entrypoint)
+			}
+
+			// Parse the compiled SQL
+			sql, err := parser.ParseString(buf.String())
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to parse compiled schema")
 			}
 
 			w := cmd.Writer

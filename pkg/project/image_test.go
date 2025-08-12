@@ -86,11 +86,11 @@ func TestGenerateImage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse the SQL
-			grammar, err := parser.ParseString(tt.sql)
+			sql, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 
 			// Generate the image
-			fsImage, err := GenerateImage(grammar)
+			fsImage, err := GenerateImage(sql)
 			require.NoError(t, err)
 
 			// Check expected files and content
@@ -123,10 +123,10 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 		CREATE VIEW analytics.summary AS SELECT count() FROM events;
 	`
 
-	grammar, err := parser.ParseString(sql)
+	parsed, err := parser.ParseString(sql)
 	require.NoError(t, err)
 
-	fsImage, err := GenerateImage(grammar)
+	fsImage, err := GenerateImage(parsed)
 	require.NoError(t, err)
 
 	// Collect all files in the image

@@ -8,6 +8,7 @@ import (
 	"testing/fstest"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
@@ -50,13 +51,13 @@ type (
 	NewProjectParams struct {
 		fx.In
 
-		Dir    string `name:"dir"`
-		Config *Config
+		Config *config.Config
 	}
 
+	// Project represents a ClickHouse schema management project with its configuration.
+	// The project always operates in the current working directory.
 	Project struct {
-		root   string
-		config *Config
+		Config *config.Config
 	}
 )
 
@@ -67,92 +68,74 @@ type (
 // Example:
 //
 //	// Create a project with loaded configuration
-//	config, err := project.LoadConfigFile("/path/to/housekeeper.yaml")
+//	cfg, err := config.LoadConfigFile("housekeeper.yaml")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //	proj := project.New(project.NewProjectParams{
-//		Dir:    "/path/to/my/clickhouse/project",
-//		Config: config,
+//		Config: cfg,
 //	})
 //
-//	// Parse project schema (no initialization needed)
-//	grammar, err := proj.ParseSchema()
+//	// Compile and parse project schema
+//	var buf bytes.Buffer
+//	if err := schema.Compile(cfg.Entrypoint, &buf); err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	sql, err := parser.ParseString(buf.String())
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	fmt.Printf("Parsed %d DDL statements\n", len(grammar.Statements))
+//	fmt.Printf("Parsed %d DDL statements\n", len(sql.Statements))
 func New(p NewProjectParams) *Project {
 	return &Project{
-		root:   p.Dir,
-		config: p.Config,
+		Config: p.Config,
 	}
 }
 
-// Initialize sets up a new project directory structure and returns a configured Project instance.
+// Initialize sets up a new project directory structure.
 // This function is idempotent - it will only create missing files and directories,
 // preserving any existing content. It creates the standard housekeeper project
 // structure including db/, migrations/, and schema directories along with
-// configuration files.
+// configuration files. The function temporarily changes to the target directory
+// to perform initialization, then restores the original working directory.
 //
 // Example:
 //
 //	// Initialize a new project with default options
-//	proj, err := project.Initialize("/path/to/my/project", project.InitOptions{})
+//	err := project.Initialize("/path/to/my/project", project.InitOptions{})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
-//	// Project is ready for use
-//	grammar, err := proj.ParseSchema()
+//	// Change to project directory and create project instance
+//	os.Chdir("/path/to/my/project")
+//	cfg, err := config.LoadConfigFile("housekeeper.yaml")
 //	if err != nil {
-//		log.Fatal("Failed to parse schema:", err)
+//		log.Fatal("Failed to load config:", err)
 //	}
+//	proj := project.New(project.NewProjectParams{Config: cfg})
 //
 //	// Initialize with custom cluster
-//	proj, err = project.Initialize("/path/to/my/project", project.InitOptions{
+//	err = project.Initialize("/path/to/my/project", project.InitOptions{
 //		Cluster: "production",
 //	})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
-func Initialize(path string, options InitOptions) (*Project, error) {
-	// Create a temporary project to initialize the directory structure
-	tempProject := &Project{root: path}
-	if err := tempProject.initialize(options); err != nil {
-		return nil, err
-	}
-
-	// Load the configuration and return a properly configured project
-	cfg, err := LoadConfigFile(filepath.Join(path, "housekeeper.yaml"))
+func Initialize(path string, options InitOptions) error {
+	// Save current directory and change to target path
+	origDir, err := os.Getwd()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load housekeeper.yaml")
+		return errors.Wrap(err, "failed to get current directory")
 	}
 
-	// Create ClickHouse config directory if it doesn't exist
-	configDirPath := filepath.Join(path, cfg.ClickHouse.ConfigDir)
-	if _, err := os.Stat(configDirPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(configDirPath, consts.ModeDir); err != nil {
-			return nil, errors.Wrapf(err, "failed to create ClickHouse config directory %s", configDirPath)
-		}
+	// Change to the target directory
+	if err := os.Chdir(path); err != nil {
+		return errors.Wrapf(err, "failed to change to directory %s", path)
 	}
-
-	return New(NewProjectParams{
-		Dir:    path,
-		Config: cfg,
-	}), nil
-}
-
-// initialize sets up the project directory structure and configuration files.
-// This is an internal method used by the top-level Initialize function.
-func (p *Project) initialize(options InitOptions) error {
-	// Ensure the root directory exists and is valid
-	if err := p.ensureDirectory(); err != nil {
-		return err
-	}
-
-	perm := consts.ModeFile
+	defer func() { _ = os.Chdir(origDir) }()
 
 	// Determine the cluster name to use
 	clusterName := options.Cluster
@@ -162,7 +145,7 @@ func (p *Project) initialize(options InitOptions) error {
 
 	// Walk the embedded FS and create missing files/directories
 	for path, entry := range image {
-		fullPath := filepath.Join(p.root, path)
+		fullPath := path
 
 		// Check if the entry already exists
 		if _, err := os.Stat(fullPath); err == nil {
@@ -199,45 +182,43 @@ func (p *Project) initialize(options InitOptions) error {
 		}
 
 		// Create file with content
-		if err := os.WriteFile(fullPath, fileContent, perm); err != nil {
+		if err := os.WriteFile(fullPath, fileContent, consts.ModeFile); err != nil {
 			return errors.Wrapf(err, "failed to write file %s", fullPath)
 		}
 	}
 
-	if options.Cluster == "" {
-		return nil
-	}
-
-	// Apply custom options if provided
-	cfg, err := LoadConfigFile(filepath.Join(p.root, "housekeeper.yaml"))
+	// Load the configuration to create ClickHouse config directory
+	cfg, err := config.LoadConfigFile("housekeeper.yaml")
 	if err != nil {
 		return errors.Wrap(err, "failed to load housekeeper.yaml")
 	}
 
-	cfg.ClickHouse.Cluster = options.Cluster
+	// Apply custom cluster option if provided
+	if options.Cluster != "" {
+		cfg.ClickHouse.Cluster = options.Cluster
 
-	// Write the updated config back to the file
-	configPath := filepath.Join(p.root, "housekeeper.yaml")
-	configFile, err := os.Create(configPath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to open config file for writing: %s", configPath)
-	}
-	defer configFile.Close()
+		// Write the updated config back to the file
+		configPath := "housekeeper.yaml"
+		configFile, err := os.Create(configPath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open config file for writing: %s", configPath)
+		}
+		defer configFile.Close()
 
-	// Use yaml.NewEncoder to write the updated config
-	encoder := yaml.NewEncoder(configFile)
-	if err := encoder.Encode(cfg); err != nil {
-		return errors.Wrap(err, "failed to write updated config")
-	}
-	if err := encoder.Close(); err != nil {
-		return errors.Wrap(err, "failed to close yaml encoder")
+		// Use yaml.NewEncoder to write the updated config
+		encoder := yaml.NewEncoder(configFile)
+		if err := encoder.Encode(cfg); err != nil {
+			return errors.Wrap(err, "failed to write updated config")
+		}
+		if err := encoder.Close(); err != nil {
+			return errors.Wrap(err, "failed to close yaml encoder")
+		}
 	}
 
 	// Create ClickHouse config directory if it doesn't exist
-	configDirPath := filepath.Join(p.root, cfg.ClickHouse.ConfigDir)
-	if _, err := os.Stat(configDirPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(configDirPath, consts.ModeDir); err != nil {
-			return errors.Wrapf(err, "failed to create ClickHouse config directory %s", configDirPath)
+	if _, err := os.Stat(cfg.ClickHouse.ConfigDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cfg.ClickHouse.ConfigDir, consts.ModeDir); err != nil {
+			return errors.Wrapf(err, "failed to create ClickHouse config directory %s", cfg.ClickHouse.ConfigDir)
 		}
 	}
 
@@ -245,52 +226,5 @@ func (p *Project) initialize(options InitOptions) error {
 }
 
 func (p *Project) MigrationsDir() string {
-	return filepath.Join(p.root, "db", "migrations")
-}
-
-func (p *Project) ensureDirectory() error {
-	dir, err := os.Stat(p.root)
-	if err != nil {
-		return errors.Wrapf(err, "failed to stat dir: %s", p.root)
-	}
-
-	if !dir.IsDir() {
-		return errors.Wrapf(err, "%s is not a directory", p.root)
-	}
-
-	return nil
-}
-
-// withConfig executes the provided function with access to the project's configuration.
-// This method ensures the working directory is set to the project root during execution
-// and automatically restores the original working directory when complete.
-//
-// The function is passed a pointer to the Config struct, allowing read and write access
-// to configuration values. This is the preferred way to access project configuration
-// in a consistent, safe manner.
-//
-// Example:
-//
-//	var version string
-//	err := project.WithConfig(func(cfg *Config) error {
-//		version = cfg.ClickHouse.Version
-//		return nil
-//	})
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	fmt.Printf("ClickHouse version: %s\n", version)
-func (p *Project) withConfig(fn func(*Config) error) error {
-	if p.config == nil {
-		return errors.New("project configuration not loaded")
-	}
-
-	pwd, _ := os.Getwd()
-	defer func() { _ = os.Chdir(pwd) }()
-
-	if err := os.Chdir(p.root); err != nil {
-		return errors.Wrapf(err, "failed to change to project root: %s", p.root)
-	}
-
-	return fn(p.config)
+	return filepath.Join("db", "migrations")
 }

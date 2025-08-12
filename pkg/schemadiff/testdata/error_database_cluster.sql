@@ -1,1 +1,0 @@
-ErrUnsupported: failed to compare databases: cannot change cluster from '' to 'production': cluster configuration changes not supported: unsupported operation

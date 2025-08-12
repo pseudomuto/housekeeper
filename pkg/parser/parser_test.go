@@ -151,14 +151,14 @@ func TestParserWithTestdata(t *testing.T) {
 			require.NoError(t, err)
 
 			// Parse SQL
-			grammar, err := ParseString(string(sqlData))
+			sql, err := ParseString(string(sqlData))
 			require.NoError(t, err)
 
 			yamlPath := filepath.Join("testdata", yamlFile)
 
 			if *updateFlag {
 				// Generate and save YAML file
-				expectedResult := generateTestCaseFromSQL(grammar)
+				expectedResult := generateTestCaseFromSQL(sql)
 				yamlData, err := yaml.Marshal(&expectedResult)
 				require.NoError(t, err)
 
@@ -175,7 +175,7 @@ func TestParserWithTestdata(t *testing.T) {
 			require.NoError(t, yaml.Unmarshal(yamlData, &expectedResult))
 
 			// Verify results
-			verifySQL(t, grammar, expectedResult, sqlFile)
+			verifySQL(t, sql, expectedResult, sqlFile)
 		})
 	}
 }

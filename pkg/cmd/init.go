@@ -50,10 +50,9 @@ func initCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			_, err := project.Initialize(".", project.InitOptions{
+			return project.Initialize(".", project.InitOptions{
 				Cluster: cmd.String("cluster"),
 			})
-			return err
 		},
 	}
 }
@@ -95,7 +94,7 @@ func initCmd() *cli.Command {
 //
 // The command handles all ClickHouse object types and uses the cluster configuration
 // from the existing project for proper ON CLUSTER injection.
-func bootstrap() *cli.Command {
+func bootstrap(p *project.Project) *cli.Command {
 	return &cli.Command{
 		Name:  "bootstrap",
 		Usage: "Extract schema from an existing ClickHouse server into initialized project",
@@ -120,17 +119,12 @@ func bootstrap() *cli.Command {
 				return errors.New("housekeeper.yaml not found - please run 'housekeeper init' first to initialize the project")
 			}
 
-			config, err := project.LoadConfigFile(configPath)
-			if err != nil {
-				return errors.Wrap(err, "failed to load existing housekeeper.yaml")
-			}
-
 			// Use cluster from existing configuration
 			client, err := clickhouse.NewClientWithOptions(
 				ctx,
 				cmd.String("url"),
 				clickhouse.ClientOptions{
-					Cluster: config.ClickHouse.Cluster,
+					Cluster: p.Config.ClickHouse.Cluster,
 				},
 			)
 			if err != nil {

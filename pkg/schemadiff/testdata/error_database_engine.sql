@@ -1,1 +1,0 @@
-ErrUnsupported: failed to compare databases: cannot change database engine from Atomic to Memory: engine type changes not supported: unsupported operation

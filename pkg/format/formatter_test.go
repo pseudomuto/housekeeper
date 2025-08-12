@@ -197,11 +197,11 @@ func TestFormatSQL_Method(t *testing.T) {
 func TestFormatSQL_NilSQL(t *testing.T) {
 	var buf bytes.Buffer
 
-	// Test function with nil grammar
+	// Test function with nil sql
 	require.NoError(t, FormatSQL(&buf, Defaults, nil))
 	require.Empty(t, buf.String())
 
-	// Test method with nil grammar
+	// Test method with nil sql
 	formatter := New(Defaults)
 	require.NoError(t, formatter.FormatSQL(&buf, nil))
 	require.Empty(t, buf.String())

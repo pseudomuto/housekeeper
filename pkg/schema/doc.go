@@ -1,0 +1,70 @@
+// Package schema provides schema migration generation for ClickHouse.
+//
+// This package compares current and target schemas to generate executable
+// migration files with SQL statements. It supports all major ClickHouse
+// schema objects including databases, tables, dictionaries, and views,
+// ensuring safe and predictable migrations for ClickHouse deployments.
+//
+// Key features:
+//   - Intelligent diff detection between current and target schemas
+//   - Generation of executable DDL statements (not just comments)
+//   - Proper operation ordering for safe migrations
+//   - Complete support for all schema objects: databases, tables, dictionaries, views
+//   - Smart rename detection to avoid unnecessary DROP+CREATE operations
+//   - Different migration strategies for different object types
+//   - Error handling for unsupported operations (engine/cluster changes)
+//   - Comprehensive testing with YAML fixtures and table-driven tests
+//
+// Supported Operations:
+//   - Database operations: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME DATABASE
+//   - Table operations: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME TABLE
+//   - Dictionary operations: CREATE OR REPLACE, ATTACH, DETACH, DROP, RENAME DICTIONARY
+//   - View operations: CREATE, ALTER, ATTACH, DETACH, DROP, RENAME for both regular and materialized views
+//
+// Migration Strategies:
+//   - Databases: Standard CREATE, ALTER, DROP operations
+//   - Tables: Full DDL support including column modifications
+//   - Dictionaries: CREATE OR REPLACE for modifications (since they can't be altered)
+//   - Regular Views: CREATE OR REPLACE for modifications
+//   - Materialized Views: DROP+CREATE for query changes (more reliable than ALTER TABLE MODIFY QUERY)
+//   - Integration Engine Tables: DROP+CREATE for all modifications (required due to read-only nature)
+//
+// The migration generation process:
+//  1. Parse current schema state (from ClickHouse or SQL files)
+//  2. Parse target schema state (from SQL files)
+//  3. Compare the two states using intelligent algorithms
+//  4. Generate appropriate DDL for each difference with correct strategies
+//  5. Order operations correctly (databases → tables → dictionaries → views; CREATE → ALTER → RENAME → DROP)
+//
+// Example usage:
+//
+//	// Parse current schema (from ClickHouse or existing SQL files)
+//	currentSQL, _ := parser.ParseString("CREATE DATABASE analytics;")
+//
+//	// Parse target schema (from SQL string or file)
+//	targetSQL, _ := parser.ParseString(targetSchemaString)
+//
+//	// Generate diff
+//	diff, err := schema.GenerateDiff(
+//	    currentSQL,
+//	    targetSQL
+//	)
+//	if err != nil {
+//	    // Handle error (e.g., unsupported operation like engine changes)
+//	    log.Fatalf("Migration generation failed: %v", err)
+//	}
+//
+//	// Format and write timestamped migration file
+//	timestamp := time.Now().Format("20060102150405")
+//	migrationFile := fmt.Sprintf("%s_migration.sql", timestamp)
+//
+//	var buf bytes.Buffer
+//	format.FormatSQL(&buf, format.Defaults, diff)
+//	os.WriteFile(migrationFile, buf.Bytes(), consts.ModeFile)
+//
+// The package will return errors for operations that cannot be safely
+// automated, such as database engine changes or cluster modifications.
+// For integration engines and materialized views, it automatically uses
+// DROP+CREATE strategies instead of reporting errors, ensuring migrations
+// are both safe and executable.
+package schema

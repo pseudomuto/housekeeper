@@ -1,0 +1,1 @@
+RENAME TABLE `old_users` TO `users`;

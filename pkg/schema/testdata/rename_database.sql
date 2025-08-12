@@ -1,0 +1,1 @@
+RENAME DATABASE `old_analytics` TO `analytics`;

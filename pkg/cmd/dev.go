@@ -12,11 +12,11 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 )
 
@@ -119,7 +119,7 @@ func runDevDownCommand(ctx context.Context, cmd *cli.Command) error {
 
 func loadDevConfig() (*devConfig, error) {
 	// Load configuration directly from file (we're already in the project directory)
-	cfg, err := project.LoadConfigFile("housekeeper.yaml")
+	cfg, err := config.LoadConfigFile("housekeeper.yaml")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load project configuration")
 	}

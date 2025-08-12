@@ -48,6 +48,7 @@ import (
 	"time"
 
 	"github.com/pseudomuto/housekeeper/pkg/cmd"
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"go.uber.org/fx"
 )
@@ -59,22 +60,37 @@ var (
 	date    string = time.Now().UTC().Format(time.RFC3339) // Build timestamp
 )
 
+type Params struct {
+	fx.Out
+
+	Version *cmd.Version
+}
+
 func main() {
+	if dir, ok := os.LookupEnv("HOUSEKEEPER_DIR"); ok {
+		if err := os.Chdir(dir); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	app := fx.New(
 		fx.Supply(
 			os.Args,
-			&cmd.Version{
-				Version:   version,
-				Commit:    commit,
-				Timestamp: date,
+			Params{
+				Version: &cmd.Version{
+					Version:   version,
+					Commit:    commit,
+					Timestamp: date,
+				},
 			},
 		),
 		fx.Provide(
 			context.Background,
 		),
 		cmd.Module,
+		config.Module,
 		project.Module,
-		fx.NopLogger,
+		// fx.NopLogger,
 	)
 
 	app.Run()

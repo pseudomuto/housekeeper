@@ -1,0 +1,12 @@
+clickhouse:
+  # Controls the version of ClickHouse Server used when diffing migrations.
+  version: "25.7"
+  # Where to find clickhouse.xml (and other configs).
+  config_dir: "db/config.d"
+  # The name of the cluster for DDL objects. If blank, no cluster is applied.
+  cluster: "cluster"
+
+# Where to find the entrypoint for the desired schema.
+entrypoint: db/main.sql
+# Where to store/find migrations.
+dir: db/migrations
