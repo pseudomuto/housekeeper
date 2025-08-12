@@ -1,17 +1,18 @@
 package project
 
 import (
+	"bytes"
 	_ "embed"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing/fstest"
+	"text/template"
 
 	"github.com/pkg/errors"
-	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
-	"go.uber.org/fx"
-	"gopkg.in/yaml.v3"
+	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 var (
@@ -48,183 +49,206 @@ type (
 		Cluster string
 	}
 
-	NewProjectParams struct {
-		fx.In
-
-		Config *config.Config
+	// templateData contains all the data available to templates during initialization
+	templateData struct {
+		Cluster string
 	}
 
-	// Project represents a ClickHouse schema management project with its configuration.
-	// The project always operates in the current working directory.
+	// Project represents a ClickHouse schema management project.
+	// The project operates within the specified root directory.
 	Project struct {
-		Config *config.Config
+		RootDir string
 	}
 )
 
 // New creates a new Project instance for managing ClickHouse schema projects.
-// Uses dependency injection pattern with NewProjectParams struct containing
-// the project directory and loaded configuration.
+// Takes the root directory path where the project is located.
 //
 // Example:
 //
-//	// Create a project with loaded configuration
-//	cfg, err := config.LoadConfigFile("housekeeper.yaml")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	proj := project.New(project.NewProjectParams{
-//		Config: cfg,
-//	})
+//	// Create a project for a specific directory
+//	proj := project.New("/path/to/my/project")
 //
-//	// Compile and parse project schema
-//	var buf bytes.Buffer
-//	if err := schema.Compile(cfg.Entrypoint, &buf); err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	sql, err := parser.ParseString(buf.String())
+//	// Initialize a new project structure
+//	err := proj.Initialize(project.InitOptions{})
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	fmt.Printf("Parsed %d DDL statements\n", len(sql.Statements))
-func New(p NewProjectParams) *Project {
+//	// Get migrations directory path
+//	migrationsDir := proj.MigrationsDir()
+//	fmt.Printf("Migrations directory: %s\n", migrationsDir)
+func New(rootDir string) *Project {
 	return &Project{
-		Config: p.Config,
+		RootDir: rootDir,
 	}
 }
 
 // Initialize sets up a new project directory structure.
-// This function is idempotent - it will only create missing files and directories,
+// This method is idempotent - it will only create missing files and directories,
 // preserving any existing content. It creates the standard housekeeper project
 // structure including db/, migrations/, and schema directories along with
-// configuration files. The function temporarily changes to the target directory
-// to perform initialization, then restores the original working directory.
+// configuration files in the project's root directory.
 //
 // Example:
 //
-//	// Initialize a new project with default options
-//	err := project.Initialize("/path/to/my/project", project.InitOptions{})
+//	// Create and initialize a new project
+//	proj := project.New("/path/to/my/project")
+//	err := proj.Initialize(project.InitOptions{})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
-//	// Change to project directory and create project instance
-//	os.Chdir("/path/to/my/project")
-//	cfg, err := config.LoadConfigFile("housekeeper.yaml")
-//	if err != nil {
-//		log.Fatal("Failed to load config:", err)
-//	}
-//	proj := project.New(project.NewProjectParams{Config: cfg})
-//
 //	// Initialize with custom cluster
-//	err = project.Initialize("/path/to/my/project", project.InitOptions{
+//	proj := project.New("/path/to/my/project")
+//	err := proj.Initialize(project.InitOptions{
 //		Cluster: "production",
 //	})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
-func Initialize(path string, options InitOptions) error {
-	// Save current directory and change to target path
-	origDir, err := os.Getwd()
+func (p *Project) Initialize(options InitOptions) error {
+	// Ensure the project directory exists
+	if err := os.MkdirAll(p.RootDir, consts.ModeDir); err != nil {
+		return errors.Wrapf(err, "failed to create project directory %s", p.RootDir)
+	}
+
+	// Prepare template data
+	data := templateData(options)
+	if data.Cluster == "" {
+		data.Cluster = "cluster" // default cluster name
+	}
+
+	// Use the unified overlayFS method to materialize the embedded image
+	return p.overlayFS(image, &data)
+}
+
+func (p *Project) MigrationsDir() string {
+	return filepath.Join(p.RootDir, "db", "migrations")
+}
+
+// BootstrapFromSchema creates project files from a parsed SQL schema.
+// This method is used by the bootstrap command to extract schema from an
+// existing ClickHouse instance and organize it into a project structure.
+//
+// The function is idempotent - existing files are preserved to avoid
+// overwriting user modifications.
+//
+// Parameters:
+//   - sql: The parsed SQL containing DDL statements to organize into project structure
+//
+// Returns an error if schema generation or file operations fail.
+func (p *Project) BootstrapFromSchema(sql *parser.SQL) error {
+	// Generate file system image from parsed SQL
+	fsImage, err := GenerateImage(sql)
 	if err != nil {
-		return errors.Wrap(err, "failed to get current directory")
+		return errors.Wrap(err, "failed to generate schema image")
 	}
 
-	// Change to the target directory
-	if err := os.Chdir(path); err != nil {
-		return errors.Wrapf(err, "failed to change to directory %s", path)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
+	// Overlay the generated image without template processing
+	return p.overlayFS(fsImage, nil)
+}
 
-	// Determine the cluster name to use
-	clusterName := options.Cluster
-	if clusterName == "" {
-		clusterName = "cluster" // default cluster name
-	}
-
-	// Walk the embedded FS and create missing files/directories
-	for path, entry := range image {
-		fullPath := path
-
-		// Check if the entry already exists
-		if _, err := os.Stat(fullPath); err == nil {
-			// Entry exists, skip it
-			continue
-		} else if !os.IsNotExist(err) {
-			// Some other error occurred
-			return errors.Wrapf(err, "failed to stat %s", fullPath)
+// overlayFS writes the contents of an fs.FS to the project directory,
+// creating necessary directory structure and files that don't already exist.
+// If templateData is provided, files containing template syntax will be rendered.
+// This provides a unified way to materialize virtual file systems onto disk.
+//
+// The function is idempotent - existing files are preserved to avoid
+// overwriting user modifications.
+//
+// Parameters:
+//   - source: The virtual file system to overlay
+//   - data: Optional template data for rendering files with Go template syntax
+//
+// Returns an error if any file or directory operation fails.
+func (p *Project) overlayFS(source fs.FS, data *templateData) error {
+	return fs.WalkDir(source, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
 
-		// Entry doesn't exist, create it
-		if entry.Mode.IsDir() {
-			// Create directory
-			if err := os.MkdirAll(fullPath, entry.Mode.Perm()); err != nil {
-				return errors.Wrapf(err, "failed to create directory %s", fullPath)
-			}
+		// Skip the root directory
+		if path == "." {
+			return nil
+		}
 
-			continue
+		targetPath := filepath.Join(p.RootDir, path)
+
+		if d.IsDir() {
+			// Create directory if it doesn't exist
+			if err := os.MkdirAll(targetPath, consts.ModeDir); err != nil {
+				return errors.Wrapf(err, "failed to create directory %s", targetPath)
+			}
+			return nil
+		}
+
+		// Check if file already exists
+		if _, err := os.Stat(targetPath); err == nil {
+			// File exists, skip it to preserve user modifications
+			return nil
+		} else if !os.IsNotExist(err) {
+			// Some other error occurred
+			return errors.Wrapf(err, "failed to stat file %s", targetPath)
+		}
+
+		// Read the file content from source
+		file, err := source.Open(path)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open source file %s", path)
+		}
+		defer file.Close()
+
+		content, err := io.ReadAll(file)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read source file %s", path)
+		}
+
+		// Apply template rendering if data is provided
+		if data != nil {
+			content, err = p.renderTemplate(path, content, *data)
+			if err != nil {
+				return errors.Wrapf(err, "failed to render template for %s", path)
+			}
 		}
 
 		// Ensure parent directory exists
-		parentDir := filepath.Dir(fullPath)
+		parentDir := filepath.Dir(targetPath)
 		if err := os.MkdirAll(parentDir, consts.ModeDir); err != nil {
 			return errors.Wrapf(err, "failed to create parent directory %s", parentDir)
 		}
 
-		// Special handling for _clickhouse.xml to replace cluster name
-		fileContent := entry.Data
-		if path == "db/config.d/_clickhouse.xml" {
-			// Replace $$CLUSTER placeholder with the actual cluster name
-			xmlContent := string(defaultClickHouseXML)
-			xmlContent = strings.ReplaceAll(xmlContent, "$$CLUSTER", clusterName)
-			fileContent = []byte(xmlContent)
+		// Write the file
+		if err := os.WriteFile(targetPath, content, consts.ModeFile); err != nil {
+			return errors.Wrapf(err, "failed to write file %s", targetPath)
 		}
 
-		// Create file with content
-		if err := os.WriteFile(fullPath, fileContent, consts.ModeFile); err != nil {
-			return errors.Wrapf(err, "failed to write file %s", fullPath)
-		}
-	}
-
-	// Load the configuration to create ClickHouse config directory
-	cfg, err := config.LoadConfigFile("housekeeper.yaml")
-	if err != nil {
-		return errors.Wrap(err, "failed to load housekeeper.yaml")
-	}
-
-	// Apply custom cluster option if provided
-	if options.Cluster != "" {
-		cfg.ClickHouse.Cluster = options.Cluster
-
-		// Write the updated config back to the file
-		configPath := "housekeeper.yaml"
-		configFile, err := os.Create(configPath)
-		if err != nil {
-			return errors.Wrapf(err, "failed to open config file for writing: %s", configPath)
-		}
-		defer configFile.Close()
-
-		// Use yaml.NewEncoder to write the updated config
-		encoder := yaml.NewEncoder(configFile)
-		if err := encoder.Encode(cfg); err != nil {
-			return errors.Wrap(err, "failed to write updated config")
-		}
-		if err := encoder.Close(); err != nil {
-			return errors.Wrap(err, "failed to close yaml encoder")
-		}
-	}
-
-	// Create ClickHouse config directory if it doesn't exist
-	if _, err := os.Stat(cfg.ClickHouse.ConfigDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(cfg.ClickHouse.ConfigDir, consts.ModeDir); err != nil {
-			return errors.Wrapf(err, "failed to create ClickHouse config directory %s", cfg.ClickHouse.ConfigDir)
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
-func (p *Project) MigrationsDir() string {
-	return filepath.Join("db", "migrations")
+// renderTemplate efficiently renders file content as a Go template.
+// It only parses content as a template if it contains template syntax ({{ or }}).
+// This provides maximum efficiency for files that don't need templating.
+func (p *Project) renderTemplate(name string, content []byte, data templateData) ([]byte, error) {
+	contentStr := string(content)
+
+	// Fast path: if content doesn't contain template syntax, return as-is
+	// This avoids template parsing overhead for most files
+	if !bytes.Contains(content, []byte("{{")) && !bytes.Contains(content, []byte("}}")) {
+		return content, nil
+	}
+
+	// Content contains template syntax, parse and execute
+	tmpl, err := template.New(name).Parse(contentStr)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse template")
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, errors.Wrapf(err, "failed to execute template")
+	}
+
+	return buf.Bytes(), nil
 }

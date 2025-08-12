@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
-	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
@@ -106,16 +104,13 @@ database state and generating appropriate migration files.`,
 				return ctx, err
 			}
 
-			// Load configuration and create project instance
-			pwd, _ := os.Getwd()
-			cfg, err := config.LoadConfigFile(filepath.Join(pwd, "housekeeper.yaml"))
+			// Create project instance with current working directory
+			pwd, err := os.Getwd()
 			if err != nil {
-				return ctx, errors.Wrap(err, "failed to load project configuration")
+				return ctx, errors.Wrap(err, "failed to get current working directory")
 			}
 
-			currentProject = project.New(project.NewProjectParams{
-				Config: cfg,
-			})
+			currentProject = project.New(pwd)
 			return ctx, nil
 		},
 		Commands: p.Commands,

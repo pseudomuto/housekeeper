@@ -4,7 +4,7 @@ clickhouse:
   # Where to find clickhouse.xml (and other configs).
   config_dir: "db/config.d"
   # The name of the cluster for DDL objects. If blank, no cluster is applied.
-  cluster: "cluster"
+  cluster: "{{.Cluster}}"
 
 # Where to find the entrypoint for the desired schema.
 entrypoint: db/main.sql

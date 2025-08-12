@@ -12,21 +12,21 @@
 
     <!-- Macros for replica names -->
     <macros>
-        <cluster>$$CLUSTER</cluster>
+        <cluster>{{.Cluster}}</cluster>
         <shard>01</shard>
         <replica>replica_1</replica>
     </macros>
 
     <!-- Cluster configuration with single replica -->
     <remote_servers>
-        <$$CLUSTER>
+        <{{.Cluster}}>
             <shard>
                 <replica>
                     <host>localhost</host>
                     <port>9000</port>
                 </replica>
             </shard>
-        </$$CLUSTER>
+        </{{.Cluster}}>
     </remote_servers>
 
     <!-- Keeper configuration for replication -->

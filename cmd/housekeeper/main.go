@@ -49,7 +49,6 @@ import (
 
 	"github.com/pseudomuto/housekeeper/pkg/cmd"
 	"github.com/pseudomuto/housekeeper/pkg/config"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"go.uber.org/fx"
 )
 
@@ -89,7 +88,6 @@ func main() {
 		),
 		cmd.Module,
 		config.Module,
-		project.Module,
 		// fx.NopLogger,
 	)
 

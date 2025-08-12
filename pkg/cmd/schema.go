@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
@@ -183,10 +184,16 @@ func schemaParse() *cli.Command {
 			return ctx, nil
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// Compile schema using new schema.Compile function
+			// Load configuration to get entrypoint
+			cfg, err := config.LoadConfigFile("housekeeper.yaml")
+			if err != nil {
+				return errors.Wrap(err, "failed to load project configuration")
+			}
+
+			// Compile schema using schema.Compile function
 			var buf bytes.Buffer
-			if err := schemapkg.Compile(currentProject.Config.Entrypoint, &buf); err != nil {
-				return errors.Wrapf(err, "failed to compile schema from: %s", currentProject.Config.Entrypoint)
+			if err := schemapkg.Compile(cfg.Entrypoint, &buf); err != nil {
+				return errors.Wrapf(err, "failed to compile schema from: %s", cfg.Entrypoint)
 			}
 
 			// Parse the compiled SQL

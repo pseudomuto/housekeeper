@@ -43,22 +43,21 @@
 // # Usage Example
 //
 //	// Initialize a new project
-//	err := project.Initialize("/path/to/my/project", project.InitOptions{})
+//	proj := project.New("/path/to/my/project")
+//	err := proj.Initialize(project.InitOptions{})
 //	if err != nil {
 //		log.Fatal("Failed to initialize project:", err)
 //	}
 //
-//	// Change to project directory and load existing project
-//	os.Chdir("/path/to/my/project")
+//	// Create a project instance for the directory
+//	proj := project.New("/path/to/my/project")
+//
+//	// Load configuration and compile schema
 //	cfg, err := config.LoadConfigFile("housekeeper.yaml")
 //	if err != nil {
 //		log.Fatal("Failed to load config:", err)
 //	}
-//	proj := project.New(project.NewProjectParams{
-//		Config: cfg,
-//	})
 //
-//	// Compile and parse schema using the schema package
 //	var buf bytes.Buffer
 //	if err := schema.Compile(cfg.Entrypoint, &buf); err != nil {
 //		log.Fatal("Failed to compile schema:", err)
