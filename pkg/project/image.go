@@ -10,7 +10,6 @@ import (
 	"testing/fstest"
 
 	"github.com/pkg/errors"
-	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -22,7 +21,7 @@ type databaseObjects struct {
 	views        []*parser.CreateViewStmt
 }
 
-// GenerateImage creates a file system image from parsed SQL statements,
+// generateImage creates a file system image from parsed SQL statements,
 // organizing them into a structured project layout suitable for overlaying
 // on a directory structure.
 //
@@ -32,24 +31,11 @@ type databaseObjects struct {
 //   - db/schemas/<database>/tables/<table>.sql: Individual table files
 //   - db/schemas/<database>/dictionaries/<dict>.sql: Individual dictionary files
 //   - db/schemas/<database>/views/<view>.sql: Individual view files
-//
-// Example usage:
-//
-//	sql, _ := parser.ParseString("CREATE DATABASE analytics; CREATE TABLE analytics.events (...);"
-//	fsImage, err := project.GenerateImage(sql)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	// The fsImage can be overlayed on a directory or used for testing
-//	file, _ := fsImage.Open("db/main.sql")
-//	content, _ := io.ReadAll(file)
-//	fmt.Println(string(content))
-func GenerateImage(sql *parser.SQL) (fs.FS, error) {
+func (p *Project) generateImage(sql *parser.SQL) (fs.FS, error) {
 	dbObjects := organizeStatementsByDatabase(sql)
 	fsMap := make(fstest.MapFS)
 
-	mainImports, err := generateDatabaseFiles(fsMap, dbObjects)
+	mainImports, err := p.generateDatabaseFiles(fsMap, dbObjects)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +91,7 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 }
 
 // generateDatabaseFiles creates files for each database and returns import list
-func generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string]*databaseObjects) ([]string, error) {
+func (p *Project) generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string]*databaseObjects) ([]string, error) {
 	mainImports := make([]string, 0, len(dbObjects))
 
 	// Get sorted database names for consistent ordering
@@ -128,7 +114,7 @@ func generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string]*databaseObj
 		}
 
 		// Create database schema file
-		schemaContent, err := generateDatabaseSchemaContent(objects)
+		schemaContent, err := p.generateDatabaseSchemaContent(objects)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate database schema for %s", dbName)
 		}
@@ -137,13 +123,13 @@ func generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string]*databaseObj
 		}
 
 		// Create individual object files
-		if err := addTableFiles(fsMap, dbName, objects.tables); err != nil {
+		if err := p.addTableFiles(fsMap, dbName, objects.tables); err != nil {
 			return nil, errors.Wrapf(err, "failed to add table files for %s", dbName)
 		}
-		if err := addDictionaryFiles(fsMap, dbName, objects.dictionaries); err != nil {
+		if err := p.addDictionaryFiles(fsMap, dbName, objects.dictionaries); err != nil {
 			return nil, errors.Wrapf(err, "failed to add dictionary files for %s", dbName)
 		}
-		if err := addViewFiles(fsMap, dbName, objects.views); err != nil {
+		if err := p.addViewFiles(fsMap, dbName, objects.views); err != nil {
 			return nil, errors.Wrapf(err, "failed to add view files for %s", dbName)
 		}
 
@@ -162,7 +148,7 @@ func getDatabase(database *string) string {
 }
 
 // formatStatement formats a DDL statement into SQL string
-func formatStatement(stmt any) (string, error) {
+func (p *Project) formatStatement(stmt any) (string, error) {
 	var statement *parser.Statement
 	switch s := stmt.(type) {
 	case *parser.CreateDatabaseStmt:
@@ -178,7 +164,7 @@ func formatStatement(stmt any) (string, error) {
 	}
 
 	var buf bytes.Buffer
-	if err := format.Format(&buf, format.Defaults, statement); err != nil {
+	if err := p.fmtr.Format(&buf, statement); err != nil {
 		return "", err
 	}
 
@@ -186,13 +172,13 @@ func formatStatement(stmt any) (string, error) {
 }
 
 // generateDatabaseSchemaContent creates the content for a database schema file
-func generateDatabaseSchemaContent(objects *databaseObjects) (string, error) {
+func (p *Project) generateDatabaseSchemaContent(objects *databaseObjects) (string, error) {
 	var content strings.Builder
 	var imports []string
 
 	// Add database creation if present
 	if objects.database != nil {
-		stmt, err := formatStatement(objects.database)
+		stmt, err := p.formatStatement(objects.database)
 		if err != nil {
 			return "", err
 		}
@@ -236,9 +222,9 @@ func generateDatabaseSchemaContent(objects *databaseObjects) (string, error) {
 }
 
 // addTableFiles adds table files to the file system map
-func addTableFiles(fsMap fstest.MapFS, dbName string, tables []*parser.CreateTableStmt) error {
+func (p *Project) addTableFiles(fsMap fstest.MapFS, dbName string, tables []*parser.CreateTableStmt) error {
 	for _, table := range tables {
-		stmt, err := formatStatement(table)
+		stmt, err := p.formatStatement(table)
 		if err != nil {
 			return err
 		}
@@ -252,9 +238,9 @@ func addTableFiles(fsMap fstest.MapFS, dbName string, tables []*parser.CreateTab
 }
 
 // addDictionaryFiles adds dictionary files to the file system map
-func addDictionaryFiles(fsMap fstest.MapFS, dbName string, dictionaries []*parser.CreateDictionaryStmt) error {
+func (p *Project) addDictionaryFiles(fsMap fstest.MapFS, dbName string, dictionaries []*parser.CreateDictionaryStmt) error {
 	for _, dict := range dictionaries {
-		stmt, err := formatStatement(dict)
+		stmt, err := p.formatStatement(dict)
 		if err != nil {
 			return err
 		}
@@ -268,9 +254,9 @@ func addDictionaryFiles(fsMap fstest.MapFS, dbName string, dictionaries []*parse
 }
 
 // addViewFiles adds view files to the file system map
-func addViewFiles(fsMap fstest.MapFS, dbName string, views []*parser.CreateViewStmt) error {
+func (p *Project) addViewFiles(fsMap fstest.MapFS, dbName string, views []*parser.CreateViewStmt) error {
 	for _, view := range views {
-		stmt, err := formatStatement(view)
+		stmt, err := p.formatStatement(view)
 		if err != nil {
 			return err
 		}

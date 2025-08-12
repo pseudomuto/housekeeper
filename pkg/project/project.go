@@ -157,7 +157,7 @@ func (p *Project) MigrationsDir() string {
 // Returns an error if schema generation or file operations fail.
 func (p *Project) BootstrapFromSchema(sql *parser.SQL) error {
 	// Generate file system image from parsed SQL
-	fsImage, err := GenerateImage(sql)
+	fsImage, err := p.generateImage(sql)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate schema image")
 	}

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"testing"
 
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
@@ -89,8 +90,14 @@ func TestGenerateImage(t *testing.T) {
 			sql, err := parser.ParseString(tt.sql)
 			require.NoError(t, err)
 
+			// Create project instance
+			proj := New(ProjectParams{
+				Dir:       "/tmp/test",
+				Formatter: format.New(format.Defaults),
+			})
+
 			// Generate the image
-			fsImage, err := GenerateImage(sql)
+			fsImage, err := proj.generateImage(sql)
 			require.NoError(t, err)
 
 			// Check expected files and content
@@ -126,7 +133,13 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 	parsed, err := parser.ParseString(sql)
 	require.NoError(t, err)
 
-	fsImage, err := GenerateImage(parsed)
+	// Create project instance
+	proj := New(ProjectParams{
+		Dir:       "/tmp/test",
+		Formatter: format.New(format.Defaults),
+	})
+
+	fsImage, err := proj.generateImage(parsed)
 	require.NoError(t, err)
 
 	// Collect all files in the image
@@ -157,7 +170,11 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 
 func TestFormatStatement_UnsupportedType(t *testing.T) {
 	// Test that formatStatement returns an error for unsupported types
-	_, err := formatStatement("invalid")
+	proj := New(ProjectParams{
+		Dir:       "/tmp/test",
+		Formatter: format.New(format.Defaults),
+	})
+	_, err := proj.formatStatement("invalid")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported statement type")
 }
