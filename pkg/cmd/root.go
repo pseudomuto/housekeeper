@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/config"
@@ -67,6 +68,15 @@ func Run(p Params) {
 		fmt.Fprintln(cmd.Writer, "Commit:", p.Version.Commit)
 		fmt.Fprintln(cmd.Writer, "Date:", p.Version.Timestamp)
 	}
+
+	// sort commands alphabetically
+	slices.SortFunc(p.Commands, func(a, b *cli.Command) int {
+		if a.Name < b.Name {
+			return -1
+		}
+
+		return 0
+	})
 
 	app := &cli.Command{
 		Name:  "housekeeper",
