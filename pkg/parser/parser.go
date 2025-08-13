@@ -80,6 +80,67 @@ func normalizeCase(sql string) string {
 	return result
 }
 
+// normalizeImplicitAliases converts implicit table aliases to explicit AS syntax
+func normalizeImplicitAliases(sql string) string {
+	// Handle the most common cases using simple patterns
+	// Be more careful to avoid transforming already correct SQL
+	result := sql
+	
+	// Process patterns carefully, checking each match individually
+	
+	// Pattern 1: FROM tablename alias WHERE/GROUP/ORDER/etc
+	keywords := []string{"WHERE", "LEFT", "RIGHT", "INNER", "JOIN", "GROUP", "ORDER", "LIMIT", "HAVING", "SETTINGS"}
+	
+	for _, keyword := range keywords {
+		// Only process if the match doesn't already contain AS
+		pattern := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s+` + keyword + `\b`)
+		matches := pattern.FindAllStringSubmatch(result, -1)
+		for _, match := range matches {
+			if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+				result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+" "+keyword)
+			}
+		}
+	}
+	
+	// Pattern 2: FROM tablename alias ) (for subqueries)
+	pattern2 := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s*\)`)
+	matches2 := pattern2.FindAllStringSubmatch(result, -1)
+	for _, match := range matches2 {
+		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+			result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+" )")
+		}
+	}
+	
+	// Pattern 3: FROM tablename alias; (end of statement)
+	semicolonPattern := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s*;`)
+	matches3 := semicolonPattern.FindAllStringSubmatch(result, -1)
+	for _, match := range matches3 {
+		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+			result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+";")
+		}
+	}
+	
+	// Pattern 4: JOIN tablename alias ON (for JOIN clauses)
+	joinPattern := regexp.MustCompile(`\bJOIN\s+(\w+(?:\.\w+)?)\s+(\w+)\s+ON\b`)
+	matches4 := joinPattern.FindAllStringSubmatch(result, -1)
+	for _, match := range matches4 {
+		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+			result = strings.ReplaceAll(result, match[0], "JOIN "+match[1]+" AS "+match[2]+" ON")
+		}
+	}
+	
+	// Pattern 5: ) alias ON (for JOIN conditions on subqueries)
+	onPattern := regexp.MustCompile(`\)\s+(\w+)\s+ON\b`)
+	matches5 := onPattern.FindAllStringSubmatch(result, -1)
+	for _, match := range matches5 {
+		if len(match) == 2 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+			result = strings.ReplaceAll(result, match[0], ") AS "+match[1]+" ON")
+		}
+	}
+	
+	return result
+}
+
 type (
 	// SQL defines the complete ClickHouse DDL/DML SQL structure
 	SQL struct {
@@ -265,5 +326,7 @@ func Parse(reader io.Reader) (*SQL, error) {
 func ParseString(sql string) (*SQL, error) {
 	// Normalize case to uppercase for consistent parsing
 	normalizedSQL := normalizeCase(sql)
-	return Parse(strings.NewReader(normalizedSQL))
+	// Convert implicit table aliases to explicit AS syntax
+	aliasNormalizedSQL := normalizeImplicitAliases(normalizedSQL)
+	return Parse(strings.NewReader(aliasNormalizedSQL))
 }

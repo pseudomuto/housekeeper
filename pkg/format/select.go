@@ -173,8 +173,10 @@ func (f *Formatter) formatTableNameWithAlias(table *parser.TableNameWithAlias) s
 	}
 
 	result := f.qualifiedName(table.Database, table.Table)
-	if table.Alias != nil && table.Alias.Name != nil {
-		result += " " + f.keyword("AS") + " " + f.identifier(*table.Alias.Name)
+	if table.ExplicitAlias != nil && table.ExplicitAlias.Name != nil {
+		result += " " + f.keyword("AS") + " " + f.identifier(*table.ExplicitAlias.Name)
+	} else if table.ImplicitAlias != nil {
+		result += " " + f.identifier(*table.ImplicitAlias)
 	}
 	return result
 }

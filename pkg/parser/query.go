@@ -63,9 +63,10 @@ type (
 
 	// TableNameWithAlias represents a table name with optional alias
 	TableNameWithAlias struct {
-		Database *string     `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Table    string      `parser:"@(Ident | BacktickIdent)"`
-		Alias    *TableAlias `parser:"@@?"`
+		Database      *string     `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Table         string      `parser:"@(Ident | BacktickIdent)"`
+		ExplicitAlias *TableAlias `parser:"@@?"`
+		ImplicitAlias *string     `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// TableAlias represents a table alias - requires explicit AS keyword
