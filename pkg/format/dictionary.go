@@ -246,7 +246,7 @@ func (f *Formatter) formatDictionarySource(source *parser.DictionarySource) stri
 		result += "("
 		var params []string
 		for _, param := range source.Parameters {
-			params = append(params, param.Name+" "+param.Value)
+			params = append(params, param.Name+" "+param.GetValue())
 		}
 		result += strings.Join(params, " ")
 		result += ")"
@@ -267,7 +267,7 @@ func (f *Formatter) formatDictionaryLayout(layout *parser.DictionaryLayout) stri
 	if len(layout.Parameters) > 0 {
 		var params []string
 		for _, param := range layout.Parameters {
-			params = append(params, param.Name+" "+param.Value)
+			params = append(params, param.Name+" "+param.GetValue())
 		}
 		result += strings.Join(params, " ")
 	}

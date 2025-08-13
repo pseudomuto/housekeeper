@@ -114,10 +114,11 @@ type (
 	}
 
 	// DictionaryParameter represents parameters in SOURCE or LAYOUT
+	// Values are parsed as expressions to handle both simple literals and function calls
 	DictionaryParameter struct {
-		Name  string  `parser:"@(Ident | BacktickIdent)"`
-		Value string  `parser:"@(String | Number | Ident | BacktickIdent)"`
-		Comma *string `parser:"@','?"`
+		Name       string     `parser:"@(Ident | BacktickIdent)"`
+		Expression Expression `parser:"@@"`
+		Comma      *string    `parser:"@','?"`
 	}
 
 	// AttachDictionaryStmt represents ATTACH DICTIONARY statements.
@@ -168,6 +169,11 @@ type (
 		ToName       string  `parser:"@(Ident | BacktickIdent))"`
 	}
 )
+
+// GetValue returns the string representation of the parameter value
+func (p *DictionaryParameter) GetValue() string {
+	return p.Expression.String()
+}
 
 // Convenience methods for CreateDictionaryStmt to access clauses from the new flexible structure
 // These maintain backward compatibility with existing code

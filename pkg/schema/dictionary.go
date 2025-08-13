@@ -504,7 +504,7 @@ func dictionaryParametersEqual(a, b []*parser.DictionaryParameter) bool {
 	}
 	for i, paramA := range a {
 		paramB := b[i]
-		if paramA.Name != paramB.Name || paramA.Value != paramB.Value {
+		if paramA.Name != paramB.Name || paramA.GetValue() != paramB.GetValue() {
 			return false
 		}
 	}
@@ -653,7 +653,7 @@ func buildSourceClause(source *parser.DictionarySource) string {
 	if len(source.Parameters) > 0 {
 		var paramStrs []string
 		for _, param := range source.Parameters {
-			paramStrs = append(paramStrs, param.Name+" "+param.Value)
+			paramStrs = append(paramStrs, param.Name+" "+param.GetValue())
 		}
 		sourceStr += "(" + strings.Join(paramStrs, ", ") + ")"
 	}
@@ -665,7 +665,7 @@ func buildLayoutClause(layout *parser.DictionaryLayout) string {
 	if len(layout.Parameters) > 0 {
 		var paramStrs []string
 		for _, param := range layout.Parameters {
-			paramStrs = append(paramStrs, param.Name+" "+param.Value)
+			paramStrs = append(paramStrs, param.Name+" "+param.GetValue())
 		}
 		layoutStr += "(" + strings.Join(paramStrs, ", ") + ")"
 	}
