@@ -72,8 +72,31 @@ type Params struct {
 	Version       *cmd.Version
 }
 
+func parseDirFlag(args []string) (string, []string) {
+	var dir string
+	var newArgs []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "-d" || arg == "--dir" {
+			if i+1 < len(args) {
+				dir = args[i+1]
+				i++
+			}
+		} else if len(arg) > 6 && arg[:6] == "--dir=" {
+			dir = arg[6:]
+		} else {
+			newArgs = append(newArgs, arg)
+		}
+	}
+
+	return dir, newArgs
+}
+
 func main() {
-	if dir, ok := os.LookupEnv("HOUSEKEEPER_DIR"); ok {
+	dir, args := parseDirFlag(os.Args)
+	if dir != "" {
 		if err := os.Chdir(dir); err != nil {
 			log.Fatal(err)
 		}
@@ -83,7 +106,7 @@ func main() {
 
 	app := fx.New(
 		fx.Supply(
-			os.Args,
+			args,
 			Params{
 				Dir:           pwd,
 				FormatOptions: format.Defaults,

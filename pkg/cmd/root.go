@@ -44,6 +44,8 @@ type (
 //
 // Global Flags:
 //   - --dir, -d: Project directory (defaults to current directory)
+//     Note: This flag is processed before CLI parsing to ensure the working
+//     directory is set before dependency injection occurs.
 //
 // The application automatically detects housekeeper projects by looking for
 // housekeeper.yaml in the specified directory. If found, it initializes the
@@ -74,6 +76,8 @@ schema migrations by comparing desired schema definitions with the current
 database state and generating appropriate migration files.`,
 		Version: p.Version.Version,
 		Flags: []cli.Flag{
+			// Note: This flag is pre-processed in main() before CLI parsing
+			// to ensure working directory changes happen before fx dependency injection
 			&cli.StringFlag{
 				Name:        "dir",
 				Aliases:     []string{"d"},

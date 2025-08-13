@@ -24,6 +24,12 @@ tasks:
     silent: true
     cmd: "{{.BIN_DIR}}/golangci-lint run {{.CLI_ARGS}}"
 
+  lint:fix:
+    desc: Run golangci-lint --fix on the codebase
+    deps: [install:golangci-lint]
+    silent: true
+    cmd: "{{.BIN_DIR}}/golangci-lint run --fix"
+
   test:
     desc: Run the test suite
     silent: true
