@@ -247,9 +247,20 @@ func (f *Formatter) formatIdentifierExpr(id *parser.IdentifierExpr) string {
 	if id.Table != nil {
 		parts = append(parts, f.identifier(*id.Table))
 	}
-	parts = append(parts, f.identifier(id.Name))
+
+	// Special case: don't backtick boolean literals that are parsed as identifiers
+	if id.Database == nil && id.Table == nil && isBooleanLiteral(id.Name) {
+		parts = append(parts, id.Name)
+	} else {
+		parts = append(parts, f.identifier(id.Name))
+	}
 
 	return strings.Join(parts, ".")
+}
+
+// isBooleanLiteral checks if a name represents a boolean literal
+func isBooleanLiteral(name string) bool {
+	return name == "true" || name == "false"
 }
 
 // formatFunctionCall formats a function call

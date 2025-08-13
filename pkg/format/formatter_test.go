@@ -220,3 +220,50 @@ func TestFormatSQL_EmptySQL(t *testing.T) {
 	require.NoError(t, formatter.FormatSQL(&buf, sqlResult))
 	require.Empty(t, buf.String())
 }
+
+func TestFormatter_BooleanDefaults(t *testing.T) {
+	tests := []struct {
+		name        string
+		sql         string
+		contains    []string
+		notContains []string
+	}{
+		{
+			name:        "boolean_defaults_in_table",
+			sql:         "CREATE TABLE test_table (id UInt64, is_premium Bool DEFAULT false, is_active Bool DEFAULT true) ENGINE = MergeTree();",
+			contains:    []string{"DEFAULT false", "DEFAULT true"},
+			notContains: []string{"`false`", "`true`"},
+		},
+		{
+			name:        "boolean_defaults_in_alter",
+			sql:         "ALTER TABLE test_table ADD COLUMN new_col Bool DEFAULT false;",
+			contains:    []string{"DEFAULT false"},
+			notContains: []string{"`false`"},
+		},
+		{
+			name:        "regular_identifiers_still_backticked",
+			sql:         "CREATE TABLE test_table (id UInt64, user_defined String DEFAULT some_identifier) ENGINE = MergeTree();",
+			contains:    []string{"DEFAULT `some_identifier`"},
+			notContains: []string{"DEFAULT some_identifier"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sqlResult, err := parser.ParseString(tt.sql)
+			require.NoError(t, err)
+
+			var buf bytes.Buffer
+			require.NoError(t, Format(&buf, Defaults, sqlResult.Statements[0]))
+			formatted := buf.String()
+
+			for _, contains := range tt.contains {
+				require.Contains(t, formatted, contains, "formatted output should contain: %s", contains)
+			}
+
+			for _, notContains := range tt.notContains {
+				require.NotContains(t, formatted, notContains, "formatted output should not contain: %s", notContains)
+			}
+		})
+	}
+}

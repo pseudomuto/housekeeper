@@ -72,28 +72,6 @@ type Params struct {
 	Version       *cmd.Version
 }
 
-func parseDirFlag(args []string) (string, []string) {
-	var dir string
-	var newArgs []string
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		if arg == "-d" || arg == "--dir" {
-			if i+1 < len(args) {
-				dir = args[i+1]
-				i++
-			}
-		} else if len(arg) > 6 && arg[:6] == "--dir=" {
-			dir = arg[6:]
-		} else {
-			newArgs = append(newArgs, arg)
-		}
-	}
-
-	return dir, newArgs
-}
-
 func main() {
 	dir, args := parseDirFlag(os.Args)
 	if dir != "" {
@@ -142,4 +120,26 @@ func newDockerClient() (docker.DockerClient, error) {
 	}
 
 	return dc, nil
+}
+
+func parseDirFlag(args []string) (string, []string) {
+	var dir string
+	var newArgs []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "-d" || arg == "--dir" {
+			if i+1 < len(args) {
+				dir = args[i+1]
+				i++
+			}
+		} else if len(arg) > 6 && arg[:6] == "--dir=" {
+			dir = arg[6:]
+		} else {
+			newArgs = append(newArgs, arg)
+		}
+	}
+
+	return dir, newArgs
 }

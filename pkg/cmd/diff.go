@@ -35,10 +35,10 @@ func diff(cfg *config.Config, client docker.DockerClient) *cli.Command {
 				return err
 			}
 			defer func() {
+				_ = client.Close()
 				if stopErr := container.Stop(ctx); stopErr != nil {
 					fmt.Printf("Warning: failed to stop container: %v\n", stopErr)
 				}
-				client.Close()
 			}()
 
 			// 2. Load project schema and generate diff
