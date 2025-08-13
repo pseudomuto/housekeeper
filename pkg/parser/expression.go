@@ -211,14 +211,6 @@ type (
 		End     string `parser:"'END'"`
 	}
 
-	// WhenClause represents a WHEN clause in CASE
-	WhenClause struct {
-		When      string               `parser:"'WHEN'"`
-		Condition ComparisonExpression `parser:"@@"`
-		Then      string               `parser:"'THEN'"`
-		Result    ComparisonExpression `parser:"@@"`
-	}
-
 	// CastExpression represents type casting
 	CastExpression struct {
 		Cast       string     `parser:"'CAST' '('"`
@@ -542,10 +534,6 @@ func (i IntervalExpr) String() string {
 
 func (c CaseExpression) String() string {
 	return "CASE " + c.Content + " END"
-}
-
-func (w WhenClause) String() string {
-	return "WHEN " + w.Condition.String() + " THEN " + w.Result.String()
 }
 
 func (c CastExpression) String() string {
