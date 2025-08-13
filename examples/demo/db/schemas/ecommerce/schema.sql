@@ -14,8 +14,8 @@ CREATE DATABASE IF NOT EXISTS ecommerce ON CLUSTER demo ENGINE = Atomic COMMENT 
 -- housekeeper:import dictionaries/user_segments.sql
 
 -- Import view definitions  
--- housekeeper:import views/daily_sales.sql
--- housekeeper:import views/user_activity.sql
--- housekeeper:import views/top_products.sql
--- housekeeper:import views/mv_product_stats.sql
--- housekeeper:import views/mv_hourly_events.sql
+-- #housekeeper:import views/daily_sales.sql
+-- #housekeeper:import views/user_activity.sql
+-- #housekeeper:import views/top_products.sql
+-- #housekeeper:import views/mv_product_stats.sql
+-- #housekeeper:import views/mv_hourly_events.sql

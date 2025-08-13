@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -34,14 +35,31 @@ func buildSystemDatabaseExclusion(columnName string) (string, []any) {
 	return condition, params
 }
 
-// cleanCreateStatement normalizes a CREATE statement by removing extra whitespace and ensuring semicolon
+// cleanCreateStatement normalizes a CREATE statement by removing extra whitespace, ensuring semicolon,
+// and normalizing data types for consistent comparison with parsed DDL
 func cleanCreateStatement(createQuery string) string {
 	cleaned := strings.TrimSpace(createQuery)
 	if !strings.HasSuffix(cleaned, ";") {
 		cleaned += ";"
 	}
 
+	// Normalize data types to match what the parser produces
+	cleaned = normalizeDataTypesInDDL(cleaned)
+
 	return cleaned
+}
+
+// normalizeDataTypesInDDL normalizes data types in DDL statements to match parser output
+func normalizeDataTypesInDDL(ddl string) string {
+	// Normalize Decimal(18, X) -> Decimal64(X)
+	decimalPattern := regexp.MustCompile(`Decimal\(18,\s*(\d+)\)`)
+	ddl = decimalPattern.ReplaceAllString(ddl, "Decimal64($1)")
+	
+	// Normalize DateTime64(X, 'TZ') -> DateTime(X, 'TZ')
+	datetimePattern := regexp.MustCompile(`DateTime64\((\d+),\s*'([^']+)'\)`)
+	ddl = datetimePattern.ReplaceAllString(ddl, "DateTime($1, '$2')")
+	
+	return ddl
 }
 
 // validateDDLStatement ensures the generated DDL statement is valid by parsing it

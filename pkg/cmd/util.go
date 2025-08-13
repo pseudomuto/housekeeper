@@ -54,7 +54,15 @@ func runContainer(ctx context.Context, opts docker.DockerOptions, cfg *config.Co
 		return nil, nil, errors.Wrap(err, "failed to get container DSN")
 	}
 
-	client, err := clickhouse.NewClient(ctx, dsn)
+	// Create client with cluster configuration if specified
+	var client *clickhouse.Client
+	if cfg.ClickHouse.Cluster != "" {
+		client, err = clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
+			Cluster: cfg.ClickHouse.Cluster,
+		})
+	} else {
+		client, err = clickhouse.NewClient(ctx, dsn)
+	}
 	if err != nil {
 		_ = container.Stop(ctx) // Clean up container on error
 		return nil, nil, errors.Wrap(err, "failed to create ClickHouse client")

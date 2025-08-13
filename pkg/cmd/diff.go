@@ -67,10 +67,12 @@ func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Co
 		return errors.Wrap(err, "failed to parse target schema")
 	}
 
+
 	// Check if there are differences
 	_, err = schemapkg.GenerateDiff(currentSchema, targetSchema)
 	if err != nil {
 		if errors.Is(err, schemapkg.ErrNoDiff) {
+			fmt.Println("No differences found between current and target schemas")
 			return nil // No changes needed
 		}
 		return errors.Wrap(err, "failed to generate schema diff")

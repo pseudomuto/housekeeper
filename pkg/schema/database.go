@@ -127,7 +127,7 @@ func extractDatabaseInfo(sql *parser.SQL) map[string]*DatabaseInfo {
 		if stmt.CreateDatabase != nil {
 			db := stmt.CreateDatabase
 			info := &DatabaseInfo{
-				Name: db.Name,
+				Name: normalizeIdentifier(db.Name),
 			}
 
 			if db.OnCluster != nil {
@@ -229,9 +229,15 @@ func generateRenameDatabaseSQL(oldName, newName, onCluster string) string {
 
 // needsModification checks if a database needs to be modified
 func needsModification(current, target *DatabaseInfo) bool {
+	// For housekeeper databases, ignore cluster differences
+	clusterMatch := current.Cluster == target.Cluster
+	if isHousekeeperDatabase(current.Name) || isHousekeeperDatabase(target.Name) {
+		clusterMatch = true // Ignore cluster differences for housekeeper objects
+	}
+
 	return current.Comment != target.Comment ||
 		current.Engine != target.Engine ||
-		current.Cluster != target.Cluster
+		!clusterMatch
 }
 
 // generateCreateDatabaseSQL generates CREATE DATABASE SQL from database info

@@ -161,12 +161,12 @@ func extractDictionaryInfo(sql *parser.SQL) map[string]*DictionaryInfo {
 		if stmt.CreateDictionary != nil {
 			dict := stmt.CreateDictionary
 			info := &DictionaryInfo{
-				Name:      dict.Name,
+				Name:      normalizeIdentifier(dict.Name),
 				Statement: dict,
 			}
 
 			if dict.Database != nil {
-				info.Database = *dict.Database
+				info.Database = normalizeIdentifier(*dict.Database)
 			}
 
 			if dict.OnCluster != nil {

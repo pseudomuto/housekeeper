@@ -273,8 +273,8 @@ func extractViewsFromSQL(sql *parser.SQL) map[string]*ViewInfo {
 			}
 
 			view := &ViewInfo{
-				Name:           stmt.CreateView.Name,
-				Database:       getStringValue(stmt.CreateView.Database),
+				Name:           normalizeIdentifier(stmt.CreateView.Name),
+				Database:       normalizeIdentifier(getStringValue(stmt.CreateView.Database)),
 				Cluster:        getStringValue(stmt.CreateView.OnCluster),
 				IsMaterialized: stmt.CreateView.Materialized,
 				OrReplace:      stmt.CreateView.OrReplace,

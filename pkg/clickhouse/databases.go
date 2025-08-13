@@ -97,8 +97,8 @@ func generateDatabaseDDL(name, engine, comment string) string {
 
 	parts = append(parts, "CREATE DATABASE", name)
 
-	if engine != "" && engine != "Atomic" {
-		// Only specify engine if it's not the default Atomic engine
+	if engine != "" {
+		// Always specify engine for explicit comparison
 		parts = append(parts, "ENGINE =", engine)
 	}
 

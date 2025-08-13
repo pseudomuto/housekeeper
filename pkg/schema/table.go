@@ -164,19 +164,19 @@ func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 		//nolint:nestif // Complex nested logic needed for comprehensive table extraction
 		if stmt.CreateTable != nil {
 			table := stmt.CreateTable
-			tableName := table.Name
+			tableName := normalizeIdentifier(table.Name)
 			if table.Database != nil {
-				tableName = *table.Database + "." + table.Name
+				tableName = normalizeIdentifier(*table.Database) + "." + normalizeIdentifier(table.Name)
 			}
 
 			tableInfo := &TableInfo{
-				Name:        table.Name,
+				Name:        normalizeIdentifier(table.Name),
 				OrReplace:   table.OrReplace,
 				IfNotExists: table.IfNotExists,
 			}
 
 			if table.Database != nil {
-				tableInfo.Database = *table.Database
+				tableInfo.Database = normalizeIdentifier(*table.Database)
 			}
 			if table.OnCluster != nil {
 				tableInfo.Cluster = *table.OnCluster
@@ -218,7 +218,7 @@ func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 				}
 				col := element.Column
 				columnInfo := ColumnInfo{
-					Name:     col.Name,
+					Name:     normalizeIdentifier(col.Name),
 					DataType: formatColumnDataType(col.DataType),
 				}
 				if defaultClause := col.GetDefault(); defaultClause != nil {
