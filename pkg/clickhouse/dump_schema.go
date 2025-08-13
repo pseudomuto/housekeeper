@@ -93,23 +93,56 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 //   - CREATE DICTIONARY statements
 //   - CREATE VIEW statements (both regular and materialized)
 //
+// Housekeeper internal objects (database 'housekeeper' and its objects) are excluded
+// from ON CLUSTER injection as they should be shard-local for migration tracking.
+//
 // Other statement types (ALTER, DROP, etc.) are left unchanged as they're not typically
 // part of schema extraction output.
 func injectOnCluster(statements []*parser.Statement, cluster string) []*parser.Statement {
+	// If cluster is empty, return statements unchanged
+	if cluster == "" {
+		return statements
+	}
+
 	clusterName := &cluster
 
 	for _, stmt := range statements {
 		switch {
 		case stmt.CreateDatabase != nil:
-			stmt.CreateDatabase.OnCluster = clusterName
+			if !isHousekeeperDatabase(stmt.CreateDatabase.Name) {
+				stmt.CreateDatabase.OnCluster = clusterName
+			}
 		case stmt.CreateTable != nil:
-			stmt.CreateTable.OnCluster = clusterName
+			dbName := getDatabaseName(stmt.CreateTable.Database)
+			if !isHousekeeperDatabase(dbName) {
+				stmt.CreateTable.OnCluster = clusterName
+			}
 		case stmt.CreateDictionary != nil:
-			stmt.CreateDictionary.OnCluster = clusterName
+			dbName := getDatabaseName(stmt.CreateDictionary.Database)
+			if !isHousekeeperDatabase(dbName) {
+				stmt.CreateDictionary.OnCluster = clusterName
+			}
 		case stmt.CreateView != nil:
-			stmt.CreateView.OnCluster = clusterName
+			dbName := getDatabaseName(stmt.CreateView.Database)
+			if !isHousekeeperDatabase(dbName) {
+				stmt.CreateView.OnCluster = clusterName
+			}
 		}
 	}
 
 	return statements
+}
+
+// isHousekeeperDatabase determines if a database belongs to housekeeper's internal tracking system.
+// Housekeeper databases and their objects should be shard-local and never created with ON CLUSTER clauses.
+func isHousekeeperDatabase(database string) bool {
+	return database == "housekeeper"
+}
+
+// getDatabaseName extracts the database name from a pointer, defaulting to "default" if nil.
+func getDatabaseName(database *string) string {
+	if database != nil && *database != "" {
+		return *database
+	}
+	return "default"
 }
