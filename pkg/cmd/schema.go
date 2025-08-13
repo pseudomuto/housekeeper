@@ -35,13 +35,13 @@ import (
 //
 // The command automatically validates project structure before executing
 // any subcommands.
-func schema() *cli.Command {
+func schema(cfg *config.Config) *cli.Command {
 	return &cli.Command{
 		Name:  "schema",
 		Usage: "Commands for working with schemas",
 		Commands: []*cli.Command{
 			schemaDump(),
-			schemaParse(),
+			schemaParse(cfg),
 		},
 	}
 }
@@ -165,7 +165,7 @@ func schemaDump() *cli.Command {
 //
 // The command validates that the project is properly initialized and that
 // all imported schema files are accessible.
-func schemaParse() *cli.Command {
+func schemaParse(cfg *config.Config) *cli.Command {
 	return &cli.Command{
 		Name:  "compile",
 		Usage: "Compile the project schema",
@@ -176,20 +176,8 @@ func schemaParse() *cli.Command {
 				Usage:   "File to write the output to",
 			},
 		},
-		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			if currentProject == nil {
-				return ctx, errors.Errorf("not a housekeeper project. Dir: %s", cmd.String("dir"))
-			}
-
-			return ctx, nil
-		},
+		Before: requireConfig(cfg),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// Load configuration to get entrypoint
-			cfg, err := config.LoadConfigFile("housekeeper.yaml")
-			if err != nil {
-				return errors.Wrap(err, "failed to load project configuration")
-			}
-
 			// Compile schema using schema.Compile function
 			var buf bytes.Buffer
 			if err := schemapkg.Compile(cfg.Entrypoint, &buf); err != nil {

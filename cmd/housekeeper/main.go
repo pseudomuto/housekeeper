@@ -93,11 +93,11 @@ func main() {
 		),
 		fx.Provide(
 			context.Background,
+			project.New,
 		),
 		cmd.Module,
 		config.Module,
 		format.Module,
-		project.Module,
 		fx.NopLogger,
 	)
 

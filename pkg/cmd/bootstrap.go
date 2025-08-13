@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"context"
-	"os"
 
-	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/project"
@@ -48,7 +46,7 @@ import (
 //
 // The command handles all ClickHouse object types and uses the cluster configuration
 // from the existing project for proper ON CLUSTER injection.
-func bootstrap(p *project.Project) *cli.Command {
+func bootstrap(p *project.Project, cfg *config.Config) *cli.Command {
 	return &cli.Command{
 		Name:  "bootstrap",
 		Usage: "Extract schema from an existing ClickHouse server into initialized project",
@@ -61,18 +59,8 @@ func bootstrap(p *project.Project) *cli.Command {
 				Required: true,
 			},
 		},
+		Before: requireConfig(cfg),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// Load existing project configuration
-			if _, err := os.Stat("housekeeper.yaml"); os.IsNotExist(err) {
-				return errors.New("housekeeper.yaml not found - please run 'housekeeper init' first to initialize the project")
-			}
-
-			// Load configuration to get cluster info
-			cfg, err := config.LoadConfigFile("housekeeper.yaml")
-			if err != nil {
-				return errors.Wrap(err, "failed to load project configuration")
-			}
-
 			// Use cluster from existing configuration
 			client, err := clickhouse.NewClientWithOptions(
 				ctx,

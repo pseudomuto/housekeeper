@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
+	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 )
 
-func snapshot() *cli.Command {
+func snapshot(p *project.Project) *cli.Command {
 	return &cli.Command{
-		Name:   "snapshot",
-		Usage:  "Create a snapshot from existing migrations",
-		Before: requireProject,
+		Name:  "snapshot",
+		Usage: "Create a snapshot from existing migrations",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "description",
@@ -25,7 +25,7 @@ func snapshot() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			migrationsDir := currentProject.MigrationsDir()
+			migrationsDir := p.MigrationsDir()
 			dir, err := migrator.LoadMigrationDir(os.DirFS(migrationsDir))
 			if err != nil {
 				return err

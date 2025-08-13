@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
@@ -130,10 +131,12 @@ database state and generating appropriate migration files.`,
 	}))
 }
 
-func requireProject(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-	if currentProject == nil {
-		return ctx, errors.New("not a housekeeper project")
-	}
+func requireConfig(cfg *config.Config) func(context.Context, *cli.Command) (context.Context, error) {
+	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+		if cfg == nil {
+			return ctx, errors.New("housekeeper.yaml not found")
+		}
 
-	return ctx, nil
+		return ctx, nil
+	}
 }
