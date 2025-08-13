@@ -85,12 +85,12 @@ func normalizeImplicitAliases(sql string) string {
 	// Handle the most common cases using simple patterns
 	// Be more careful to avoid transforming already correct SQL
 	result := sql
-	
+
 	// Process patterns carefully, checking each match individually
-	
+
 	// Pattern 1: FROM tablename alias WHERE/GROUP/ORDER/etc
 	keywords := []string{"WHERE", "LEFT", "RIGHT", "INNER", "JOIN", "GROUP", "ORDER", "LIMIT", "HAVING", "SETTINGS"}
-	
+
 	for _, keyword := range keywords {
 		// Only process if the match doesn't already contain AS
 		pattern := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s+` + keyword + `\b`)
@@ -101,7 +101,7 @@ func normalizeImplicitAliases(sql string) string {
 			}
 		}
 	}
-	
+
 	// Pattern 2: FROM tablename alias ) (for subqueries)
 	pattern2 := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s*\)`)
 	matches2 := pattern2.FindAllStringSubmatch(result, -1)
@@ -110,7 +110,7 @@ func normalizeImplicitAliases(sql string) string {
 			result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+" )")
 		}
 	}
-	
+
 	// Pattern 3: FROM tablename alias; (end of statement)
 	semicolonPattern := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s*;`)
 	matches3 := semicolonPattern.FindAllStringSubmatch(result, -1)
@@ -119,7 +119,7 @@ func normalizeImplicitAliases(sql string) string {
 			result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+";")
 		}
 	}
-	
+
 	// Pattern 4: JOIN tablename alias ON (for JOIN clauses)
 	joinPattern := regexp.MustCompile(`\bJOIN\s+(\w+(?:\.\w+)?)\s+(\w+)\s+ON\b`)
 	matches4 := joinPattern.FindAllStringSubmatch(result, -1)
@@ -128,7 +128,7 @@ func normalizeImplicitAliases(sql string) string {
 			result = strings.ReplaceAll(result, match[0], "JOIN "+match[1]+" AS "+match[2]+" ON")
 		}
 	}
-	
+
 	// Pattern 5: ) alias ON (for JOIN conditions on subqueries)
 	onPattern := regexp.MustCompile(`\)\s+(\w+)\s+ON\b`)
 	matches5 := onPattern.FindAllStringSubmatch(result, -1)
@@ -137,7 +137,7 @@ func normalizeImplicitAliases(sql string) string {
 			result = strings.ReplaceAll(result, match[0], ") AS "+match[1]+" ON")
 		}
 	}
-	
+
 	return result
 }
 

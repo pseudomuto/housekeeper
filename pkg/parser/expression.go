@@ -3,16 +3,18 @@ package parser
 type (
 	// Expression represents any ClickHouse expression with proper precedence handling
 	// Precedence levels (lowest to highest):
-	// 1. OR
-	// 2. AND
-	// 3. NOT
-	// 4. Comparison (=, !=, <, >, <=, >=, LIKE, IN, BETWEEN)
-	// 5. Addition/Subtraction (+, -)
-	// 6. Multiplication/Division/Modulo (*, /, %)
-	// 7. Unary (+, -, NOT)
-	// 8. Primary (literals, identifiers, functions, parentheses)
+	// 1. CASE (lowest - can contain any sub-expressions)
+	// 2. OR
+	// 3. AND
+	// 4. NOT
+	// 5. Comparison (=, !=, <, >, <=, >=, LIKE, IN, BETWEEN)
+	// 6. Addition/Subtraction (+, -)
+	// 7. Multiplication/Division/Modulo (*, /, %)
+	// 8. Unary (+, -, NOT)
+	// 9. Primary (literals, identifiers, functions, parentheses)
 	Expression struct {
-		Or *OrExpression `parser:"@@"`
+		Case *CaseExpression `parser:"@@"`
+		Or   *OrExpression   `parser:"| @@"`
 	}
 
 	// OrExpression handles OR operations (lowest precedence)
@@ -123,7 +125,6 @@ type (
 		Cast        *CastExpression    `parser:"| @@"`
 		Function    *FunctionCall      `parser:"| @@"`
 		Identifier  *IdentifierExpr    `parser:"| @@"`
-		Case        *CaseExpression    `parser:"| @@"`
 		Parentheses *ParenExpression   `parser:"| @@"`
 		Tuple       *TupleExpression   `parser:"| @@"`
 		Array       *ArrayExpression   `parser:"| @@"`
@@ -204,11 +205,26 @@ type (
 	}
 
 	// CaseExpression represents CASE expressions
-	// For now, capture the content as raw text to avoid recursion issues
 	CaseExpression struct {
-		Case    string `parser:"'CASE'"`
-		Content string `parser:"@(~'END')+"`
-		End     string `parser:"'END'"`
+		Case        string       `parser:"'CASE'"`
+		WhenClauses []WhenClause `parser:"@@+"`
+		ElseClause  *ElseClause  `parser:"@@?"`
+		End         string       `parser:"'END'"`
+	}
+
+	// WhenClause represents WHEN condition THEN result
+	// Using simpler parsing to avoid recursion issues during debugging
+	WhenClause struct {
+		When      string `parser:"'WHEN'"`
+		Condition string `parser:"@(~'THEN')+"`
+		Then      string `parser:"'THEN'"`
+		Result    string `parser:"@(~('WHEN' | 'ELSE' | 'END'))+"`
+	}
+
+	// ElseClause represents ELSE result
+	ElseClause struct {
+		Else   string `parser:"'ELSE'"`
+		Result string `parser:"@(~'END')+"`
 	}
 
 	// CastExpression represents type casting
@@ -267,6 +283,9 @@ type (
 
 // String returns the string representation of an Expression.
 func (e Expression) String() string {
+	if e.Case != nil {
+		return e.Case.String()
+	}
 	if e.Or != nil {
 		return e.Or.String()
 	}
@@ -420,9 +439,6 @@ func (p PrimaryExpression) String() string {
 	if p.Identifier != nil {
 		return p.Identifier.String()
 	}
-	if p.Case != nil {
-		return p.Case.String()
-	}
 	if p.Parentheses != nil {
 		return "(" + p.Parentheses.Expression.String() + ")"
 	}
@@ -533,7 +549,15 @@ func (i IntervalExpr) String() string {
 }
 
 func (c CaseExpression) String() string {
-	return "CASE " + c.Content + " END"
+	result := "CASE"
+	for _, when := range c.WhenClauses {
+		result += " WHEN " + when.Condition + " THEN " + when.Result
+	}
+	if c.ElseClause != nil {
+		result += " ELSE " + c.ElseClause.Result
+	}
+	result += " END"
+	return result
 }
 
 func (c CastExpression) String() string {

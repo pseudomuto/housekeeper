@@ -11,6 +11,9 @@ func (f *Formatter) formatExpression(expr *parser.Expression) string {
 	if expr == nil {
 		return ""
 	}
+	if expr.Case != nil {
+		return f.formatCaseExpression(expr.Case)
+	}
 	return f.formatOrExpression(expr.Or)
 }
 
@@ -207,8 +210,6 @@ func (f *Formatter) formatPrimaryExpression(primary *parser.PrimaryExpression) s
 		return f.formatIntervalExpression(primary.Interval)
 	case primary.Extract != nil:
 		return f.formatExtractExpression(primary.Extract)
-	case primary.Case != nil:
-		return f.formatCaseExpression(primary.Case)
 	default:
 		return ""
 	}
