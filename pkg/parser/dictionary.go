@@ -50,9 +50,10 @@ type (
 	}
 
 	// DictionaryColumnDefault represents DEFAULT or EXPRESSION clause
+	// Supports both simple values and function calls like now()
 	DictionaryColumnDefault struct {
-		Type       string `parser:"(@'DEFAULT' | @'EXPRESSION')"`
-		Expression string `parser:"@(String | Number | Ident | BacktickIdent)"`
+		Type       string     `parser:"(@'DEFAULT' | @'EXPRESSION')"`
+		Expression Expression `parser:"@@"`
 	}
 
 	// DictionaryColumnAttr represents column attributes like IS_OBJECT_ID, HIERARCHICAL, INJECTIVE
@@ -114,11 +115,30 @@ type (
 	}
 
 	// DictionaryParameter represents parameters in SOURCE or LAYOUT
-	// Values are parsed as expressions to handle both simple literals and function calls
 	DictionaryParameter struct {
+		DSLFunction *DictionaryDSLFunc `parser:"@@"`
+		SimpleParam *SimpleParameter   `parser:"| @@"`
+		Comma       *string            `parser:"@','?"`
+	}
+
+	// SimpleParameter represents name-value parameters
+	SimpleParameter struct {
 		Name       string     `parser:"@(Ident | BacktickIdent)"`
 		Expression Expression `parser:"@@"`
-		Comma      *string    `parser:"@','?"`
+	}
+
+	// DictionaryDSLFunc represents special DSL functions in SOURCE parameters
+	// like credentials(user 'user' password 'password') and header(name 'key' value 'val')
+	DictionaryDSLFunc struct {
+		Name   string                `parser:"@('credentials' | 'header' | 'headers')"`
+		Params []*DictionaryDSLParam `parser:"'(' @@* ')'"`
+	}
+
+	// DictionaryDSLParam represents key-value pairs in DSL functions
+	DictionaryDSLParam struct {
+		Name       string             `parser:"@(Ident | BacktickIdent | 'USER' | 'PASSWORD' | 'VALUE' | 'NAME')"`
+		Value      string             `parser:"@(String | Number)"`
+		NestedFunc *DictionaryDSLFunc `parser:"| @@"`
 	}
 
 	// AttachDictionaryStmt represents ATTACH DICTIONARY statements.
@@ -172,7 +192,46 @@ type (
 
 // GetValue returns the string representation of the parameter value
 func (p *DictionaryParameter) GetValue() string {
-	return p.Expression.String()
+	if p.DSLFunction != nil {
+		return p.DSLFunction.String()
+	}
+	if p.SimpleParam != nil {
+		return p.SimpleParam.Expression.String()
+	}
+	return ""
+}
+
+// GetName returns the parameter name
+func (p *DictionaryParameter) GetName() string {
+	if p.DSLFunction != nil {
+		return p.DSLFunction.Name
+	}
+	if p.SimpleParam != nil {
+		return p.SimpleParam.Name
+	}
+	return ""
+}
+
+// String returns the string representation of a DictionaryDSLFunc
+func (d *DictionaryDSLFunc) String() string {
+	result := d.Name + "("
+	for i, param := range d.Params {
+		if i > 0 {
+			result += " "
+		}
+		if param.NestedFunc != nil {
+			result += param.NestedFunc.String()
+		} else {
+			result += param.Name + " " + param.Value
+		}
+	}
+	result += ")"
+	return result
+}
+
+// GetValue returns the string representation of the default value
+func (d *DictionaryColumnDefault) GetValue() string {
+	return d.Expression.String()
 }
 
 // Convenience methods for CreateDictionaryStmt to access clauses from the new flexible structure

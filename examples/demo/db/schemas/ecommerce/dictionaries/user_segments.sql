@@ -8,7 +8,8 @@ CREATE DICTIONARY ecommerce.user_segments_dict ON CLUSTER demo (
 SOURCE(HTTP(
     url 'http://ml-service:8080/user-segments'
     format 'TabSeparated'
-    headers(list(header(name 'Authorization' value 'Bearer token123')))
+    credentials(user 'user' password 'password')
+    headers(header(name 'API-KEY' value 'key'))
 ))
 LAYOUT(FLAT())
 LIFETIME(1800)

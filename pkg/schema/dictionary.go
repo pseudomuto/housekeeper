@@ -504,7 +504,7 @@ func dictionaryParametersEqual(a, b []*parser.DictionaryParameter) bool {
 	}
 	for i, paramA := range a {
 		paramB := b[i]
-		if paramA.Name != paramB.Name || paramA.GetValue() != paramB.GetValue() {
+		if paramA.GetName() != paramB.GetName() || paramA.GetValue() != paramB.GetValue() {
 			return false
 		}
 	}
@@ -588,7 +588,7 @@ func buildDictionaryColumns(parts []string, stmt *parser.CreateDictionaryStmt) [
 
 			// Add DEFAULT or EXPRESSION if present
 			if col.Default != nil {
-				columnStr += " " + col.Default.Type + " " + col.Default.Expression
+				columnStr += " " + col.Default.Type + " " + col.Default.GetValue()
 			}
 
 			// Add attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
@@ -653,7 +653,11 @@ func buildSourceClause(source *parser.DictionarySource) string {
 	if len(source.Parameters) > 0 {
 		var paramStrs []string
 		for _, param := range source.Parameters {
-			paramStrs = append(paramStrs, param.Name+" "+param.GetValue())
+			if param.DSLFunction != nil {
+				paramStrs = append(paramStrs, param.GetValue())
+			} else {
+				paramStrs = append(paramStrs, param.GetName()+" "+param.GetValue())
+			}
 		}
 		sourceStr += "(" + strings.Join(paramStrs, ", ") + ")"
 	}
@@ -665,7 +669,11 @@ func buildLayoutClause(layout *parser.DictionaryLayout) string {
 	if len(layout.Parameters) > 0 {
 		var paramStrs []string
 		for _, param := range layout.Parameters {
-			paramStrs = append(paramStrs, param.Name+" "+param.GetValue())
+			if param.DSLFunction != nil {
+				paramStrs = append(paramStrs, param.GetValue())
+			} else {
+				paramStrs = append(paramStrs, param.GetName()+" "+param.GetValue())
+			}
 		}
 		layoutStr += "(" + strings.Join(paramStrs, ", ") + ")"
 	}
