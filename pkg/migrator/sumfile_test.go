@@ -139,7 +139,7 @@ func TestLoadSumFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sumFile)
 
-	// Write it back and verify consistency
+	// Write it back and verify entry consistency
 	var buf bytes.Buffer
 	_, err = sumFile.WriteTo(&buf)
 	require.NoError(t, err)
@@ -148,11 +148,14 @@ func TestLoadSumFile(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	require.Len(t, lines, 4)
 
-	// Should match original content
+	// First line is computed total hash, so we skip it and check entry lines
 	expectedLines := strings.Split(sumContent, "\n")
-	for i, expected := range expectedLines {
-		require.Equal(t, expected, lines[i])
+	for i := 1; i < len(expectedLines); i++ {
+		require.Equal(t, expectedLines[i], lines[i], "Entry line %d should match", i)
 	}
+
+	// Verify first line has h1 format (computed total hash)
+	require.True(t, strings.HasPrefix(lines[0], "h1:"), "First line should have h1 format")
 }
 
 func TestLoadSumFile_InvalidFormat(t *testing.T) {

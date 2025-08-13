@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -42,19 +43,20 @@ import (
 //
 // Returns a *parser.SQL containing table CREATE statements or an error if extraction fails.
 func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
-	query := `
+	condition, params := buildSystemDatabaseExclusion("database")
+	query := fmt.Sprintf(`
 		SELECT 
 			create_table_query
 		FROM system.tables
-		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+		WHERE %s
 		  AND engine NOT IN ('View', 'MaterializedView')  -- Views are handled separately
 		  AND is_temporary = 0
-		  AND name NOT LIKE '.inner_id.%'  -- Exclude internal materialized view tables
-		  AND name NOT LIKE '.inner.%'  -- Exclude other internal tables
+		  AND name NOT LIKE '.inner_id.%%'  -- Exclude internal materialized view tables
+		  AND name NOT LIKE '.inner.%%'  -- Exclude other internal tables
 		ORDER BY database, name
-	`
+	`, condition)
 
-	rows, err := client.conn.Query(ctx, query)
+	rows, err := client.conn.Query(ctx, query, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query tables")
 	}

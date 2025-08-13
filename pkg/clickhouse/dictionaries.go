@@ -43,16 +43,17 @@ import (
 // Returns a *parser.SQL containing dictionary CREATE statements or an error if extraction fails.
 func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, error) {
 	// First, get a list of all dictionaries (excluding system ones)
-	query := `
+	condition, params := buildSystemDatabaseExclusion("database")
+	query := fmt.Sprintf(`
 		SELECT 
 			database, 
 			name
 		FROM system.dictionaries
-		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+		WHERE %s
 		ORDER BY database, name
-	`
+	`, condition)
 
-	rows, err := client.conn.Query(ctx, query)
+	rows, err := client.conn.Query(ctx, query, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query dictionaries")
 	}

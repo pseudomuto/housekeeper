@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/config"
-	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
@@ -24,6 +22,7 @@ type (
 		Commands   []*cli.Command `group:"commands"`
 		Ctx        context.Context
 		Lifecycle  fx.Lifecycle
+		Project    *project.Project
 		Shutdowner fx.Shutdowner
 		Version    *Version
 	}
@@ -87,36 +86,6 @@ database state and generating appropriate migration files.`,
 					TrimSpace: true,
 				},
 			},
-		},
-		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			projectDir := cmd.String("dir")
-
-			// Change to project directory first
-			if err := os.Chdir(projectDir); err != nil {
-				return ctx, err
-			}
-
-			// Check if this is a housekeeper project
-			_, err := os.Stat("housekeeper.yaml")
-			if os.IsNotExist(err) {
-				return ctx, nil
-			}
-
-			if err != nil {
-				return ctx, err
-			}
-
-			// Create project instance with current working directory
-			pwd, err := os.Getwd()
-			if err != nil {
-				return ctx, errors.Wrap(err, "failed to get current working directory")
-			}
-
-			currentProject = project.New(project.ProjectParams{
-				Dir:       pwd,
-				Formatter: format.New(format.Defaults),
-			})
-			return ctx, nil
 		},
 		Commands: p.Commands,
 	}

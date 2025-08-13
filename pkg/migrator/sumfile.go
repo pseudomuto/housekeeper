@@ -286,8 +286,21 @@ func (f *SumFile) Add(v string, r io.Reader) error {
 //
 // Returns the number of bytes written and any error encountered during writing.
 func (f *SumFile) WriteTo(w io.Writer) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Compute the total hash from all entries if we have any
+	var totalHash []byte
+	if len(f.entries) > 0 {
+		h := sha256.New()
+		for _, entry := range f.entries {
+			h.Write(entry.hash)
+		}
+		totalHash = h.Sum(nil)
+	}
+
 	bytesWritten := int64(0)
-	n, err := fmt.Fprintln(w, writeHash(f.sum))
+	n, err := fmt.Fprintln(w, writeHash(totalHash))
 	if err != nil {
 		return bytesWritten, err
 	}

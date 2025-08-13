@@ -39,17 +39,18 @@ import (
 //
 // Returns a *parser.SQL containing database CREATE statements or an error if extraction fails.
 func extractDatabases(ctx context.Context, client *Client) (*parser.SQL, error) {
-	query := `
+	condition, params := buildSystemDatabaseExclusion("name")
+	query := fmt.Sprintf(`
 		SELECT 
 			name,
 			engine,
 			comment
 		FROM system.databases 
-		WHERE name NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+		WHERE %s
 		ORDER BY name
-	`
+	`, condition)
 
-	rows, err := client.conn.Query(ctx, query)
+	rows, err := client.conn.Query(ctx, query, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query databases")
 	}
