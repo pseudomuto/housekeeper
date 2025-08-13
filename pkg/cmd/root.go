@@ -79,7 +79,10 @@ func Run(p Params) {
 	})
 
 	app := &cli.Command{
-		Name:  "housekeeper",
+		Name: "housekeeper",
+		Authors: []any{
+			"David Muto (pseudomuto)",
+		},
 		Usage: "A tool for managing ClickHouse schema migrations",
 		Description: `housekeeper is a CLI tool that helps you manage ClickHouse database 
 schema migrations by comparing desired schema definitions with the current 

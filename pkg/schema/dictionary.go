@@ -247,9 +247,15 @@ func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInf
 func dictionaryPropertiesMatch(dict1, dict2 *DictionaryInfo) bool {
 	// Compare basic metadata (excluding name)
 	if dict1.Comment != dict2.Comment ||
-		dict1.Cluster != dict2.Cluster ||
 		dict1.Database != dict2.Database {
 		return false
+	}
+
+	// For housekeeper dictionaries, ignore cluster differences
+	if dict1.Database != "housekeeper" && dict2.Database != "housekeeper" {
+		if dict1.Cluster != dict2.Cluster {
+			return false
+		}
 	}
 
 	// Deep comparison of dictionary structure
@@ -273,9 +279,15 @@ func generateRenameDictionarySQL(oldName, newName, onCluster string) string {
 func needsDictionaryModification(current, target *DictionaryInfo) bool {
 	// Basic metadata comparison
 	if current.Comment != target.Comment ||
-		current.Cluster != target.Cluster ||
 		current.Database != target.Database {
 		return true
+	}
+
+	// For housekeeper dictionaries, ignore cluster differences
+	if current.Database != "housekeeper" && target.Database != "housekeeper" {
+		if current.Cluster != target.Cluster {
+			return true
+		}
 	}
 
 	// Deep comparison of dictionary structure

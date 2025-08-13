@@ -267,8 +267,14 @@ func findRenamedTable(targetTable *TableInfo, currentTables, targetTables map[st
 
 // tablesEqual compares two tables for equality
 func tablesEqual(a, b *TableInfo) bool {
+	// For housekeeper tables, ignore cluster differences
+	clusterMatch := a.Cluster == b.Cluster
+	if a.Database == "housekeeper" || b.Database == "housekeeper" {
+		clusterMatch = true // Ignore cluster differences for housekeeper objects
+	}
+
 	return a.Engine == b.Engine &&
-		a.Cluster == b.Cluster &&
+		clusterMatch &&
 		a.Comment == b.Comment &&
 		a.OrderBy == b.OrderBy &&
 		a.PartitionBy == b.PartitionBy &&
@@ -281,8 +287,14 @@ func tablesEqual(a, b *TableInfo) bool {
 
 // tablesEqualIgnoringName compares two tables for equality ignoring name and database
 func tablesEqualIgnoringName(a, b *TableInfo) bool {
+	// For housekeeper tables, ignore cluster differences
+	clusterMatch := a.Cluster == b.Cluster
+	if a.Database == "housekeeper" || b.Database == "housekeeper" {
+		clusterMatch = true // Ignore cluster differences for housekeeper objects
+	}
+
 	return a.Engine == b.Engine &&
-		a.Cluster == b.Cluster &&
+		clusterMatch &&
 		a.Comment == b.Comment &&
 		a.OrderBy == b.OrderBy &&
 		a.PartitionBy == b.PartitionBy &&

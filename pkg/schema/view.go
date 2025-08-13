@@ -299,10 +299,16 @@ func extractViewsFromSQL(sql *parser.SQL) map[string]*ViewInfo {
 func viewsAreEqual(current, target *ViewInfo) bool {
 	if current.Name != target.Name ||
 		current.Database != target.Database ||
-		current.Cluster != target.Cluster ||
 		current.IsMaterialized != target.IsMaterialized ||
 		current.OrReplace != target.OrReplace {
 		return false
+	}
+
+	// For housekeeper views, ignore cluster differences
+	if current.Database != "housekeeper" && target.Database != "housekeeper" {
+		if current.Cluster != target.Cluster {
+			return false
+		}
 	}
 
 	// Compare the full statements for deep equality
@@ -313,10 +319,16 @@ func viewsAreEqual(current, target *ViewInfo) bool {
 // viewsHaveSameProperties compares views ignoring the name (used for rename detection)
 func viewsHaveSameProperties(view1, view2 *ViewInfo) bool {
 	if view1.Database != view2.Database ||
-		view1.Cluster != view2.Cluster ||
 		view1.IsMaterialized != view2.IsMaterialized ||
 		view1.OrReplace != view2.OrReplace {
 		return false
+	}
+
+	// For housekeeper views, ignore cluster differences
+	if view1.Database != "housekeeper" && view2.Database != "housekeeper" {
+		if view1.Cluster != view2.Cluster {
+			return false
+		}
 	}
 
 	// Compare statements ignoring names

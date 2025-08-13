@@ -51,10 +51,13 @@ func validateTableOperation(current, target *TableInfo) error {
 
 	// Category 3: ON CLUSTER Configuration Changes
 	if current != nil && target != nil {
-		// Check for cluster changes
+		// Check for cluster changes, but ignore for housekeeper tables
 		if current.Cluster != target.Cluster {
-			return errors.Wrapf(ErrUnsupported,
-				"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			// Skip cluster validation for housekeeper tables
+			if current.Database != "housekeeper" && target.Database != "housekeeper" {
+				return errors.Wrapf(ErrUnsupported,
+					"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			}
 		}
 	}
 
@@ -83,10 +86,13 @@ func validateTableOperation(current, target *TableInfo) error {
 func validateDatabaseOperation(current, target *DatabaseInfo) error {
 	// Category 3: ON CLUSTER Configuration Changes
 	if current != nil && target != nil {
-		// Check for cluster changes
+		// Check for cluster changes, but ignore for housekeeper databases
 		if current.Cluster != target.Cluster {
-			return errors.Wrapf(ErrUnsupported,
-				"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			// Skip cluster validation for housekeeper databases
+			if current.Name != "housekeeper" && target.Name != "housekeeper" {
+				return errors.Wrapf(ErrUnsupported,
+					"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			}
 		}
 	}
 
@@ -119,9 +125,13 @@ func validateDictionaryOperation(current, target *DictionaryInfo) error {
 
 	// Category 3: ON CLUSTER Configuration Changes
 	if current != nil && target != nil {
+		// Check for cluster changes, but ignore for housekeeper dictionaries
 		if current.Cluster != target.Cluster {
-			return errors.Wrapf(ErrUnsupported,
-				"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			// Skip cluster validation for housekeeper dictionaries
+			if current.Database != "housekeeper" && target.Database != "housekeeper" {
+				return errors.Wrapf(ErrUnsupported,
+					"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			}
 		}
 	}
 
@@ -142,9 +152,13 @@ func validateDictionaryOperation(current, target *DictionaryInfo) error {
 func validateViewOperation(current, target *ViewInfo) error {
 	// Category 3: ON CLUSTER Configuration Changes
 	if current != nil && target != nil {
+		// Check for cluster changes, but ignore for housekeeper views
 		if current.Cluster != target.Cluster {
-			return errors.Wrapf(ErrUnsupported,
-				"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			// Skip cluster validation for housekeeper views
+			if current.Database != "housekeeper" && target.Database != "housekeeper" {
+				return errors.Wrapf(ErrUnsupported,
+					"cannot change cluster from '%s' to '%s': %v", current.Cluster, target.Cluster, ErrClusterChange)
+			}
 		}
 	}
 
