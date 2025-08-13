@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/client"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
@@ -40,8 +41,12 @@ func TestDumpSchema(t *testing.T) {
 	configFile := filepath.Join(configDir, "clickhouse.xml")
 	require.NoError(t, os.WriteFile(configFile, configContent, consts.ModeFile))
 
+	// Create Docker client
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err)
+
 	// Start ClickHouse container using our Docker package
-	container, err := docker.NewWithOptions(docker.DockerOptions{
+	container, err := docker.NewWithOptions(dockerClient, docker.DockerOptions{
 		Version:   consts.DefaultClickHouseVersion,
 		ConfigDir: configDir,
 	})

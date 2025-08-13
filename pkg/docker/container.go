@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 )
@@ -35,7 +34,7 @@ type (
 	// ClickHouseContainer manages ClickHouse Docker containers for development
 	ClickHouseContainer struct {
 		options DockerOptions
-		engine  *Engine
+		engine  *engine
 		running bool
 		ports   map[int]int // hostPort -> containerPort mapping
 	}
@@ -45,7 +44,14 @@ type (
 //
 // Example:
 //
-//	container, err := docker.New()
+//	// Create Docker client
+//	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer cli.Close()
+//
+//	container, err := docker.New(cli)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -55,19 +61,26 @@ type (
 //		log.Fatal(err)
 //	}
 //	defer container.Stop(ctx)
-func New() (*ClickHouseContainer, error) {
-	return NewWithOptions(DockerOptions{})
+func New(dockerClient DockerClient) (*ClickHouseContainer, error) {
+	return NewWithOptions(dockerClient, DockerOptions{})
 }
 
 // NewWithOptions creates a new ClickHouse Docker container with custom options
 //
 // Example:
 //
+//	// Create Docker client
+//	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer cli.Close()
+//
 //	opts := docker.DockerOptions{
 //		Version:   "25.7",
 //		ConfigDir: "/path/to/project/db/config.d",
 //	}
-//	container, err := docker.NewWithOptions(opts)
+//	container, err := docker.NewWithOptions(cli, opts)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -77,14 +90,8 @@ func New() (*ClickHouseContainer, error) {
 //		log.Fatal(err)
 //	}
 //	defer container.Stop(ctx)
-func NewWithOptions(opts DockerOptions) (*ClickHouseContainer, error) {
-	// Create Docker client
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Docker client")
-	}
-
-	engine := NewEngine(dockerClient)
+func NewWithOptions(dockerClient DockerClient, opts DockerOptions) (*ClickHouseContainer, error) {
+	engine := newEngine(dockerClient)
 
 	return &ClickHouseContainer{
 		options: opts,

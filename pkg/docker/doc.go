@@ -19,15 +19,26 @@
 //
 //	import (
 //		"context"
+//		"github.com/docker/docker/client"
 //		"github.com/pseudomuto/housekeeper/pkg/docker"
 //		"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 //	)
 //
+//	// Create Docker client
+//	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer dockerClient.Close()
+//
 //	// Create and configure ClickHouse container
-//	container := docker.NewWithOptions(docker.DockerOptions{
+//	container, err := docker.NewWithOptions(dockerClient, docker.DockerOptions{
 //		Version:   "25.7",
 //		ConfigDir: "/path/to/clickhouse/config.d",
 //	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
 //
 //	ctx := context.Background()
 //	defer container.Stop(ctx)

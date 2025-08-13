@@ -12,6 +12,25 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// snapshot creates a CLI command for consolidating existing migrations into a single snapshot file.
+//
+// The command consolidates all existing migration files into a single timestamped snapshot
+// file and removes the original migration files. This helps reduce the number of migration
+// files while preserving the complete schema definition.
+//
+// The snapshot process:
+// 1. Loads all existing migrations from the migrations directory
+// 2. Creates a timestamped snapshot file containing all migration content
+// 3. Removes the individual migration files that were consolidated
+// 4. Updates the migration sum file accordingly
+//
+// Example usage:
+//
+//	# Create snapshot with default description
+//	housekeeper snapshot
+//
+//	# Create snapshot with custom description
+//	housekeeper snapshot --description "Initial schema baseline"
 func snapshot(p *project.Project) *cli.Command {
 	return &cli.Command{
 		Name:  "snapshot",

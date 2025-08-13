@@ -12,8 +12,6 @@ import (
 	"go.uber.org/fx"
 )
 
-var currentProject *project.Project
-
 type (
 	Params struct {
 		fx.In
@@ -100,6 +98,8 @@ database state and generating appropriate migration files.`,
 	}))
 }
 
+// requireConfig creates a CLI before function that ensures a valid configuration
+// is present before executing a command.
 func requireConfig(cfg *config.Config) func(context.Context, *cli.Command) (context.Context, error) {
 	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 		if cfg == nil {

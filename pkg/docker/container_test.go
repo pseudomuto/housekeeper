@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/client"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,10 @@ func setupDockerContainer(t *testing.T, tmpDir string, containerName string) *do
 	configFile := filepath.Join(configDir, "config.xml")
 	require.NoError(t, os.WriteFile(configFile, []byte(configContent), consts.ModeFile))
 
+	// Create Docker client
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err)
+
 	// Create Docker container with test options
 	opts := docker.DockerOptions{
 		Version:   "25.7",
@@ -57,7 +62,7 @@ func setupDockerContainer(t *testing.T, tmpDir string, containerName string) *do
 		Name:      containerName,
 	}
 
-	container, err := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(dockerClient, opts)
 	require.NoError(t, err)
 	return container
 }
@@ -125,13 +130,17 @@ func TestDockerContainer_WithCustomOptions(t *testing.T) {
 	configFile := filepath.Join(configDir, "config.xml")
 	require.NoError(t, os.WriteFile(configFile, []byte(configContent), consts.ModeFile))
 
+	// Create Docker client
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err)
+
 	// Use custom options with different version
 	opts := docker.DockerOptions{
 		Version:   "24.3", // Different version for testing
 		ConfigDir: configDir,
 		Name:      "test-clickhouse-custom",
 	}
-	container, err := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(dockerClient, opts)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -162,12 +171,16 @@ func TestDockerContainer_WithCustomOptions(t *testing.T) {
 func TestDockerContainer_StopNonExistent(t *testing.T) {
 	skipIfNoDocker(t)
 
+	// Create Docker client
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err)
+
 	// Use custom version for testing without config
 	opts := docker.DockerOptions{
 		Version: "24.3",
 		Name:    "test-clickhouse-stop-nonexistent",
 	}
-	container, err := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(dockerClient, opts)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -209,13 +222,17 @@ func TestDockerContainer_RelativeConfigDir(t *testing.T) {
 		_ = os.Chdir("/Users/pseudomuto/src/github.com/pseudomuto/housekeeper")
 	}()
 
+	// Create Docker client
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err)
+
 	// Use relative path in options to test conversion to absolute
 	opts := docker.DockerOptions{
 		Version:   "24.3",
 		ConfigDir: relativeConfigDir, // Use relative path
 		Name:      "test-clickhouse-relative",
 	}
-	container, err := docker.NewWithOptions(opts)
+	container, err := docker.NewWithOptions(dockerClient, opts)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

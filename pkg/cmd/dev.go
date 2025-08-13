@@ -1,36 +1,18 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/client"
+	"github.com/docker/docker/api/types/container"
 	"github.com/pkg/errors"
-	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/config"
-	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
-	"github.com/pseudomuto/housekeeper/pkg/format"
-	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/urfave/cli/v3"
 )
-
-func dev(cfg *config.Config) *cli.Command {
-	return &cli.Command{
-		Name:   "dev",
-		Usage:  "Manage local ClickHouse development server",
-		Before: requireConfig(cfg),
-		Commands: []*cli.Command{
-			devUp(cfg),
-			devDown(),
-		},
-	}
-}
 
 const devContainerName = "housekeeper-dev"
 
@@ -40,7 +22,21 @@ type devConfig struct {
 	cluster   string
 }
 
-func devUp(cfg *config.Config) *cli.Command {
+// dev creates a CLI command for managing a local ClickHouse development server.
+func dev(cfg *config.Config, client docker.DockerClient) *cli.Command {
+	return &cli.Command{
+		Name:   "dev",
+		Usage:  "Manage local ClickHouse development server",
+		Before: requireConfig(cfg),
+		Commands: []*cli.Command{
+			devUp(cfg, client),
+			devDown(client),
+		},
+	}
+}
+
+// devUp creates a CLI command for starting a ClickHouse development server.
+func devUp(cfg *config.Config, client docker.DockerClient) *cli.Command {
 	return &cli.Command{
 		Name:  "up",
 		Usage: "Start ClickHouse development server and apply migrations",
@@ -48,69 +44,64 @@ func devUp(cfg *config.Config) *cli.Command {
 			config := loadDevConfigFromConfig(cfg)
 
 			// Check if container is already running
-			if isDevContainerRunning(ctx) {
+			if isDevContainerRunning(ctx, client) {
 				fmt.Println("ClickHouse development server is already running")
 				fmt.Println("Use 'housekeeper dev down' to stop it first")
 				return nil
 			}
 
-			container, err := startClickHouseContainer(ctx, config)
+			// Start container, run migrations, get client
+			container, client, err := runContainer(ctx, docker.DockerOptions{
+				Version:   config.version,
+				ConfigDir: config.configDir,
+				Name:      devContainerName,
+			}, cfg, client)
 			if err != nil {
 				return err
 			}
 			// Don't defer container.Stop() - we want it to keep running
-
-			client, dsn, err := connectToClickHouse(ctx, container)
-			if err != nil {
-				return err
-			}
 			defer client.Close()
 
-			if err := applyAllMigrations(ctx, client); err != nil {
-				return err
-			}
-
-			// Store container info for dev down command
-			if err := saveDevContainerInfo(container); err != nil {
-				fmt.Printf("Warning: failed to save container info: %v\n", err)
+			// Get DSN for display
+			dsn, err := container.GetDSN(ctx)
+			if err != nil {
+				return errors.Wrap(err, "failed to get container DSN")
 			}
 
 			// Print connection details and exit
-			printConnectionDetails(ctx, container, dsn, config.cluster)
+			printConnectionDetails(ctx, container, dsn)
 
 			return nil
 		},
 	}
 }
 
-func devDown() *cli.Command {
+// devDown creates a CLI command for stopping the ClickHouse development server.
+func devDown(dockerClient docker.DockerClient) *cli.Command {
 	return &cli.Command{
 		Name:  "down",
 		Usage: "Stop and remove ClickHouse development server",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if !isDevContainerRunning(ctx) {
+			if !isDevContainerRunning(ctx, dockerClient) {
 				fmt.Println("No ClickHouse development server is currently running")
 				return nil
 			}
 
 			// Stop the actual Docker container using docker commands
-			if err := stopHousekeeperDevContainer(ctx); err != nil {
+			if err := stopHousekeeperDevContainer(ctx, dockerClient); err != nil {
 				fmt.Printf("Warning: failed to stop container: %v\n", err)
 				fmt.Println("You may need to manually stop the container with: docker stop $(docker ps -q --filter label=housekeeper.dev=true)")
 			} else {
 				fmt.Println("ClickHouse development server stopped")
 			}
 
-			// Clean up the tracking file
-			if err := removeDevContainerInfo(); err != nil {
-				return errors.Wrap(err, "failed to clean up container info")
-			}
-
 			return nil
 		},
 	}
 }
 
+// loadDevConfigFromConfig creates a devConfig from the project configuration,
+// applying defaults for missing values.
 func loadDevConfigFromConfig(cfg *config.Config) *devConfig {
 	config := &devConfig{
 		version: cfg.ClickHouse.Version,
@@ -130,79 +121,9 @@ func loadDevConfigFromConfig(cfg *config.Config) *devConfig {
 	return config
 }
 
-func startClickHouseContainer(ctx context.Context, config *devConfig) (*docker.ClickHouseContainer, error) {
-	fmt.Printf("Starting ClickHouse %s container...\n", config.version)
-
-	container, err := docker.NewWithOptions(docker.DockerOptions{
-		Version:   config.version,
-		ConfigDir: config.configDir,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create ClickHouse container")
-	}
-
-	if err := container.Start(ctx); err != nil {
-		return nil, errors.Wrap(err, "failed to start ClickHouse container")
-	}
-
-	return container, nil
-}
-
-func connectToClickHouse(ctx context.Context, container *docker.ClickHouseContainer) (*clickhouse.Client, string, error) {
-	dsn, err := container.GetDSN(ctx)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get container DSN")
-	}
-
-	fmt.Printf("ClickHouse server started: %s\n", dsn)
-
-	client, err := clickhouse.NewClient(ctx, dsn)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to create clickhouse client")
-	}
-
-	fmt.Println("Connected to ClickHouse server")
-	return client, dsn, nil
-}
-
-func applyAllMigrations(ctx context.Context, client *clickhouse.Client) error {
-	// Load the migration set from the current project
-	migrations, err := migrator.LoadMigrationDir(os.DirFS(currentProject.MigrationsDir()))
-	if err != nil {
-		// If the migrations directory doesn't exist, that's okay - just no migrations to apply
-		if os.IsNotExist(errors.Cause(err)) {
-			fmt.Println("No migrations directory found - skipping migrations")
-			return nil
-		}
-		return errors.Wrap(err, "failed to load migration set")
-	}
-
-	// Get migration files from the set
-	if len(migrations.Migrations) == 0 {
-		fmt.Println("No migrations found")
-		return nil
-	}
-
-	valid, err := migrations.Validate()
-	if !valid || err != nil {
-		fmt.Printf("Warning: could not validate migration set: %v\n", err)
-	}
-
-	fmt.Printf("Applying %d migrations...\n", len(migrations.Migrations))
-
-	for i, migrationFile := range migrations.Migrations {
-		fmt.Printf("  [%d/%d] Applying %s.sql\n", i+1, len(migrations.Migrations), migrationFile.Version)
-
-		if err := applyMigration(ctx, client, migrationFile); err != nil {
-			return errors.Wrapf(err, "failed to apply migration: %s.sql", migrationFile.Version)
-		}
-	}
-
-	fmt.Println("All migrations applied successfully!")
-	return nil
-}
-
-func printConnectionDetails(ctx context.Context, container *docker.ClickHouseContainer, dsn, cluster string) {
+// printConnectionDetails displays formatted connection information for the
+// development ClickHouse server.
+func printConnectionDetails(ctx context.Context, container *docker.ClickHouseContainer, dsn string) {
 	httpDSN, err := container.GetHTTPDSN(ctx)
 	if err != nil {
 		fmt.Printf("Warning: could not get HTTP DSN: %v\n", err)
@@ -214,95 +135,34 @@ func printConnectionDetails(ctx context.Context, container *docker.ClickHouseCon
 	fmt.Println(strings.Repeat("=", 60))
 	fmt.Printf("Native DSN:  %s\n", dsn)
 	fmt.Printf("HTTP DSN:    %s\n", httpDSN)
-	if cluster != "" {
-		fmt.Printf("Cluster:     %s\n", cluster)
-	}
+	fmt.Println(strings.Repeat("=", 60))
 	fmt.Println("\nUse 'housekeeper dev down' to stop the server")
 	fmt.Println(strings.Repeat("=", 60))
 }
 
-// Container persistence functions
-func getDevContainerInfoPath() string {
-	return filepath.Join(os.TempDir(), "housekeeper-dev-container.json")
-}
-
-type containerInfo struct {
-	ID string `json:"id"`
-}
-
-func isDevContainerRunning(ctx context.Context) bool {
-	// Create a Docker engine to check if container is running
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return false
-	}
-
-	engine := docker.NewEngine(dockerClient)
-
-	// Try to get the housekeeper-dev container
-	_, err = engine.Get(ctx, "housekeeper-dev")
+// isDevContainerRunning checks if a housekeeper-dev container is currently running.
+func isDevContainerRunning(ctx context.Context, dockerClient docker.DockerClient) bool {
+	// Try to inspect the housekeeper-dev container
+	_, err := dockerClient.ContainerInspect(ctx, "housekeeper-dev")
 	return err == nil
 }
 
-func saveDevContainerInfo(container *docker.ClickHouseContainer) error {
-	if !container.IsRunning() {
-		return errors.New("container is not running")
-	}
-
-	// For now, we'll just create a marker file
-	// In a real implementation, we might store container ID
-	infoPath := getDevContainerInfoPath()
-	info := containerInfo{ID: devContainerName}
-
-	data, err := json.Marshal(info)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal container info")
-	}
-
-	if err := os.WriteFile(infoPath, data, consts.ModeFile); err != nil {
-		return errors.Wrap(err, "failed to write container info")
-	}
-
-	return nil
-}
-
-func removeDevContainerInfo() error {
-	infoPath := getDevContainerInfoPath()
-	if err := os.Remove(infoPath); err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, "failed to remove container info")
-	}
-	return nil
-}
-
-func applyMigration(ctx context.Context, client *clickhouse.Client, migration *migrator.Migration) error {
-	fmtr := format.New(format.Defaults)
-	for _, stmt := range migration.Statements {
-		// Execute the statement
-		buf := new(bytes.Buffer)
-		if err := fmtr.Format(buf, stmt); err != nil {
-			return errors.Wrap(err, "failed to execute SQL statement")
-		}
-
-		if err := client.ExecuteMigration(ctx, buf.String()); err != nil {
-			return errors.Wrapf(err, "failed to execute statement: %s", buf.String())
-		}
-	}
-
-	return nil
-}
-
-func stopHousekeeperDevContainer(ctx context.Context) error {
-	// Create a Docker engine to stop the container
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return errors.Wrap(err, "failed to create Docker client")
-	}
-
-	engine := docker.NewEngine(dockerClient)
-
+// stopHousekeeperDevContainer stops and removes the housekeeper-dev container
+// with a 30-second timeout.
+func stopHousekeeperDevContainer(ctx context.Context, dockerClient docker.DockerClient) error {
 	// Stop the housekeeper-dev container
-	if err := engine.Stop(ctx, "housekeeper-dev"); err != nil {
+	timeout := 30
+	if err := dockerClient.ContainerStop(ctx, "housekeeper-dev", container.StopOptions{
+		Timeout: &timeout,
+	}); err != nil {
 		return errors.Wrap(err, "failed to stop housekeeper-dev container")
+	}
+
+	// Remove the container
+	if err := dockerClient.ContainerRemove(ctx, "housekeeper-dev", container.RemoveOptions{
+		Force: true,
+	}); err != nil {
+		return errors.Wrap(err, "failed to remove housekeeper-dev container")
 	}
 
 	return nil

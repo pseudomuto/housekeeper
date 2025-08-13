@@ -11,115 +11,46 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
-	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
 	"github.com/urfave/cli/v3"
 )
 
-func diff(cfg *config.Config, formatter *format.Formatter) *cli.Command {
+// diff creates a CLI command for generating schema migration files by comparing
+// the current database state with the target schema definition.
+func diff(cfg *config.Config, client docker.DockerClient) *cli.Command {
 	return &cli.Command{
 		Name:   "diff",
 		Usage:  "Generate any missing migrations",
 		Before: requireConfig(cfg),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return runDiff(ctx, cfg, formatter)
+			// 1. Start container, run migrations, get client
+			container, client, err := runContainer(ctx, docker.DockerOptions{
+				Version:   cfg.ClickHouse.Version,
+				ConfigDir: cfg.ClickHouse.ConfigDir,
+				Name:      "housekeeper-diff",
+			}, cfg, client)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if stopErr := container.Stop(ctx); stopErr != nil {
+					fmt.Printf("Warning: failed to stop container: %v\n", stopErr)
+				}
+				client.Close()
+			}()
+
+			// 2. Load project schema and generate diff
+			return generateDiff(ctx, client, cfg)
 		},
 	}
 }
 
-func runDiff(ctx context.Context, cfg *config.Config, formatter *format.Formatter) error {
-	// 1. Load and validate migrations before creating container
-	migrationDir, err := loadAndValidateMigrations(cfg.Dir)
-	if err != nil {
-		return err
-	}
-
-	// 2. Set up container and client
-	client, cleanup, err := setupClickHouseContainer(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	defer cleanup()
-
-	// 3. Execute migrations and generate diff
-	return executeMigrationsAndGenerateDiff(ctx, client, migrationDir, cfg, formatter)
-}
-
-func loadAndValidateMigrations(migrationsPath string) (*migrator.MigrationDir, error) {
-	migrationDir, err := migrator.LoadMigrationDir(os.DirFS(migrationsPath))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load migration directory")
-	}
-
-	isValid, err := migrationDir.Validate()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to validate migrations")
-	}
-	if !isValid {
-		return nil, errors.New("migration directory failed validation - files have been modified")
-	}
-
-	return migrationDir, nil
-}
-
-func setupClickHouseContainer(ctx context.Context, cfg *config.Config) (*clickhouse.Client, func(), error) {
-	container, err := docker.NewWithOptions(docker.DockerOptions{
-		Version:   cfg.ClickHouse.Version,
-		ConfigDir: cfg.ClickHouse.ConfigDir,
-	})
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create ClickHouse container")
-	}
-
-	if err := container.Start(ctx); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to start ClickHouse container")
-	}
-
-	cleanup := func() {
-		if stopErr := container.Stop(ctx); stopErr != nil {
-			fmt.Printf("Warning: failed to stop container: %v\n", stopErr)
-		}
-	}
-
-	dsn, err := container.GetDSN(ctx)
-	if err != nil {
-		cleanup()
-		return nil, nil, errors.Wrap(err, "failed to get container DSN")
-	}
-
-	client, err := clickhouse.NewClient(ctx, dsn)
-	if err != nil {
-		cleanup()
-		return nil, nil, errors.Wrap(err, "failed to create ClickHouse client")
-	}
-
-	fullCleanup := func() {
-		client.Close()
-		cleanup()
-	}
-
-	return client, fullCleanup, nil
-}
-
-func executeMigrationsAndGenerateDiff(ctx context.Context, client *clickhouse.Client, migrationDir *migrator.MigrationDir, cfg *config.Config, formatter *format.Formatter) error {
-	// Execute migrations statement by statement
-	for _, migration := range migrationDir.Migrations {
-		for i, stmt := range migration.Statements {
-			// Format the statement as SQL
-			var stmtBuf bytes.Buffer
-			if err := formatter.Format(&stmtBuf, stmt); err != nil {
-				return errors.Wrapf(err, "failed to format statement %d in migration %s", i+1, migration.Version)
-			}
-
-			stmtSQL := stmtBuf.String()
-			if err := client.ExecuteMigration(ctx, stmtSQL); err != nil {
-				return errors.Wrapf(err, "failed to execute statement %d in migration %s: %s", i+1, migration.Version, stmtSQL)
-			}
-		}
-	}
-
+// generateDiff compares the current database schema with the target schema
+// and generates a migration file if differences are found.
+func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Config) error {
+	// NB: Migrations have already been applied by runContainer
 	// Get current and target schemas
 	currentSchema, err := client.GetSchema(ctx)
 	if err != nil {
@@ -151,7 +82,12 @@ func executeMigrationsAndGenerateDiff(ctx context.Context, client *clickhouse.Cl
 		return errors.Wrap(err, "failed to generate migration file")
 	}
 
-	// Rehash migration directory to include the new migration
+	// Reload and rehash migration directory to include the new migration
+	migrationDir, err := migrator.LoadMigrationDir(os.DirFS(cfg.Dir))
+	if err != nil {
+		return errors.Wrap(err, "failed to reload migration directory")
+	}
+
 	if err := migrationDir.Rehash(); err != nil {
 		return errors.Wrap(err, "failed to rehash migration directory")
 	}

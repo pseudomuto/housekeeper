@@ -47,8 +47,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/cmd"
 	"github.com/pseudomuto/housekeeper/pkg/config"
+	"github.com/pseudomuto/housekeeper/pkg/docker"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"go.uber.org/fx"
@@ -94,6 +97,7 @@ func main() {
 		fx.Provide(
 			context.Background,
 			project.New,
+			newDockerClient,
 		),
 		cmd.Module,
 		config.Module,
@@ -106,4 +110,13 @@ func main() {
 	if err := app.Err(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func newDockerClient() (docker.DockerClient, error) {
+	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create docker client")
+	}
+
+	return dc, nil
 }

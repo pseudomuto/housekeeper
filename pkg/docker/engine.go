@@ -32,7 +32,7 @@ type (
 		ContainerInspect(context.Context, string) (container.InspectResponse, error)
 	}
 
-	Engine struct {
+	engine struct {
 		client DockerClient
 	}
 
@@ -58,32 +58,15 @@ type (
 	}
 )
 
-// NewEngine creates a new Docker Engine instance for managing Docker operations.
+// newEngine creates a new Docker engine instance for managing Docker operations.
 // The Docker client should be initialized and connected before passing to this constructor.
-//
-// Example:
-//
-//	// Create Docker client
-//	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer cli.Close()
-//
-//	// Create engine
-//	engine := docker.NewEngine(cli)
-//
-//	// Pull an image
-//	if err := engine.Pull(ctx, "clickhouse/clickhouse-server:latest"); err != nil {
-//		log.Fatal(err)
-//	}
-func NewEngine(cl DockerClient) *Engine {
-	return &Engine{
+func newEngine(cl DockerClient) *engine {
+	return &engine{
 		client: cl,
 	}
 }
 
-func (c *Engine) Pull(ctx context.Context, img string) error {
+func (c *engine) Pull(ctx context.Context, img string) error {
 	out, err := c.client.ImagePull(ctx, img, image.PullOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to pull image: %s", img)
@@ -94,7 +77,7 @@ func (c *Engine) Pull(ctx context.Context, img string) error {
 	return nil
 }
 
-func (c *Engine) Start(ctx context.Context, opts ContainerOptions) error {
+func (c *engine) Start(ctx context.Context, opts ContainerOptions) error {
 	// Build environment variables
 	env := make([]string, 0, len(opts.Env))
 	for key, value := range opts.Env {
@@ -157,7 +140,7 @@ func (c *Engine) Start(ctx context.Context, opts ContainerOptions) error {
 	return nil
 }
 
-func (c *Engine) List(ctx context.Context) ([]*Container, error) {
+func (c *engine) List(ctx context.Context) ([]*Container, error) {
 	list, err := c.client.ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(runningContainers),
 	})
@@ -184,7 +167,7 @@ func (c *Engine) List(ctx context.Context) ([]*Container, error) {
 	return res, nil
 }
 
-func (c *Engine) Stop(ctx context.Context, nameOrID string) error {
+func (c *engine) Stop(ctx context.Context, nameOrID string) error {
 	timeout := 30
 	if err := c.client.ContainerStop(ctx, nameOrID, container.StopOptions{
 		Timeout: &timeout,
@@ -201,7 +184,7 @@ func (c *Engine) Stop(ctx context.Context, nameOrID string) error {
 	return nil
 }
 
-func (c *Engine) Get(ctx context.Context, nameOrID string) (*Container, error) {
+func (c *engine) Get(ctx context.Context, nameOrID string) (*Container, error) {
 	inspect, err := c.client.ContainerInspect(ctx, nameOrID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to inspect container: %s", nameOrID)
