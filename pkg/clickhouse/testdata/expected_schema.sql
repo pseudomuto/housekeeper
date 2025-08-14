@@ -1,6 +1,6 @@
-CREATE DATABASE `analytics` ON CLUSTER `test_cluster` COMMENT 'Analytics database for events and metrics';
+CREATE DATABASE `analytics` ON CLUSTER `test_cluster` ENGINE = Atomic COMMENT 'Analytics database for events and metrics';
 
-CREATE DATABASE `user_data` ON CLUSTER `test_cluster` COMMENT 'User-related data storage';
+CREATE DATABASE `user_data` ON CLUSTER `test_cluster` ENGINE = Atomic COMMENT 'User-related data storage';
 
 CREATE TABLE `analytics`.`daily_summary` ON CLUSTER `test_cluster` (
     `date`                 Date,
