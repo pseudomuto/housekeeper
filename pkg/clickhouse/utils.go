@@ -54,11 +54,36 @@ func normalizeDataTypesInDDL(ddl string) string {
 	// Normalize Decimal(18, X) -> Decimal64(X)
 	decimalPattern := regexp.MustCompile(`Decimal\(18,\s*(\d+)\)`)
 	ddl = decimalPattern.ReplaceAllString(ddl, "Decimal64($1)")
-	
+
 	// Normalize DateTime64(X, 'TZ') -> DateTime(X, 'TZ')
 	datetimePattern := regexp.MustCompile(`DateTime64\((\d+),\s*'([^']+)'\)`)
 	ddl = datetimePattern.ReplaceAllString(ddl, "DateTime($1, '$2')")
-	
+
+	// Normalize LIFETIME(MIN 0 MAX N) -> LIFETIME(N) when MIN is 0
+	// This handles ClickHouse's normalization of single lifetime values
+	lifetimePattern := regexp.MustCompile(`LIFETIME\s*\(\s*MIN\s+0\s+MAX\s+(\d+)\s*\)`)
+	ddl = lifetimePattern.ReplaceAllString(ddl, "LIFETIME($1)")
+
+	// Normalize Float32 DEFAULT 0. -> Float32 DEFAULT 0.0
+	// ClickHouse sometimes truncates trailing zeros
+	floatDefaultPattern := regexp.MustCompile(`(Float32|Float64)\s+DEFAULT\s+(\d+)\.(?:\s|,|\n|$)`)
+	ddl = floatDefaultPattern.ReplaceAllString(ddl, "$1 DEFAULT $2.0")
+
+	// Normalize hidden passwords back to empty strings to match our schema
+	// ClickHouse may use uppercase or lowercase for password keyword
+	ddl = regexp.MustCompile(`(?i)\bpassword\s+'?\[HIDDEN\]'?`).ReplaceAllString(ddl, "password ''")
+
+	// Normalize CREATE statement keywords - ClickHouse sometimes returns lowercase
+	ddl = regexp.MustCompile(`^CREATE\s+table\s+`).ReplaceAllString(ddl, "CREATE TABLE ")
+	ddl = regexp.MustCompile(`^CREATE\s+view\s+`).ReplaceAllString(ddl, "CREATE VIEW ")
+	ddl = regexp.MustCompile(`^CREATE\s+materialized\s+view\s+`).ReplaceAllString(ddl, "CREATE MATERIALIZED VIEW ")
+	ddl = regexp.MustCompile(`^CREATE\s+database\s+`).ReplaceAllString(ddl, "CREATE DATABASE ")
+	ddl = regexp.MustCompile(`^CREATE\s+dictionary\s+`).ReplaceAllString(ddl, "CREATE DICTIONARY ")
+
+	// Remove backticks from identifiers to match our schema format
+	// ClickHouse returns `column_name` but we write column_name
+	ddl = regexp.MustCompile("`([^`]+)`").ReplaceAllString(ddl, "$1")
+
 	return ddl
 }
 

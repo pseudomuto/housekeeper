@@ -14,6 +14,6 @@ SOURCE(CLICKHOUSE(
     db 'ecommerce'
     table 'categories_source'
 ))
-LAYOUT(COMPLEX_KEY_HASHED())
+LAYOUT(HASHED())
 LIFETIME(MIN 300 MAX 3600)
 COMMENT 'Product category hierarchy with parent relationships';

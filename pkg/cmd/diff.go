@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
@@ -67,6 +69,21 @@ func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Co
 		return errors.Wrap(err, "failed to parse target schema")
 	}
 
+	// Normalize target schema for consistent comparison with current schema
+	// This ensures both schemas use the same identifier format
+	formatter := format.New(format.Defaults)
+	var normalizedTargetBuf bytes.Buffer
+	err = formatter.Format(&normalizedTargetBuf, targetSchema.Statements...)
+	if err != nil {
+		return errors.Wrap(err, "failed to format target schema")
+	}
+
+	// Apply same normalization as ClickHouse output
+	normalizedTargetSQL := normalizeForComparison(normalizedTargetBuf.String())
+	targetSchema, err = parser.ParseString(normalizedTargetSQL)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse normalized target schema")
+	}
 
 	// Check if there are differences
 	_, err = schemapkg.GenerateDiff(currentSchema, targetSchema)
@@ -78,7 +95,7 @@ func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Co
 		return errors.Wrap(err, "failed to generate schema diff")
 	}
 
-	// Generate migration file
+	// Generate migration file using normalized schemas for consistent output
 	filename, err := schemapkg.GenerateMigrationFile(cfg.Dir, currentSchema, targetSchema)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate migration file")
@@ -109,4 +126,16 @@ func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Co
 	fmt.Printf("Generated migration: %s\n", filename)
 	fmt.Printf("Updated sum file: housekeeper.sum\n")
 	return nil
+}
+
+// normalizeForComparison applies the same normalization to target schema
+// that we apply to ClickHouse output to ensure consistent comparison
+func normalizeForComparison(ddl string) string {
+	// Remove backticks from identifiers to match ClickHouse normalization
+	ddl = regexp.MustCompile("`([^`]+)`").ReplaceAllString(ddl, "$1")
+
+	// Don't normalize SOURCE parameter keywords - the parser handles both cases
+	// and we'll make the comparison case-insensitive instead
+
+	return ddl
 }

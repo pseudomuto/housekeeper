@@ -380,7 +380,8 @@ func dictionaryColumnDefaultEqual(a, b *parser.DictionaryColumnDefault) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	return a.Type == b.Type && a.Expression == b.Expression
+	// Compare type and expression string representation for semantic equality
+	return a.Type == b.Type && fmt.Sprintf("%v", a.Expression) == fmt.Sprintf("%v", b.Expression)
 }
 
 func dictionaryColumnAttributesEqual(a, b []*parser.DictionaryColumnAttr) bool {
@@ -459,24 +460,32 @@ func dictionaryLifetimeEqual(a, b *parser.DictionaryLifetime) bool {
 		return false
 	}
 
-	// Compare single values
-	if !stringPtrEqual(a.Single, b.Single) {
-		return false
+	// Extract effective values from both formats
+	aValue := getEffectiveLifetimeValue(a)
+	bValue := getEffectiveLifetimeValue(b)
+
+	return aValue == bValue
+}
+
+// getEffectiveLifetimeValue extracts the effective lifetime value from either single or MinMax format
+// For MinMax with MIN 0, it returns the MAX value (equivalent to single value)
+// For other MinMax formats, it returns a normalized "MIN x MAX y" string
+func getEffectiveLifetimeValue(lifetime *parser.DictionaryLifetime) string {
+	if lifetime.Single != nil {
+		return *lifetime.Single
 	}
 
-	// Compare MinMax values
-	if a.MinMax == nil && b.MinMax == nil {
-		return true
-	}
-	if a.MinMax == nil || b.MinMax == nil {
-		return false
+	if lifetime.MinMax != nil {
+		min, max := getMinMaxValues(lifetime.MinMax)
+		// If MIN is 0, treat it as equivalent to single value of MAX
+		if min == "0" {
+			return max
+		}
+		// For non-zero MIN, return the full range representation
+		return "MIN " + min + " MAX " + max
 	}
 
-	// Both MinMax structures should be equivalent regardless of order
-	aMin, aMax := getMinMaxValues(a.MinMax)
-	bMin, bMax := getMinMaxValues(b.MinMax)
-
-	return aMin == bMin && aMax == bMax
+	return ""
 }
 
 // getMinMaxValues extracts min and max values from DictionaryLifetimeMinMax regardless of order
@@ -514,12 +523,26 @@ func dictionaryParametersEqual(a, b []*parser.DictionaryParameter) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i, paramA := range a {
-		paramB := b[i]
-		if paramA.GetName() != paramB.GetName() || paramA.GetValue() != paramB.GetValue() {
+
+	// Create maps for order-independent and case-insensitive comparison
+	// Use lowercase keys for comparison
+	aParams := make(map[string]string)
+	for _, param := range a {
+		aParams[strings.ToLower(param.GetName())] = param.GetValue()
+	}
+
+	bParams := make(map[string]string)
+	for _, param := range b {
+		bParams[strings.ToLower(param.GetName())] = param.GetValue()
+	}
+
+	// Compare the maps
+	for name, value := range aParams {
+		if bParams[name] != value {
 			return false
 		}
 	}
+
 	return true
 }
 

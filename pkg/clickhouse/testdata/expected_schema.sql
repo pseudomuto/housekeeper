@@ -74,12 +74,12 @@ CREATE DICTIONARY `user_data`.`user_segments_dict` ON CLUSTER `test_cluster` (
     `user_id` UInt64 IS_OBJECT_ID,
     `segment` String,
     `tier`    String DEFAULT 'free',
-    `score`   Float32 DEFAULT 0.
+    `score`   Float32 DEFAULT 0.0
 )
 PRIMARY KEY `user_id`
 SOURCE(CLICKHOUSE(HOST 'localhost' PORT 9000 DB 'user_data' TABLE 'user_segments_source'))
 LAYOUT(COMPLEX_KEY_HASHED(SIZE_IN_CELLS 100000))
-LIFETIME(MIN 0 MAX 3600)
+LIFETIME(3600)
 SETTINGS(max_threads=2)
 COMMENT 'User segmentation for targeting';
 

@@ -116,9 +116,8 @@ type (
 
 	// DictionaryParameter represents parameters in SOURCE or LAYOUT
 	DictionaryParameter struct {
-		DSLFunction *DictionaryDSLFunc `parser:"@@"`
-		SimpleParam *SimpleParameter   `parser:"| @@"`
-		Comma       *string            `parser:"@','?"`
+		DSLFunction *DictionaryDSLFunc `parser:"(@@ ','?)"`
+		SimpleParam *SimpleParameter   `parser:"| (@@ ','?)"`
 	}
 
 	// SimpleParameter represents name-value parameters
@@ -130,15 +129,15 @@ type (
 	// DictionaryDSLFunc represents special DSL functions in SOURCE parameters
 	// like credentials(user 'user' password 'password') and header(name 'key' value 'val')
 	DictionaryDSLFunc struct {
-		Name   string                `parser:"@('credentials' | 'header' | 'headers')"`
+		Name   string                `parser:"@('credentials' | 'CREDENTIALS' | 'header' | 'HEADER' | 'headers' | 'HEADERS')"`
 		Params []*DictionaryDSLParam `parser:"'(' @@* ')'"`
 	}
 
 	// DictionaryDSLParam represents key-value pairs in DSL functions
 	DictionaryDSLParam struct {
-		Name       string             `parser:"@(Ident | BacktickIdent | 'USER' | 'PASSWORD' | 'VALUE' | 'NAME')"`
-		Value      string             `parser:"@(String | Number)"`
-		NestedFunc *DictionaryDSLFunc `parser:"| @@"`
+		Name       string             `parser:"(@(Ident | BacktickIdent | 'USER' | 'PASSWORD' | 'VALUE' | 'NAME')"`
+		Value      string             `parser:"@(String | Number) ','?)"`
+		NestedFunc *DictionaryDSLFunc `parser:"| (@@ ','?)"`
 	}
 
 	// AttachDictionaryStmt represents ATTACH DICTIONARY statements.
