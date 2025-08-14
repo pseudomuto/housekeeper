@@ -63,7 +63,7 @@ func normalizeCase(sql string) string {
 	// Find all string literals first and preserve them
 	stringLiteralPattern := regexp.MustCompile(`'([^'\\]|\\.)*'`)
 	stringLiterals := stringLiteralPattern.FindAllString(sql, -1)
-	
+
 	// Replace string literals with placeholders
 	result := sql
 	placeholders := make(map[string]string)

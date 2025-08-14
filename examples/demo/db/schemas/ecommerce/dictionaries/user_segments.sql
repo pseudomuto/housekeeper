@@ -5,11 +5,13 @@ CREATE DICTIONARY ecommerce.user_segments_dict ON CLUSTER demo (
     score Float32 DEFAULT 0.0,
     last_updated DateTime
 ) PRIMARY KEY user_id
-SOURCE(HTTP(
-    url 'http://ml-service:8080/user-segments'
-    format 'TabSeparated'
-    credentials(user 'user' password 'password')
-    headers(header(name 'API-KEY' value 'key'))
+SOURCE(CLICKHOUSE(
+    host 'localhost'
+    port 9000
+    user 'default'
+    password ''
+    db 'ecommerce'
+    table 'user_segments_source'
 ))
 LAYOUT(FLAT())
 LIFETIME(1800)

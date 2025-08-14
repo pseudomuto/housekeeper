@@ -2,6 +2,8 @@
 CREATE DATABASE IF NOT EXISTS ecommerce ON CLUSTER demo ENGINE = Atomic COMMENT 'E-commerce analytics database';
 
 -- Import table definitions
+-- housekeeper:import tables/categories_source.sql
+-- housekeeper:import tables/user_segments_source.sql
 -- housekeeper:import tables/users.sql
 -- housekeeper:import tables/events.sql
 -- housekeeper:import tables/products.sql

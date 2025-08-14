@@ -43,11 +43,13 @@ import (
 // Returns a *parser.SQL containing dictionary CREATE statements or an error if extraction fails.
 func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, error) {
 	// First, get a list of all dictionaries (excluding system ones)
+	// Include dictionaries even if they failed to load due to external source issues
 	condition, params := buildSystemDatabaseExclusion("database")
 	query := fmt.Sprintf(`
 		SELECT 
 			database, 
-			name
+			name,
+			status
 		FROM system.dictionaries
 		WHERE %s
 		ORDER BY database, name
@@ -61,8 +63,8 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 
 	var statements []string
 	for rows.Next() {
-		var database, name string
-		if err := rows.Scan(&database, &name); err != nil {
+		var database, name, status string
+		if err := rows.Scan(&database, &name, &status); err != nil {
 			return nil, errors.Wrap(err, "failed to scan dictionary row")
 		}
 
@@ -72,7 +74,10 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 
 		showRows, err := client.conn.Query(ctx, showQuery)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to show create dictionary %s", fullName)
+			// SHOW CREATE DICTIONARY can fail for dictionaries with broken external sources
+			// Skip these with a warning to avoid failing the entire schema extraction
+			fmt.Printf("Warning: Cannot show dictionary %s (status: %s) - likely external source issue: %v\n", fullName, status, err)
+			continue
 		}
 
 		if showRows.Next() {
@@ -93,6 +98,9 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 			}
 
 			statements = append(statements, cleanedQuery)
+		} else {
+			// Dictionary exists but SHOW CREATE returns no results - likely broken external source
+			fmt.Printf("Warning: Dictionary %s exists but SHOW CREATE returned no results (status: %s) - skipping\n", fullName, status)
 		}
 		showRows.Close()
 	}

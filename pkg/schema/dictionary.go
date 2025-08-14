@@ -450,7 +450,26 @@ func dictionaryLayoutEqual(a, b *parser.DictionaryLayout) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	return a.Name == b.Name && dictionaryParametersEqual(a.Parameters, b.Parameters)
+
+	// Handle ClickHouse's automatic layout conversion:
+	// HASHED is converted to COMPLEX_KEY_HASHED for string keys
+	if layoutsEquivalent(a.Name, b.Name) {
+		return dictionaryParametersEqual(a.Parameters, b.Parameters)
+	}
+
+	return false
+}
+
+// layoutsEquivalent checks if two layout names are semantically equivalent
+// ClickHouse converts HASHED to COMPLEX_KEY_HASHED for string primary keys
+func layoutsEquivalent(a, b string) bool {
+	if a == b {
+		return true
+	}
+
+	// Handle ClickHouse automatic conversion
+	return (a == "HASHED" && b == "COMPLEX_KEY_HASHED") ||
+		(a == "COMPLEX_KEY_HASHED" && b == "HASHED")
 }
 
 func dictionaryLifetimeEqual(a, b *parser.DictionaryLifetime) bool {
@@ -525,26 +544,223 @@ func dictionaryParametersEqual(a, b []*parser.DictionaryParameter) bool {
 		return false
 	}
 
-	// Create maps for order-independent and case-insensitive comparison
-	// Use lowercase keys for comparison
-	aParams := make(map[string]string)
+	// Create maps for order-independent comparison using parsed parameter structures
+	aParams := make(map[string]*parser.DictionaryParameter)
 	for _, param := range a {
-		aParams[strings.ToLower(param.GetName())] = param.GetValue()
+		aParams[strings.ToLower(param.GetName())] = param
 	}
 
-	bParams := make(map[string]string)
+	bParams := make(map[string]*parser.DictionaryParameter)
 	for _, param := range b {
-		bParams[strings.ToLower(param.GetName())] = param.GetValue()
+		bParams[strings.ToLower(param.GetName())] = param
 	}
 
-	// Compare the maps
-	for name, value := range aParams {
-		if bParams[name] != value {
+	// Compare the parsed parameter structures
+	for name, paramA := range aParams {
+		paramB, exists := bParams[name]
+		if !exists {
+			return false
+		}
+
+		if !dictionaryParameterEqual(paramA, paramB) {
 			return false
 		}
 	}
 
 	return true
+}
+
+// dictionaryParameterEqual compares two parsed dictionary parameters for semantic equality
+// This handles the structural comparison of parameters regardless of formatting differences
+func dictionaryParameterEqual(a, b *parser.DictionaryParameter) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Both parameters must have the same structure type (SimpleParam vs DSLFunction)
+	if (a.SimpleParam != nil) != (b.SimpleParam != nil) {
+		return false
+	}
+	if (a.DSLFunction != nil) != (b.DSLFunction != nil) {
+		return false
+	}
+
+	// Compare simple parameters (name value pairs like: url 'http://...')
+	if a.SimpleParam != nil && b.SimpleParam != nil {
+		return simpleParameterEqual(a.SimpleParam, b.SimpleParam)
+	}
+
+	// Compare DSL function parameters (like: headers(header(name 'Content-Type' value 'application/json')))
+	if a.DSLFunction != nil && b.DSLFunction != nil {
+		return dslFunctionEqual(a.DSLFunction, b.DSLFunction)
+	}
+
+	return false
+}
+
+// simpleParameterEqual compares simple name-value parameters
+func simpleParameterEqual(a, b *parser.SimpleParameter) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Compare parameter names (case-insensitive)
+	if !strings.EqualFold(a.Name, b.Name) {
+		return false
+	}
+
+	// Compare expression values semantically
+	return expressionEqual(a.Expression, b.Expression)
+}
+
+// dslFunctionEqual compares DSL function parameters (like headers, credentials, etc.)
+func dslFunctionEqual(a, b *parser.DictionaryDSLFunc) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Compare function names (case-insensitive)
+	if !strings.EqualFold(a.Name, b.Name) {
+		return false
+	}
+
+	// Compare function parameters
+	return dslParamsEqual(a.Params, b.Params)
+}
+
+// dslParamsEqual compares DSL function parameter lists
+func dslParamsEqual(a, b []*parser.DictionaryDSLParam) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// For small parameter lists, do order-independent comparison
+	if len(a) <= 10 {
+		return dslParamsEqualUnordered(a, b)
+	}
+
+	// For larger lists, assume order matters for performance
+	for i, paramA := range a {
+		if !dslParamEqual(paramA, b[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// dslParamsEqualUnordered compares DSL parameters in order-independent way
+func dslParamsEqualUnordered(a, b []*parser.DictionaryDSLParam) bool {
+	// Create a map of used indices to avoid double-matching
+	used := make(map[int]bool)
+
+	for _, paramA := range a {
+		found := false
+		for i, paramB := range b {
+			if used[i] {
+				continue
+			}
+			if dslParamEqual(paramA, paramB) {
+				used[i] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// dslParamEqual compares individual DSL parameters
+func dslParamEqual(a, b *parser.DictionaryDSLParam) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Both parameters must have the same structure type (SimpleParam vs NestedFunc)
+	if (a.SimpleParam != nil) != (b.SimpleParam != nil) {
+		return false
+	}
+	if (a.NestedFunc != nil) != (b.NestedFunc != nil) {
+		return false
+	}
+
+	// Compare simple DSL parameters
+	if a.SimpleParam != nil && b.SimpleParam != nil {
+		return simpleDSLParamEqual(a.SimpleParam, b.SimpleParam)
+	}
+
+	// Compare nested DSL functions
+	if a.NestedFunc != nil && b.NestedFunc != nil {
+		return dslFunctionEqual(a.NestedFunc, b.NestedFunc)
+	}
+
+	return false
+}
+
+// simpleDSLParamEqual compares simple DSL parameters (name-value pairs)
+func simpleDSLParamEqual(a, b *parser.SimpleDSLParam) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Compare parameter names (case-insensitive)
+	if !strings.EqualFold(a.Name, b.Name) {
+		return false
+	}
+
+	// Compare parameter values semantically
+	return expressionEqual(a.Value, b.Value)
+}
+
+// expressionEqual compares expressions for semantic equality
+// This handles different formatting of the same logical value
+func expressionEqual(a, b parser.Expression) bool {
+	// Get the string representations
+	aStr := a.String()
+	bStr := b.String()
+
+	// If they're exactly equal, we're done
+	if aStr == bStr {
+		return true
+	}
+
+	// Normalize whitespace and quotes for comparison
+	aNorm := normalizeExpressionValue(aStr)
+	bNorm := normalizeExpressionValue(bStr)
+
+	return aNorm == bNorm
+}
+
+// normalizeExpressionValue normalizes expression strings for comparison
+func normalizeExpressionValue(value string) string {
+	// Trim and normalize whitespace
+	normalized := strings.TrimSpace(value)
+	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
+
+	// Normalize quotes - remove spaces around quotes
+	normalized = regexp.MustCompile(`\s*'\s*`).ReplaceAllString(normalized, "'")
+	normalized = regexp.MustCompile(`\s*"\s*`).ReplaceAllString(normalized, "\"")
+
+	return normalized
 }
 
 // generateCreateDictionarySQL generates CREATE DICTIONARY SQL from dictionary info
@@ -727,22 +943,22 @@ func normalizeComment(comment string) string {
 	if comment == "" {
 		return comment
 	}
-	
+
 	// Common SQL keywords that ClickHouse might normalize in comments
 	keywords := []string{"FROM", "TO", "AS", "WHERE", "BY", "WITH", "AND", "OR"}
-	
+
 	result := comment
 	for _, keyword := range keywords {
 		// Replace both cases with uppercase to normalize
 		lowerPattern := "\\b" + strings.ToLower(keyword) + "\\b"
 		upperPattern := "\\b" + strings.ToUpper(keyword) + "\\b"
-		
+
 		lowerRegex := regexp.MustCompile(lowerPattern)
 		upperRegex := regexp.MustCompile(upperPattern)
-		
+
 		result = lowerRegex.ReplaceAllString(result, strings.ToUpper(keyword))
 		result = upperRegex.ReplaceAllString(result, strings.ToUpper(keyword))
 	}
-	
+
 	return result
 }
