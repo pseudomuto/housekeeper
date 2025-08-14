@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -59,10 +60,20 @@ func init() {
 
 // normalizeCase converts SQL keywords to uppercase while preserving string literals and identifiers
 func normalizeCase(sql string) string {
-	// Much simpler approach: just avoid the most common problematic cases
-	// For now, don't try to solve the backtick issue - it's too complex and error-prone
-	// Focus on the core case sensitivity issue that was blocking the view files
+	// Find all string literals first and preserve them
+	stringLiteralPattern := regexp.MustCompile(`'([^'\\]|\\.)*'`)
+	stringLiterals := stringLiteralPattern.FindAllString(sql, -1)
+	
+	// Replace string literals with placeholders
+	result := sql
+	placeholders := make(map[string]string)
+	for i, str := range stringLiterals {
+		placeholder := fmt.Sprintf("__STRING_LITERAL_%d__", i)
+		placeholders[placeholder] = str
+		result = strings.Replace(result, str, placeholder, 1)
+	}
 
+	// Apply keyword normalization to non-string content
 	problemKeywords := map[string]*regexp.Regexp{
 		"AS":     regexp.MustCompile(`(?i)\bas\b`),
 		"FROM":   regexp.MustCompile(`(?i)\bfrom\b`),
@@ -72,9 +83,13 @@ func normalizeCase(sql string) string {
 		"VIEW":   regexp.MustCompile(`(?i)\bview\b`),
 	}
 
-	result := sql
 	for keyword, pattern := range problemKeywords {
 		result = pattern.ReplaceAllString(result, keyword)
+	}
+
+	// Restore string literals
+	for placeholder, original := range placeholders {
+		result = strings.Replace(result, placeholder, original, 1)
 	}
 
 	return result

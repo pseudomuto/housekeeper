@@ -126,18 +126,24 @@ type (
 		Expression Expression `parser:"@@"`
 	}
 
-	// DictionaryDSLFunc represents special DSL functions in SOURCE parameters
-	// like credentials(user 'user' password 'password') and header(name 'key' value 'val')
+	// DictionaryDSLFunc represents DSL functions in SOURCE parameters
+	// Supports any function name including: credentials, header, headers, HTTP, MySQL, etc.
 	DictionaryDSLFunc struct {
-		Name   string                `parser:"@('credentials' | 'CREDENTIALS' | 'header' | 'HEADER' | 'headers' | 'HEADERS')"`
+		Name   string                `parser:"@(Ident | BacktickIdent)"`
 		Params []*DictionaryDSLParam `parser:"'(' @@* ')'"`
 	}
 
-	// DictionaryDSLParam represents key-value pairs in DSL functions
+	// DictionaryDSLParam represents parameters in DSL functions
+	// Supports simple name-value pairs and nested function calls
 	DictionaryDSLParam struct {
-		Name       string             `parser:"(@(Ident | BacktickIdent | 'USER' | 'PASSWORD' | 'VALUE' | 'NAME')"`
-		Value      string             `parser:"@(String | Number) ','?)"`
-		NestedFunc *DictionaryDSLFunc `parser:"| (@@ ','?)"`
+		SimpleParam *SimpleDSLParam    `parser:"(@@ ','?)"`
+		NestedFunc  *DictionaryDSLFunc `parser:"| (@@ ','?)"`
+	}
+
+	// SimpleDSLParam represents simple name-value parameters in DSL functions
+	SimpleDSLParam struct {
+		Name  string     `parser:"@(Ident | BacktickIdent | 'USER' | 'PASSWORD' | 'VALUE' | 'NAME')"`
+		Value Expression `parser:"@@"`
 	}
 
 	// AttachDictionaryStmt represents ATTACH DICTIONARY statements.
@@ -220,8 +226,8 @@ func (d *DictionaryDSLFunc) String() string {
 		}
 		if param.NestedFunc != nil {
 			result += param.NestedFunc.String()
-		} else {
-			result += param.Name + " " + param.Value
+		} else if param.SimpleParam != nil {
+			result += param.SimpleParam.Name + " " + param.SimpleParam.Value.String()
 		}
 	}
 	result += ")"

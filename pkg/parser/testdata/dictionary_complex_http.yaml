@@ -1,0 +1,7 @@
+dictionaries:
+    - name: user_segments_dict
+      operation: CREATE
+    - name: analytics_dict
+      operation: CREATE
+    - name: complex_api_dict
+      operation: CREATE

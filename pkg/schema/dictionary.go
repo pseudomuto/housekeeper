@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -245,8 +246,8 @@ func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInf
 
 // dictionaryPropertiesMatch checks if two dictionaries have identical properties (excluding name)
 func dictionaryPropertiesMatch(dict1, dict2 *DictionaryInfo) bool {
-	// Compare basic metadata (excluding name)
-	if dict1.Comment != dict2.Comment ||
+	// Compare basic metadata (excluding name) with normalized comment comparison
+	if !commentsEqual(dict1.Comment, dict2.Comment) ||
 		dict1.Database != dict2.Database {
 		return false
 	}
@@ -277,8 +278,8 @@ func generateRenameDictionarySQL(oldName, newName, onCluster string) string {
 // needsDictionaryModification checks if a dictionary needs to be modified
 // This compares the essential properties that would require a CREATE OR REPLACE
 func needsDictionaryModification(current, target *DictionaryInfo) bool {
-	// Basic metadata comparison
-	if current.Comment != target.Comment ||
+	// Basic metadata comparison with normalized comment comparison
+	if !commentsEqual(current.Comment, target.Comment) ||
 		current.Database != target.Database {
 		return true
 	}
@@ -670,7 +671,7 @@ func buildDictionaryOptions(parts []string, stmt *parser.CreateDictionaryStmt) [
 	if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
 		var settingStrs []string
 		for _, setting := range settings.Settings {
-			settingStrs = append(settingStrs, setting.Name+"="+setting.Value)
+			settingStrs = append(settingStrs, setting.Name+" = "+setting.Value)
 		}
 		parts = append(parts, "SETTINGS("+strings.Join(settingStrs, ", ")+")")
 	}
@@ -713,4 +714,35 @@ func buildLayoutClause(layout *parser.DictionaryLayout) string {
 		layoutStr += "(" + strings.Join(paramStrs, ", ") + ")"
 	}
 	return layoutStr + ")"
+}
+
+// commentsEqual compares two comments with normalization for SQL keywords
+// ClickHouse normalizes keywords even within string literals, so we need to handle this
+func commentsEqual(comment1, comment2 string) bool {
+	return normalizeComment(comment1) == normalizeComment(comment2)
+}
+
+// normalizeComment normalizes SQL keywords in comments to handle ClickHouse keyword normalization
+func normalizeComment(comment string) string {
+	if comment == "" {
+		return comment
+	}
+	
+	// Common SQL keywords that ClickHouse might normalize in comments
+	keywords := []string{"FROM", "TO", "AS", "WHERE", "BY", "WITH", "AND", "OR"}
+	
+	result := comment
+	for _, keyword := range keywords {
+		// Replace both cases with uppercase to normalize
+		lowerPattern := "\\b" + strings.ToLower(keyword) + "\\b"
+		upperPattern := "\\b" + strings.ToUpper(keyword) + "\\b"
+		
+		lowerRegex := regexp.MustCompile(lowerPattern)
+		upperRegex := regexp.MustCompile(upperPattern)
+		
+		result = lowerRegex.ReplaceAllString(result, strings.ToUpper(keyword))
+		result = upperRegex.ReplaceAllString(result, strings.ToUpper(keyword))
+	}
+	
+	return result
 }

@@ -80,7 +80,7 @@ PRIMARY KEY `user_id`
 SOURCE(CLICKHOUSE(HOST 'localhost' PORT 9000 DB 'user_data' TABLE 'user_segments_source'))
 LAYOUT(COMPLEX_KEY_HASHED(SIZE_IN_CELLS 100000))
 LIFETIME(3600)
-SETTINGS(max_threads=2)
+SETTINGS(max_threads = 2)
 COMMENT 'User segmentation for targeting';
 
 CREATE VIEW `analytics`.`daily_events` ON CLUSTER `test_cluster`
