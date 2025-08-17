@@ -305,13 +305,13 @@ func tablesEqualIgnoringName(a, b *TableInfo) bool {
 		columnsEqual(a.Columns, b.Columns)
 }
 
-// columnsEqual compares two column slices for equality
+// columnsEqual compares two column slices for equality using case-insensitive comment comparison
 func columnsEqual(a, b []ColumnInfo) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i := range a {
-		if a[i] != b[i] {
+		if !columnInfoEqual(a[i], b[i]) {
 			return false
 		}
 	}
@@ -336,8 +336,8 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 	// Find columns to add or modify
 	for _, targetCol := range target {
 		if currentCol, exists := currentCols[targetCol.Name]; exists {
-			// Column exists - check for changes
-			if currentCol != targetCol {
+			// Column exists - check for changes using case-insensitive comment comparison
+			if !columnInfoEqual(currentCol, targetCol) {
 				diffs = append(diffs, ColumnDiff{
 					Type:        ColumnDiffModify,
 					ColumnName:  targetCol.Name,

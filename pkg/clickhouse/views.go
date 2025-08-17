@@ -70,12 +70,22 @@ func extractViews(ctx context.Context, client *Client) (*parser.SQL, error) {
 		}
 
 		// Clean up the CREATE statement
-		// ClickHouse returns CREATE VIEW name (col1 Type1, ...) AS SELECT
-		// but our parser expects CREATE VIEW name AS SELECT
 		cleanedQuery := cleanCreateStatement(createQuery)
-		openParen := strings.Index(cleanedQuery, "(")
-		asPos := strings.Index(cleanedQuery, "AS")
-		cleanedQuery = cleanedQuery[:openParen] + cleanedQuery[asPos:]
+		
+		// ClickHouse may return CREATE VIEW name (col1 Type1, ...) AS SELECT
+		// but our parser expects CREATE VIEW name AS SELECT
+		// We need to remove the column definitions if they exist
+		
+		// Find the positions safely
+		viewNameEnd := strings.Index(cleanedQuery, "(")
+		asPos := strings.Index(cleanedQuery, " AS ")
+		
+		if viewNameEnd > 0 && asPos > viewNameEnd {
+			// There are column definitions between the view name and AS
+			// Remove them by taking everything before the opening paren and after AS
+			cleanedQuery = cleanedQuery[:viewNameEnd] + cleanedQuery[asPos:]
+		}
+		// Otherwise, the query is already in the correct format
 
 		// Validate the statement using our parser
 		if err := validateDDLStatement(cleanedQuery); err != nil {
@@ -99,4 +109,41 @@ func extractViews(ctx context.Context, client *Client) (*parser.SQL, error) {
 	}
 
 	return sqlResult, nil
+}
+
+// reconstructMaterializedViewDDL reconstructs the complete CREATE MATERIALIZED VIEW DDL
+// by combining the view definition with engine and ordering information from system.tables
+func reconstructMaterializedViewDDL(viewQuery, engineFull, sortingKey, cluster string) string {
+	// Parse the existing view query to extract components
+	// Example input: "CREATE MATERIALIZED VIEW db.name AS SELECT ..."
+	// We need to inject ENGINE and ORDER BY before AS
+	
+	// Find the AS position
+	asPos := strings.Index(viewQuery, " AS ")
+	if asPos == -1 {
+		return viewQuery // Return as-is if no AS found
+	}
+	
+	beforeAS := viewQuery[:asPos]
+	afterAS := viewQuery[asPos:]
+	
+	// Build ENGINE clause from engineFull and sortingKey
+	var engineClause string
+	if engineFull != "" {
+		engineClause = "\nENGINE = " + engineFull
+		if sortingKey != "" {
+			engineClause += " ORDER BY " + sortingKey
+		}
+	}
+	
+	// Add cluster information if available
+	var clusterClause string
+	if cluster != "" && !strings.Contains(beforeAS, "ON CLUSTER") {
+		// Insert ON CLUSTER before ENGINE
+		clusterClause = " ON CLUSTER " + cluster
+	}
+	
+	// Reconstruct the complete DDL
+	result := beforeAS + clusterClause + engineClause + afterAS
+	return result
 }

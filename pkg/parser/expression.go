@@ -507,6 +507,11 @@ func (f FunctionCall) String() string {
 		result += ")"
 	}
 
+	// Add OVER clause for window functions
+	if f.Over != nil {
+		result += " " + f.Over.String()
+	}
+
 	return result
 }
 
@@ -518,6 +523,82 @@ func (a FunctionArg) String() string {
 		return a.Expression.String()
 	}
 	return ""
+}
+
+// String returns the string representation of an OverClause for window functions
+func (o OverClause) String() string {
+	result := "OVER ("
+
+	// Add PARTITION BY clause if present
+	if len(o.PartitionBy) > 0 {
+		result += "PARTITION BY "
+		for i, expr := range o.PartitionBy {
+			if i > 0 {
+				result += ", "
+			}
+			result += expr.String()
+		}
+	}
+
+	// Add ORDER BY clause if present
+	if len(o.OrderBy) > 0 {
+		if len(o.PartitionBy) > 0 {
+			result += " "
+		}
+		result += "ORDER BY "
+		for i, orderExpr := range o.OrderBy {
+			if i > 0 {
+				result += ", "
+			}
+			result += orderExpr.String()
+		}
+	}
+
+	// Add frame clause if present
+	if o.Frame != nil {
+		if len(o.PartitionBy) > 0 || len(o.OrderBy) > 0 {
+			result += " "
+		}
+		result += o.Frame.String()
+	}
+
+	result += ")"
+	return result
+}
+
+// String returns the string representation of an OrderByExpr for ORDER BY in OVER clauses
+func (o OrderByExpr) String() string {
+	result := o.Expression.String()
+	if o.Desc {
+		result += " DESC"
+	}
+	if o.Nulls != nil {
+		result += " NULLS " + *o.Nulls
+	}
+	return result
+}
+
+// String returns the string representation of a WindowFrame for window functions
+func (w WindowFrame) String() string {
+	result := w.Type
+	if w.Between {
+		result += " BETWEEN " + w.Start.String()
+		if w.End != nil {
+			result += " AND " + w.End.String()
+		}
+	} else {
+		result += " " + w.Start.String()
+	}
+	return result
+}
+
+// String returns the string representation of a FrameBound for window frame boundaries
+func (f FrameBound) String() string {
+	result := f.Type
+	if f.Direction != "" {
+		result += " " + f.Direction
+	}
+	return result
 }
 
 func (t TupleExpression) String() string {

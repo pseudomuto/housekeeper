@@ -291,11 +291,10 @@ func (f *Formatter) formatFunctionCall(fn *parser.FunctionCall) string {
 		result += ")"
 	}
 
-	// TODO: Handle OVER clause for window functions - fallback to string for now
-	// if fn.Over != nil {
-	// 	// For now, we'll omit the OVER clause formatting to avoid complexity
-	// 	// This is a limitation that can be addressed later
-	// }
+	// Handle OVER clause for window functions
+	if fn.Over != nil {
+		result += " " + fn.Over.String()
+	}
 
 	return result
 }

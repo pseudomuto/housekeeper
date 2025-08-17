@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -12,19 +11,6 @@ import (
 )
 
 var (
-	// SQL keywords that need case normalization
-	sqlKeywords = []string{
-		"AS", "SELECT", "FROM", "WHERE", "GROUP", "ORDER", "BY", "HAVING", "LIMIT",
-		"CREATE", "VIEW", "TABLE", "DATABASE", "AND", "OR", "NOT", "IN", "LIKE",
-		"CASE", "WHEN", "THEN", "ELSE", "END", "JOIN", "LEFT", "RIGHT", "INNER", "ON",
-		"IF", "EXISTS", "CLUSTER", "ENGINE", "MATERIALIZED", "POPULATE", "WITH",
-		"DISTINCT", "NULL", "TRUE", "FALSE", "IS", "BETWEEN", "OVER", "PARTITION",
-		"SETTINGS", "DESC", "ASC", "NULLS", "FIRST", "LAST", "CAST", "EXTRACT", "INTERVAL",
-	}
-
-	// Compiled regex patterns for case normalization (created once for performance)
-	keywordPatterns map[string]*regexp.Regexp
-
 	// clickhouseLexer defines the lexer for ClickHouse DDL
 	clickhouseLexer = lexer.MustSimple([]lexer.SimpleRule{
 		{Name: "Comment", Pattern: `--[^\r\n]*`},
@@ -45,54 +31,14 @@ var (
 		participle.Lexer(clickhouseLexer),
 		participle.Elide("Comment", "MultilineComment", "Whitespace"),
 		participle.UseLookahead(4),
+		participle.CaseInsensitive("Ident"), // Make identifier matching case-insensitive for keywords
 	)
 )
 
-func init() {
-	// Initialize regex patterns for case normalization
-	keywordPatterns = make(map[string]*regexp.Regexp)
-	for _, keyword := range sqlKeywords {
-		// Create case-insensitive regex pattern with word boundaries
-		pattern := `\b(?i)` + regexp.QuoteMeta(keyword) + `\b`
-		keywordPatterns[keyword] = regexp.MustCompile(pattern)
-	}
-}
-
-// normalizeCase converts SQL keywords to uppercase while preserving string literals and identifiers
+// normalizeCase is no longer needed with case-insensitive parser
 func normalizeCase(sql string) string {
-	// Find all string literals first and preserve them
-	stringLiteralPattern := regexp.MustCompile(`'([^'\\]|\\.)*'`)
-	stringLiterals := stringLiteralPattern.FindAllString(sql, -1)
-
-	// Replace string literals with placeholders
-	result := sql
-	placeholders := make(map[string]string)
-	for i, str := range stringLiterals {
-		placeholder := fmt.Sprintf("__STRING_LITERAL_%d__", i)
-		placeholders[placeholder] = str
-		result = strings.Replace(result, str, placeholder, 1)
-	}
-
-	// Apply keyword normalization to non-string content
-	problemKeywords := map[string]*regexp.Regexp{
-		"AS":     regexp.MustCompile(`(?i)\bas\b`),
-		"FROM":   regexp.MustCompile(`(?i)\bfrom\b`),
-		"WHERE":  regexp.MustCompile(`(?i)\bwhere\b`),
-		"BY":     regexp.MustCompile(`(?i)\bby\b`),
-		"CREATE": regexp.MustCompile(`(?i)\bcreate\b`),
-		"VIEW":   regexp.MustCompile(`(?i)\bview\b`),
-	}
-
-	for keyword, pattern := range problemKeywords {
-		result = pattern.ReplaceAllString(result, keyword)
-	}
-
-	// Restore string literals
-	for placeholder, original := range placeholders {
-		result = strings.Replace(result, placeholder, original, 1)
-	}
-
-	return result
+	// With case-insensitive parsing enabled, no normalization needed
+	return sql
 }
 
 // normalizeImplicitAliases converts implicit table aliases to explicit AS syntax
