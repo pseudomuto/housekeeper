@@ -381,8 +381,8 @@ func dictionaryColumnDefaultEqual(a, b *parser.DictionaryColumnDefault) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	// Compare type and expression string representation for semantic equality
-	return a.Type == b.Type && fmt.Sprintf("%v", a.Expression) == fmt.Sprintf("%v", b.Expression)
+	// Compare type and expression using AST-based comparison
+	return a.Type == b.Type && expressionsAreEqual(&a.Expression, &b.Expression)
 }
 
 func dictionaryColumnAttributesEqual(a, b []*parser.DictionaryColumnAttr) bool {
