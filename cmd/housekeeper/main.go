@@ -103,7 +103,7 @@ func main() {
 		cmd.Module,
 		config.Module,
 		format.Module,
-		// fx.NopLogger,
+		fx.NopLogger,
 	)
 
 	app.Run()
