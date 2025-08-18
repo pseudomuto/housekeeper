@@ -179,8 +179,8 @@ if err := dm.ApplyMigrationFiles(ctx, migrationFiles); err != nil {
 }
 
 // Validate migration set integrity
-migrationSet, _ := proj.LoadMigrationSet()
-isValid, _ := migrationSet.IsValid()
+migrationDir, _ := migrator.LoadMigrationDir(os.DirFS("db/migrations"))
+isValid, _ := migrationDir.IsValid()
 if !isValid {
     log.Println("Warning: Migration files modified")
 }

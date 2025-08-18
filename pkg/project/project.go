@@ -140,6 +140,11 @@ func (p *Project) Initialize(options InitOptions) error {
 	return p.overlayFS(image, &data)
 }
 
+// Dir returns the root directory of the project.
+func (p *Project) Dir() string {
+	return p.RootDir
+}
+
 func (p *Project) MigrationsDir() string {
 	return filepath.Join(p.RootDir, "db", "migrations")
 }

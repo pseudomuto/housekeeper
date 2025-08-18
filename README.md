@@ -1049,21 +1049,21 @@ func main() {
         log.Fatal(err)
     }
 
-    // Load migration set
-    migrationSet, err := proj.LoadMigrationSet()
+    // Load migrations from the configured directory
+    migrationDir, err := migrator.LoadMigrationDir(os.DirFS("db/migrations"))
     if err != nil {
         log.Fatal(err)
     }
 
     // Access migration files (sorted lexicographically)
-    files := migrationSet.Files()
-    fmt.Printf("Found %d migration files:\n", len(files))
-    for i, file := range files {
-        fmt.Printf("%d. %s\n", i+1, file)
+    migrations := migrationDir.Migrations
+    fmt.Printf("Found %d migration files:\n", len(migrations))
+    for i, migration := range migrations {
+        fmt.Printf("%d. %s\n", i+1, migration.Version)
     }
 
     // Generate SumFile for integrity checking
-    sumFile, err := migrationSet.GenerateSumFile()
+    sumFile, err := migrationDir.GenerateSumFile()
     if err != nil {
         log.Fatal(err)
     }
@@ -1071,7 +1071,7 @@ func main() {
     fmt.Printf("Generated SumFile with %d files\n", sumFile.Files())
 
     // Validate migration set integrity
-    isValid, err := migrationSet.IsValid()
+    isValid, err := migrationDir.IsValid()
     if err != nil {
         log.Fatal(err)
     }

@@ -251,6 +251,18 @@ func (m *mockRows) Scan(dest ...any) error {
 			if i, ok := val.(int64); ok {
 				*d = i
 			}
+		case *uint64:
+			if i, ok := val.(int64); ok {
+				if i >= 0 {
+					*d = uint64(i)
+				}
+			}
+		case *uint32:
+			if i, ok := val.(int); ok {
+				if i >= 0 && i <= 4294967295 { // max uint32
+					*d = uint32(i)
+				}
+			}
 		case *int:
 			if i, ok := val.(int); ok {
 				*d = i

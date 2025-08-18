@@ -157,6 +157,18 @@ func (c *Client) ExecuteMigration(ctx context.Context, sql string) error {
 	return c.conn.Exec(ctx, sql)
 }
 
+// Query executes a query that returns rows, such as a SELECT statement.
+// This method is compatible with the migrator.ClickHouse interface.
+func (c *Client) Query(ctx context.Context, query string, args ...any) (driver.Rows, error) {
+	return c.conn.Query(ctx, query, args...)
+}
+
+// Exec executes a query without returning any rows, such as INSERT, UPDATE, DELETE, or DDL statements.
+// This method is compatible with the executor.ClickHouse interface.
+func (c *Client) Exec(ctx context.Context, query string, args ...any) error {
+	return c.conn.Exec(ctx, query, args...)
+}
+
 // GetSchema returns complete schema information including databases, tables, views, and dictionaries.
 // This is the primary method for retrieving the current ClickHouse schema state,
 // including all schema objects, parsed into a structured SQL object.

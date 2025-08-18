@@ -211,17 +211,20 @@ func LoadRevisions(ctx context.Context, ch ClickHouse) (*RevisionSet, error) {
 	var revisions []*Revision
 	for rows.Next() {
 		revision := &Revision{}
-		var executionTimeMs int64
+		var executionTimeMs uint64
 		var errorStr *string
+		var kindStr string
+		var applied uint32
+		var total uint32
 
 		err := rows.Scan(
 			&revision.Version,
 			&revision.ExecutedAt,
 			&executionTimeMs,
-			&revision.Kind,
+			&kindStr,
 			&errorStr,
-			&revision.Applied,
-			&revision.Total,
+			&applied,
+			&total,
 			&revision.Hash,
 			&revision.PartialHashes,
 			&revision.HousekeeperVersion,
@@ -230,7 +233,15 @@ func LoadRevisions(ctx context.Context, ch ClickHouse) (*RevisionSet, error) {
 			return nil, errors.Wrap(err, "failed to scan revision row")
 		}
 
-		revision.ExecutionTime = time.Duration(executionTimeMs) * time.Millisecond
+		const maxDurationMs = 9223372036854775 // max safe milliseconds before overflow
+		if executionTimeMs <= maxDurationMs {
+			revision.ExecutionTime = time.Duration(int64(executionTimeMs)) * time.Millisecond
+		} else {
+			revision.ExecutionTime = time.Duration(1<<63 - 1) // max time.Duration
+		}
+		revision.Kind = RevisionKind(kindStr)
+		revision.Applied = int(applied)
+		revision.Total = int(total)
 		if errorStr != nil {
 			revision.Error = errorStr
 		}
