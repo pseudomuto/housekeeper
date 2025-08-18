@@ -4,7 +4,7 @@ CREATE TABLE `analytics`.`events` (
     `event_type` LowCardinality(String),
     `timestamp`  DateTime DEFAULT now(),
     `properties` String DEFAULT '',
-    `metadata`   Nullable(String) CODEC(ZSTD()),
+    `metadata`   Nullable(String) CODEC(ZSTD),
     `version`    UInt32 MATERIALIZED toUnixTimestamp(`timestamp`)
 )
 ENGINE = MergeTree()

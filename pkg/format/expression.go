@@ -498,9 +498,9 @@ func (f *Formatter) formatCodec(codec *parser.CodecClause) string {
 	codecSpecs := make([]string, 0, len(codec.Codecs))
 	for _, codecSpec := range codec.Codecs {
 		spec := codecSpec.Name
-		// Always add parentheses for consistency
-		spec += "("
+		// Only add parentheses when there are parameters
 		if len(codecSpec.Parameters) > 0 {
+			spec += "("
 			var params []string
 			for _, param := range codecSpec.Parameters {
 				if param.String != nil {
@@ -511,9 +511,8 @@ func (f *Formatter) formatCodec(codec *parser.CodecClause) string {
 					params = append(params, f.identifier(*param.Ident))
 				}
 			}
-			spec += strings.Join(params, ", ")
+			spec += strings.Join(params, ", ") + ")"
 		}
-		spec += ")"
 		codecSpecs = append(codecSpecs, spec)
 	}
 

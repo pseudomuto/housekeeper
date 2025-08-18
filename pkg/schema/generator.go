@@ -232,8 +232,8 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 	var processedStatements []string
 	for _, stmt := range statements {
 		// Split on \n\n in case a single statement contains multiple SQL statements
-		subStatements := strings.Split(stmt, "\n\n")
-		for _, subStmt := range subStatements {
+		subStatements := strings.SplitSeq(stmt, "\n\n")
+		for subStmt := range subStatements {
 			subStmt = strings.TrimSpace(subStmt)
 			if subStmt != "" {
 				if !strings.HasSuffix(subStmt, ";") {

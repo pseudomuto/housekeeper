@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
@@ -64,19 +65,19 @@ func snapshot(p *project.Project) *cli.Command {
 			// Create the snapshot
 			cp, err := dir.CreateSnapshot(version, description)
 			if err != nil {
-				return fmt.Errorf("failed to create snapshot: %w", err)
+				return errors.Wrapf(err, "failed to create snapshot")
 			}
 
 			// Write the snapshot file to the migrations directory
 			snapshotPath := filepath.Join(migrationsDir, version+".sql")
 			snapshotFile, err := os.Create(snapshotPath)
 			if err != nil {
-				return fmt.Errorf("failed to create snapshot file: %w", err)
+				return errors.Wrapf(err, "failed to create snapshot file")
 			}
 			defer snapshotFile.Close()
 
 			if _, err := cp.WriteTo(snapshotFile); err != nil {
-				return fmt.Errorf("failed to write snapshot content: %w", err)
+				return errors.Wrapf(err, "failed to write snapshot content")
 			}
 
 			fmt.Fprintf(cmd.Writer, "✓ Snapshot file created: %s\n", snapshotPath)
@@ -90,6 +91,20 @@ func snapshot(p *project.Project) *cli.Command {
 				} else {
 					fmt.Fprintf(cmd.Writer, "✓ Removed migration file: %s\n", migPath)
 				}
+			}
+
+			if err := dir.Rehash(); err != nil {
+				return errors.Wrap(err, "failed to compute new migration hash")
+			}
+
+			sf, err := os.Create(filepath.Join(migrationsDir, "housekeeper.sum"))
+			if err != nil {
+				return errors.Wrapf(err, "failed to create sum file")
+			}
+			defer func() { _ = sf.Close() }()
+
+			if _, err := dir.SumFile.WriteTo(sf); err != nil {
+				return errors.Wrapf(err, "failed to write sum file")
 			}
 
 			fmt.Fprintf(cmd.Writer, "\nSnapshot created successfully!\n")

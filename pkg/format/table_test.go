@@ -46,7 +46,7 @@ func TestFormatter_Table(t *testing.T) {
 			expected: []string{
 				"CREATE TABLE `test` (",
 				"    `id`   UInt64 DEFAULT 0,",
-				"    `data` Nullable(String) CODEC(ZSTD()),",
+				"    `data` Nullable(String) CODEC(ZSTD),",
 				"    `tags` Array(String)",
 				")",
 				"ENGINE = MergeTree()",

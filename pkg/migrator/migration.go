@@ -14,13 +14,16 @@ package migrator
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"io"
 	"io/fs"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -124,14 +127,39 @@ type (
 // Returns an error if the directory cannot be read or any migration file
 // contains invalid ClickHouse DDL syntax.
 func LoadMigrationDir(dir fs.FS) (*MigrationDir, error) {
-	exts := []string{".sql", ".sum"}
 	mig := &MigrationDir{
 		fs:      dir,
 		SumFile: NewSumFile(),
 	}
+	var loadedSumFile *SumFile
+
+	// Walk directory and load files
+	err := walkMigrationDirectory(dir, mig, &loadedSumFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use loaded sum file if one was found, otherwise generate one
+	if loadedSumFile != nil {
+		mig.SumFile = loadedSumFile
+		return mig, nil
+	}
+
+	// No sum file on disk - generate one from loaded migrations for validation
+	err = generateSumFileForMigrations(mig)
+	if err != nil {
+		return nil, err
+	}
+
+	return mig, nil
+}
+
+// walkMigrationDirectory walks the directory and loads migrations and sum files.
+func walkMigrationDirectory(dir fs.FS, mig *MigrationDir, loadedSumFile **SumFile) error {
+	exts := []string{".sql", ".sum"}
 
 	// NB: WalkDir always walks in lexical order.
-	if err := fs.WalkDir(dir, ".", func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(dir, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -147,52 +175,126 @@ func LoadMigrationDir(dir fs.FS) (*MigrationDir, error) {
 		}
 		defer func() { _ = f.Close() }()
 
-		if ext == ".sql" {
-			// Read content for both migration loading and sum file
-			content, err := io.ReadAll(f)
-			if err != nil {
-				return errors.Wrapf(err, "failed to read migration: %s", path)
-			}
-
-			// Check if this is a snapshot file
-			reader := strings.NewReader(string(content))
-			isSnapshot, err := IsSnapshot(reader)
-			if err != nil {
-				return errors.Wrapf(err, "failed to check if file is snapshot: %s", path)
-			}
-
-			if isSnapshot {
-				// Load as snapshot
-				reader := strings.NewReader(string(content))
-				snapshot, err := LoadSnapshot(reader)
-				if err != nil {
-					return errors.Wrapf(err, "failed to load snapshot: %s", path)
-				}
-				mig.snapshot = snapshot
-			} else {
-				// Load as regular migration - extract filename without extension as version
-				filename := filepath.Base(path)
-				version := filename[:strings.Index(filename, ".")]
-				m, err := LoadMigration(version, strings.NewReader(string(content)))
-				if err != nil {
-					return errors.Wrapf(err, "failed to load migration: %s", path)
-				}
-				mig.Migrations = append(mig.Migrations, m)
-			}
-
-			// Add to sum file
-			err = mig.SumFile.Add(path, strings.NewReader(string(content)))
-			if err != nil {
-				return errors.Wrapf(err, "failed to add migration to sum file: %s", path)
-			}
+		switch filepath.Ext(path) {
+		case ".sql":
+			return loadSQLFile(f, path, mig)
+		case ".sum":
+			return loadSumFileFromPath(f, path, loadedSumFile)
 		}
 
 		return nil
-	}); err != nil {
-		return nil, err
+	})
+}
+
+// loadSQLFile loads a SQL migration file and checks if it's a snapshot.
+func loadSQLFile(f fs.File, path string, mig *MigrationDir) error {
+	// Read content for both migration loading and sum file
+	content, err := io.ReadAll(f)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read migration: %s", path)
 	}
 
-	return mig, nil
+	// Check if this is a snapshot file
+	reader := strings.NewReader(string(content))
+	isSnapshot, err := IsSnapshot(reader)
+	if err != nil {
+		return errors.Wrapf(err, "failed to check if file is snapshot: %s", path)
+	}
+
+	// Extract filename without extension as version
+	filename := filepath.Base(path)
+	version := filename[:strings.Index(filename, ".")]
+
+	// Load as migration (snapshots are also migrations)
+	m, err := LoadMigration(version, strings.NewReader(string(content)))
+	if err != nil {
+		return errors.Wrapf(err, "failed to load migration: %s", path)
+	}
+	mig.Migrations = append(mig.Migrations, m)
+
+	// If this is also a snapshot, load snapshot metadata
+	if isSnapshot {
+		reader := strings.NewReader(string(content))
+		snapshot, err := LoadSnapshot(reader)
+		if err != nil {
+			return errors.Wrapf(err, "failed to load snapshot: %s", path)
+		}
+		mig.snapshot = snapshot
+	}
+
+	return nil
+}
+
+// loadSumFileFromPath loads a sum file from the given path.
+func loadSumFileFromPath(f fs.File, path string, loadedSumFile **SumFile) error {
+	var err error
+	*loadedSumFile, err = LoadSumFile(f)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load sum file: %s", path)
+	}
+	return nil
+}
+
+// generateSumFileForMigrations generates sum file entries for all loaded migrations.
+func generateSumFileForMigrations(mig *MigrationDir) error {
+	for _, migration := range mig.Migrations {
+		filePath := migration.Version + ".sql"
+		file, err := mig.fs.Open(filePath)
+		if err != nil {
+			// Try to find the file in the filesystem (for embedded filesystems)
+			err = findAndAddMigrationFile(mig, migration.Version)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = mig.SumFile.Add(filePath, file)
+			_ = file.Close()
+			if err != nil {
+				return errors.Wrapf(err, "failed to add migration to sum file: %s", filePath)
+			}
+		}
+	}
+	return nil
+}
+
+// findAndAddMigrationFile searches for a migration file by version and adds it to the sum file.
+func findAndAddMigrationFile(mig *MigrationDir, version string) error {
+	found := false
+	err := fs.WalkDir(mig.fs, ".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || filepath.Ext(path) != ".sql" {
+			return nil
+		}
+
+		filename := filepath.Base(path)
+		fileVersion := filename[:strings.Index(filename, ".")]
+		if fileVersion != version {
+			return nil
+		}
+
+		file, err := mig.fs.Open(path)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = file.Close() }()
+
+		err = mig.SumFile.Add(path, file)
+		if err != nil {
+			return err
+		}
+
+		found = true
+		return nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to walk directory for migration: %s", version)
+	}
+	if !found {
+		return errors.Errorf("migration file not found: %s.sql", version)
+	}
+	return nil
 }
 
 // LoadMigration creates a Migration from the provided io.Reader containing ClickHouse DDL statements.
@@ -539,29 +641,37 @@ func (m *MigrationDir) CreateSnapshot(version, description string) (*Snapshot, e
 		return nil, errors.New("no migrations to snapshot")
 	}
 
-	// If there's an existing snapshot, only include migrations after it
-	var migrationsToInclude []*Migration
-	if m.snapshot != nil {
-		// Find migrations not already in the snapshot
-		snapshotVersions := make(map[string]bool)
-		for _, v := range m.snapshot.IncludedMigrations {
-			snapshotVersions[v] = true
-		}
+	// Since there's only ever one snapshot (old migrations are removed after snapshotting),
+	// we simply include all current migrations in the new snapshot
+	// Pre-allocate slices for better performance
+	includedVersions := make([]string, 0, len(m.Migrations))
+	allStatements := make([]*parser.Statement, 0)
 
-		for _, mig := range m.Migrations {
-			if !snapshotVersions[mig.Version] {
-				migrationsToInclude = append(migrationsToInclude, mig)
-			}
-		}
-
-		if len(migrationsToInclude) == 0 {
-			return nil, errors.New("no new migrations to snapshot")
-		}
-	} else {
-		migrationsToInclude = m.Migrations
+	// Include all migrations (snapshots are removed when creating new ones)
+	for _, mig := range m.Migrations {
+		allStatements = append(allStatements, mig.Statements...)
+		includedVersions = append(includedVersions, mig.Version)
 	}
 
-	return GenerateSnapshot(version, description, migrationsToInclude)
+	// Create snapshot with all current migration content
+	hasher := sha256.New()
+	for _, stmt := range allStatements {
+		var buf strings.Builder
+		err := format.Format(&buf, format.Defaults, stmt)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to format statement for hashing")
+		}
+		hasher.Write([]byte(buf.String()))
+	}
+
+	return &Snapshot{
+		Version:            version,
+		Description:        description,
+		CreatedAt:          time.Now().UTC(),
+		IncludedMigrations: includedVersions,
+		CumulativeHash:     base64.StdEncoding.EncodeToString(hasher.Sum(nil)),
+		Statements:         allStatements,
+	}, nil
 }
 
 // GetMigrationsAfterSnapshot returns all migrations that are not included in the snapshot.
@@ -588,10 +698,10 @@ func (m *MigrationDir) GetMigrationsAfterSnapshot() []*Migration {
 		snapshotVersions[v] = true
 	}
 
-	// Filter out migrations that are in the snapshot
+	// Filter out migrations that are in the snapshot, and the snapshot itself
 	var afterSnapshot []*Migration
 	for _, mig := range m.Migrations {
-		if !snapshotVersions[mig.Version] {
+		if !snapshotVersions[mig.Version] && mig.Version != m.snapshot.Version {
 			afterSnapshot = append(afterSnapshot, mig)
 		}
 	}

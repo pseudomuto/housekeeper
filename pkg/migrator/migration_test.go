@@ -189,7 +189,7 @@ func TestLoadMigrationDir(t *testing.T) {
 			files: map[string]string{
 				"20240101120000.sql": "CREATE DATABASE test ENGINE = Atomic;",
 				"20240101120100.sql": "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
-				"migrations.sum":     "h1:totalhash=\n20240101120000.sql h1:hash1=\n20240101120100.sql h1:hash2=",
+				"migrations.sum":     "h1:dGVzdA==\n20240101120000.sql h1:aGFzaDE=\n20240101120100.sql h1:aGFzaDI=",
 			},
 			wantErr:        false,
 			migrationCount: 2,
@@ -790,8 +790,8 @@ func TestMigrationDir_SnapshotIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		// Should have loaded 3 regular migrations and 1 snapshot
-		require.Len(t, migDir.Migrations, 3) // 001, 002, 004
+		// Should have loaded 4 migrations (including snapshot as migration): 001, 002, 003_snapshot, 004
+		require.Len(t, migDir.Migrations, 4) // 001, 002, 003_snapshot, 004
 		require.True(t, migDir.HasSnapshot())
 
 		snapshot := migDir.GetSnapshot()
@@ -852,7 +852,7 @@ func TestMigrationDir_SnapshotIntegration(t *testing.T) {
 		require.Len(t, snapshot.Statements, 3)
 	})
 
-	t.Run("no new migrations to snapshot", func(t *testing.T) {
+	t.Run("create snapshot with existing snapshot", func(t *testing.T) {
 		files := map[string]string{
 			"001_init.sql":     "CREATE DATABASE test ENGINE = Atomic;",
 			"002_users.sql":    "CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
@@ -867,13 +867,17 @@ func TestMigrationDir_SnapshotIntegration(t *testing.T) {
 		migDir, err := migrator.LoadMigrationDir(fsys)
 		require.NoError(t, err)
 
-		// Try to create snapshot - should fail because all migrations are already included
-		_, err = migDir.CreateSnapshot(
+		// Create new snapshot - should include all current migrations
+		snapshot, err := migDir.CreateSnapshot(
 			"20240810120100_snapshot",
 			"Another snapshot",
 		)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "no new migrations to snapshot")
+		require.NoError(t, err)
+		require.NotNil(t, snapshot)
+		require.Equal(t, "20240810120100_snapshot", snapshot.Version)
+		require.Equal(t, "Another snapshot", snapshot.Description)
+		// Should include all 3 migrations: 001_init, 002_users, 003_snapshot
+		require.Equal(t, []string{"001_init", "002_users", "003_snapshot"}, snapshot.IncludedMigrations)
 	})
 
 	t.Run("directory without migrations", func(t *testing.T) {
