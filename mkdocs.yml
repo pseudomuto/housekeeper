@@ -1,0 +1,81 @@
+site_name: Housekeeper Documentation
+site_description: Modern ClickHouse schema management and migration tool
+site_author: Housekeeper Team
+site_url: https://pseudomuto.github.io/housekeeper/
+
+repo_name: pseudomuto/housekeeper
+repo_url: https://github.com/pseudomuto/housekeeper
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Project Setup: getting-started/project-setup.md
+  - User Guide:
+    - Schema Management: user-guide/schema-management.md
+    - Writing Schemas: user-guide/writing-schemas.md
+    - Migration Process: user-guide/migration-process.md
+    - Configuration: user-guide/configuration.md
+  - How It Works:
+    - Overview: how-it-works/overview.md
+    - Parser Architecture: how-it-works/parser.md
+    - Migration Generation: how-it-works/migration-generation.md
+    - Docker Integration: how-it-works/docker.md
+  - Advanced Topics:
+    - Cluster Management: advanced/cluster-management.md
+    - Best Practices: advanced/best-practices.md
+    - Troubleshooting: advanced/troubleshooting.md
+  - Examples:
+    - Basic Schema: examples/basic-schema.md
+    - E-commerce Demo: examples/ecommerce-demo.md
+    - Complex Migrations: examples/complex-migrations.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+extra_css:
+  - css/custom.css
+
+plugins:
+  - search

@@ -1,0 +1,52 @@
+/* Custom CSS for Housekeeper documentation */
+.highlight pre {
+    background-color: #f8f8f8;
+    border: 1px solid #e1e1e8;
+    border-radius: 4px;
+    padding: 1em;
+}
+
+.admonition {
+    margin: 1em 0;
+    padding: 0;
+    border-left: 4px solid #ccc;
+    border-radius: 4px;
+}
+
+.admonition.tip {
+    border-left-color: #00c851;
+}
+
+.admonition.warning {
+    border-left-color: #ff8800;
+}
+
+.admonition.danger {
+    border-left-color: #ff4444;
+}
+
+.admonition > .admonition-title {
+    font-weight: bold;
+    margin: 0;
+    padding: 8px 16px;
+    background-color: rgba(68, 138, 255, 0.1);
+}
+
+.admonition > .admonition-title:before {
+    content: '💡 ';
+}
+
+.admonition.warning > .admonition-title:before {
+    content: '⚠️ ';
+}
+
+.admonition.danger > .admonition-title:before {
+    content: '🚨 ';
+}
+
+code {
+    background-color: #f5f5f5;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}

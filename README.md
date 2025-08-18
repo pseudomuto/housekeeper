@@ -1310,6 +1310,35 @@ Built with modern Go practices:
 - **Error Handling**: Structured error handling with context
 - **Performance**: Stateless parser optimized for speed and memory usage
 
+## Documentation
+
+Comprehensive documentation is available at **[https://pseudomuto.github.io/housekeeper/](https://pseudomuto.github.io/housekeeper/)**
+
+### Local Development
+
+To work with the documentation locally:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Serve documentation with live reload
+mkdocs serve
+
+# Build static documentation
+mkdocs build
+```
+
+The documentation is automatically deployed to GitHub Pages when changes are merged to the main branch.
+
+### Documentation Structure
+
+- **Getting Started** - Installation, quick start, and project setup
+- **User Guide** - Schema management, migration process, and configuration
+- **How It Works** - Architecture deep-dives and technical details
+- **Advanced Topics** - Best practices, cluster management, and troubleshooting
+- **Examples** - Real-world usage patterns and complete examples
+
 ## Contributing
 
 We welcome contributions! Please see [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines on how to contribute to this project.
