@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/pkg/errors"
@@ -16,7 +17,7 @@ import (
 
 // runContainer starts a ClickHouse container with the given options, loads and executes
 // existing migrations, and returns the container and client for further use.
-func runContainer(ctx context.Context, opts docker.DockerOptions, cfg *config.Config, dockerClient docker.DockerClient) (*docker.ClickHouseContainer, *clickhouse.Client, error) {
+func runContainer(ctx context.Context, w io.Writer, opts docker.DockerOptions, cfg *config.Config, dockerClient docker.DockerClient) (*docker.ClickHouseContainer, *clickhouse.Client, error) {
 	// 1. Load and validate migrations before creating container
 	migrationDir, err := migrator.LoadMigrationDir(os.DirFS(cfg.Dir))
 	if err != nil { // nolint: nestif
@@ -70,11 +71,11 @@ func runContainer(ctx context.Context, opts docker.DockerOptions, cfg *config.Co
 
 	// 4. Apply existing migrations
 	if len(migrationDir.Migrations) > 0 {
-		fmt.Printf("Applying %d migrations...\n", len(migrationDir.Migrations))
+		fmt.Fprintf(w, "Applying %d migrations...\n", len(migrationDir.Migrations))
 		fmtr := format.New(format.Defaults)
 
 		for _, migration := range migrationDir.Migrations {
-			fmt.Printf("Applying migration %s...\n", migration.Version)
+			fmt.Fprintf(w, "Applying migration %s...\n", migration.Version)
 			for _, stmt := range migration.Statements {
 				// Format and execute the statement
 				buf := new(bytes.Buffer)
@@ -91,9 +92,9 @@ func runContainer(ctx context.Context, opts docker.DockerOptions, cfg *config.Co
 				}
 			}
 		}
-		fmt.Println("All migrations applied successfully")
+		fmt.Fprintln(w, "All migrations applied successfully")
 	} else {
-		fmt.Println("No migrations found to apply")
+		fmt.Fprintln(w, "No migrations found to apply")
 	}
 
 	return container, client, nil

@@ -31,14 +31,14 @@ tasks:
     cmd: "{{.BIN_DIR}}/golangci-lint run --fix"
 
   test:
-    desc: Run the test suite
-    silent: true
-    cmd: go test ./... -cover
-
-  test:short:
-    desc: Run the test suite (only fast tests)
+    desc: Run the test suite (unit tests only)
     silent: true
     cmd: go test ./... -cover -short
+
+  test:all:
+    desc: Run the test suite (all tests)
+    silent: true
+    cmd: go test ./... -cover
 
   build:
     desc: Build a local snapshot with goreleaser (including container images)

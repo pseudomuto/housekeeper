@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -26,7 +27,7 @@ func diff(cfg *config.Config, client docker.DockerClient) *cli.Command {
 		Before: requireConfig(cfg),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			// 1. Start container, run migrations, get client
-			container, client, err := runContainer(ctx, docker.DockerOptions{
+			container, client, err := runContainer(ctx, cmd.Writer, docker.DockerOptions{
 				Version:   cfg.ClickHouse.Version,
 				ConfigDir: cfg.ClickHouse.ConfigDir,
 				Name:      "housekeeper-diff",
@@ -37,19 +38,19 @@ func diff(cfg *config.Config, client docker.DockerClient) *cli.Command {
 			defer func() {
 				_ = client.Close()
 				if stopErr := container.Stop(ctx); stopErr != nil {
-					fmt.Printf("Warning: failed to stop container: %v\n", stopErr)
+					fmt.Fprintf(cmd.ErrWriter, "Warning: failed to stop container: %v\n", stopErr)
 				}
 			}()
 
 			// 2. Load project schema and generate diff
-			return generateDiff(ctx, client, cfg)
+			return generateDiff(ctx, cmd.Writer, client, cfg)
 		},
 	}
 }
 
 // generateDiff compares the current database schema with the target schema
 // and generates a migration file if differences are found.
-func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Config) error {
+func generateDiff(ctx context.Context, w io.Writer, client *clickhouse.Client, cfg *config.Config) error {
 	// NB: Migrations have already been applied by runContainer
 	// Get current and target schemas
 	currentSchema, err := client.GetSchema(ctx)
@@ -71,7 +72,7 @@ func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Co
 	_, err = schemapkg.GenerateDiff(currentSchema, targetSchema)
 	if err != nil {
 		if errors.Is(err, schemapkg.ErrNoDiff) {
-			fmt.Println("No differences found between current and target schemas")
+			fmt.Fprintln(w, "No differences found between current and target schemas")
 			return nil // No changes needed
 		}
 		return errors.Wrap(err, "failed to generate schema diff")
@@ -105,7 +106,7 @@ func generateDiff(ctx context.Context, client *clickhouse.Client, cfg *config.Co
 		return errors.Wrap(err, "failed to write sum file")
 	}
 
-	fmt.Printf("Generated migration: %s\n", filename)
-	fmt.Printf("Updated sum file: housekeeper.sum\n")
+	fmt.Fprintf(w, "Generated migration: %s\n", filename)
+	fmt.Fprintf(w, "Updated sum file: housekeeper.sum\n")
 	return nil
 }

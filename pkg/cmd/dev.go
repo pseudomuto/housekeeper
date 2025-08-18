@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,13 +46,13 @@ func devUp(cfg *config.Config, client docker.DockerClient) *cli.Command {
 
 			// Check if container is already running
 			if isDevContainerRunning(ctx, client) {
-				fmt.Println("ClickHouse development server is already running")
-				fmt.Println("Use 'housekeeper dev down' to stop it first")
+				fmt.Fprintln(cmd.Writer, "ClickHouse development server is already running")
+				fmt.Fprintln(cmd.Writer, "Use 'housekeeper dev down' to stop it first")
 				return nil
 			}
 
 			// Start container, run migrations, get client
-			container, client, err := runContainer(ctx, docker.DockerOptions{
+			container, client, err := runContainer(ctx, cmd.Writer, docker.DockerOptions{
 				Version:   config.version,
 				ConfigDir: config.configDir,
 				Name:      devContainerName,
@@ -69,7 +70,7 @@ func devUp(cfg *config.Config, client docker.DockerClient) *cli.Command {
 			}
 
 			// Print connection details and exit
-			printConnectionDetails(ctx, container, dsn)
+			printConnectionDetails(ctx, cmd.Writer, container, dsn)
 
 			return nil
 		},
@@ -83,16 +84,16 @@ func devDown(dockerClient docker.DockerClient) *cli.Command {
 		Usage: "Stop and remove ClickHouse development server",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if !isDevContainerRunning(ctx, dockerClient) {
-				fmt.Println("No ClickHouse development server is currently running")
+				fmt.Fprintln(cmd.Writer, "No ClickHouse development server is currently running")
 				return nil
 			}
 
 			// Stop the actual Docker container using docker commands
 			if err := stopHousekeeperDevContainer(ctx, dockerClient); err != nil {
-				fmt.Printf("Warning: failed to stop container: %v\n", err)
-				fmt.Println("You may need to manually stop the container with: docker stop $(docker ps -q --filter label=housekeeper.dev=true)")
+				fmt.Fprintf(cmd.ErrWriter, "Warning: failed to stop container: %v\n", err)
+				fmt.Fprintln(cmd.ErrWriter, "You may need to manually stop the container with: docker stop $(docker ps -q --filter label=housekeeper.dev=true)")
 			} else {
-				fmt.Println("ClickHouse development server stopped")
+				fmt.Fprintln(cmd.Writer, "ClickHouse development server stopped")
 			}
 
 			return nil
@@ -123,21 +124,21 @@ func loadDevConfigFromConfig(cfg *config.Config) *devConfig {
 
 // printConnectionDetails displays formatted connection information for the
 // development ClickHouse server.
-func printConnectionDetails(ctx context.Context, container *docker.ClickHouseContainer, dsn string) {
+func printConnectionDetails(ctx context.Context, w io.Writer, container *docker.ClickHouseContainer, dsn string) {
 	httpDSN, err := container.GetHTTPDSN(ctx)
 	if err != nil {
-		fmt.Printf("Warning: could not get HTTP DSN: %v\n", err)
+		fmt.Fprintf(w, "Warning: could not get HTTP DSN: %v\n", err)
 		httpDSN = "unavailable"
 	}
 
-	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("ClickHouse Development Server Started")
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("Native DSN:  %s\n", dsn)
-	fmt.Printf("HTTP DSN:    %s\n", httpDSN)
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Println("\nUse 'housekeeper dev down' to stop the server")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(w, "\n"+strings.Repeat("=", 60))
+	fmt.Fprintln(w, "ClickHouse Development Server Started")
+	fmt.Fprintln(w, strings.Repeat("=", 60))
+	fmt.Fprintf(w, "Native DSN:  %s\n", dsn)
+	fmt.Fprintf(w, "HTTP DSN:    %s\n", httpDSN)
+	fmt.Fprintln(w, strings.Repeat("=", 60))
+	fmt.Fprintln(w, "\nUse 'housekeeper dev down' to stop the server")
+	fmt.Fprintln(w, strings.Repeat("=", 60))
 }
 
 // isDevContainerRunning checks if a housekeeper-dev container is currently running.
