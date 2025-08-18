@@ -56,21 +56,6 @@ clickhouse:
 # Schema Configuration  
 entrypoint: db/main.sql       # Main schema file with import directives
 dir: db/migrations            # Directory for generated migration files
-
-# Connection Settings (optional - can be overridden by CLI)
-connection:
-  host: localhost
-  port: 9000
-  database: default
-  username: default
-  password: ""
-  cluster: my_cluster         # For cluster-aware operations
-
-# Migration Settings
-migration:
-  auto_approve: false         # Require manual approval for migrations
-  backup_before: true         # Create backups before applying migrations
-  timeout: 300s               # Timeout for migration operations
 ```
 
 ## Schema Import System
@@ -247,35 +232,22 @@ For different environments, create separate configuration files:
 ```yaml
 clickhouse:
   version: "25.7"
+  config_dir: "db/config.d"
   cluster: "dev_cluster"
 
-connection:
-  host: localhost
-  port: 9000
-  database: default
-
-migration:
-  auto_approve: true  # Auto-approve in development
-  backup_before: false
+entrypoint: db/main.sql
+dir: db/migrations
 ```
 
 ### `environments/production.yaml`
 ```yaml
 clickhouse:
   version: "25.7"
+  config_dir: "db/config.d"
   cluster: "production_cluster"
 
-connection:
-  host: clickhouse-prod.example.com
-  port: 9440
-  database: default
-  username: migration_user
-  password: "${CH_MIGRATION_PASSWORD}"  # From environment variable
-
-migration:
-  auto_approve: false  # Require manual approval
-  backup_before: true
-  timeout: 600s
+entrypoint: db/main.sql
+dir: db/migrations
 ```
 
 Use environment-specific configs:

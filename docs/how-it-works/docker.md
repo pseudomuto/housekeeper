@@ -642,8 +642,8 @@ jobs:
         # Wait for ready
         sleep 10
         
-        # Apply migrations
-        housekeeper migrate --url localhost:9000 --timeout 300s
+        # Start development server (applies migrations automatically)
+        housekeeper dev up
         
         # Verify schema
         housekeeper schema dump --url localhost:9000 > applied_schema.sql
@@ -692,7 +692,7 @@ services:
         condition: service_healthy
     command: |
       bash -c "
-        housekeeper migrate --url clickhouse:9000 &&
+        housekeeper dev up &&
         housekeeper schema dump --url clickhouse:9000 > /tmp/applied.sql &&
         housekeeper schema compile > /tmp/expected.sql &&
         diff -w /tmp/applied.sql /tmp/expected.sql

@@ -6,6 +6,9 @@
 
 A ClickHouse schema management tool heavily inspired by [Atlas](https://atlasgo.io/), built specifically to address the gaps in ClickHouse support that Atlas couldn't fill.
 
+> **NOTE**: This is very much still a WIP and heavily focused on my own needs. I intend to continue development as
+available. And of course, PRs are welcome and encouraged.
+
 ## Why This Exists
 
 While Atlas is an excellent database schema management tool, its ClickHouse support falls short of what's needed for production ClickHouse deployments. Critical ClickHouse features like `ON CLUSTER` operations, `PARTITION BY` clauses, materialized view management, and dictionary operations either weren't supported or had significant limitations.
@@ -47,16 +50,19 @@ housekeeper diff
 ## Installation
 
 ### Go Install
+
 ```bash
 go install github.com/pseudomuto/housekeeper@latest
 ```
 
 ### Docker
+
 ```bash
 docker pull ghcr.io/pseudomuto/housekeeper:latest
 ```
 
 ### Binary Releases
+
 Download pre-built binaries from the [releases page](https://github.com/pseudomuto/housekeeper/releases).
 
 ## Contributing
@@ -66,3 +72,4 @@ Contributions are welcome! Please see our [contributing guidelines](.github/CONT
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+

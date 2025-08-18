@@ -41,6 +41,7 @@ TTL timestamp + INTERVAL 365 DAY;                  -- Data lifecycle
 ClickHouse offers specialized data types for better performance and storage efficiency:
 
 #### Optimized String Types
+
 ```sql
 -- Use LowCardinality for repeated string values
 status LowCardinality(String),              -- 'active', 'inactive', 'pending'
@@ -53,6 +54,7 @@ currency_code FixedString(3),               -- 'USD', 'EUR', 'GBP'
 ```
 
 #### Numeric Type Optimization
+
 ```sql
 -- Choose smallest sufficient numeric types
 user_id UInt64,                            -- Large range needed
@@ -62,6 +64,7 @@ percentage Float32,                        -- Scientific calculations
 ```
 
 #### Modern Date/Time Types
+
 ```sql
 -- Use appropriate temporal precision
 created_at DateTime,                       -- Second precision
@@ -74,6 +77,7 @@ birth_date Date,                          -- Day precision only
 Design partitions to optimize query performance and data management:
 
 #### Time-Based Partitioning
+
 ```sql
 -- Monthly partitioning for time-series data
 CREATE TABLE analytics.events (
@@ -92,6 +96,7 @@ PARTITION BY toYear(timestamp)            -- One partition per year
 ```
 
 #### Multi-Dimensional Partitioning
+
 ```sql
 -- Partition by time and category
 CREATE TABLE analytics.events (
@@ -109,6 +114,7 @@ ORDER BY (timestamp, user_id);
 Choose ordering keys based on your query patterns:
 
 #### Primary Query Patterns
+
 ```sql
 -- For time-series queries by user
 ORDER BY (user_id, timestamp)
@@ -121,6 +127,7 @@ ORDER BY (user_id, timestamp, event_type)
 ```
 
 #### Compound Ordering
+
 ```sql
 -- Multi-level ordering for different query types
 CREATE TABLE analytics.user_events (
@@ -139,6 +146,7 @@ PRIMARY KEY (user_id, timestamp);            -- Explicit primary key for perform
 ### Database Organization
 
 #### By Domain/Function
+
 ```sql
 -- Separate databases by business domain
 CREATE DATABASE user_data ENGINE = Atomic COMMENT 'User profiles and authentication';
@@ -148,6 +156,7 @@ CREATE DATABASE financial ENGINE = Atomic COMMENT 'Orders, payments, and billing
 ```
 
 #### By Environment
+
 ```sql
 -- Environment-specific databases
 CREATE DATABASE prod_analytics ENGINE = Atomic;
@@ -158,6 +167,7 @@ CREATE DATABASE dev_analytics ENGINE = Atomic;
 ### Table Organization
 
 #### Core Tables
+
 ```sql
 -- User management
 CREATE TABLE user_data.users (
@@ -177,6 +187,7 @@ CREATE TABLE analytics.events (
 ```
 
 #### Aggregation Tables
+
 ```sql
 -- Pre-aggregated data for performance
 CREATE TABLE analytics.daily_user_stats (
@@ -190,6 +201,7 @@ ORDER BY (date, user_id);
 ```
 
 #### Lookup Tables
+
 ```sql
 -- Reference data
 CREATE TABLE reference.countries (
@@ -530,3 +542,4 @@ CREATE TABLE analytics.events (
 - **[Configuration](configuration.md)** - Configure Housekeeper for your environment
 - **[Best Practices](../advanced/best-practices.md)** - Advanced schema design patterns
 - **[Examples](../examples/ecommerce-demo.md)** - See complete schema examples
+

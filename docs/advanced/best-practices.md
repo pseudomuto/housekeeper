@@ -9,23 +9,33 @@ Production-proven guidelines for using Housekeeper effectively in real-world Cli
 #### Use Modular Organization
 ```
 db/
-├── main.sql                    # Orchestration file
+├── main.sql                    # Main orchestration file
 ├── schemas/
-│   ├── core/                   # Essential business objects
-│   │   ├── databases.sql
-│   │   ├── users.sql
-│   │   └── events.sql
-│   ├── analytics/              # Analytical objects
-│   │   ├── aggregations.sql
-│   │   ├── reports.sql
-│   │   └── materialized_views.sql
-│   ├── reference/              # Lookup data
-│   │   ├── countries.sql
-│   │   ├── categories.sql
-│   │   └── segments.sql
-│   └── experimental/           # New features
-│       ├── ml_features.sql
-│       └── test_tables.sql
+│   ├── analytics/              # Analytics database
+│   │   ├── schema.sql          # Creates database and imports subdirectories
+│   │   ├── tables/
+│   │   │   ├── events.sql
+│   │   │   ├── users.sql
+│   │   │   └── sessions.sql
+│   │   ├── views/
+│   │   │   ├── daily_summary.sql
+│   │   │   └── user_reports.sql
+│   │   └── dictionaries/
+│   │       └── segments_dict.sql
+│   ├── reporting/              # Reporting database
+│   │   ├── schema.sql          # Creates database and imports subdirectories
+│   │   ├── tables/
+│   │   │   ├── dashboards.sql
+│   │   │   └── metrics.sql
+│   │   └── views/
+│   │       └── executive_summary.sql
+│   └── reference/              # Reference data database
+│       ├── schema.sql          # Creates database and imports subdirectories
+│       ├── tables/
+│       │   ├── countries.sql
+│       │   └── categories.sql
+│       └── dictionaries/
+│           └── countries_dict.sql
 └── migrations/                 # Generated migrations
     ├── 20240101120000.sql
     └── housekeeper.sum
@@ -33,21 +43,50 @@ db/
 
 #### Import Order Matters
 ```sql
--- db/main.sql - Order by dependencies
--- 1. Databases first
--- housekeeper:import schemas/core/databases.sql
+-- db/main.sql - Order by database dependencies
+-- 1. Reference data first (no dependencies)
+-- housekeeper:import schemas/reference/schema.sql
 
--- 2. Core tables (no dependencies)
--- housekeeper:import schemas/core/users.sql
--- housekeeper:import schemas/core/events.sql
+-- 2. Core analytics database
+-- housekeeper:import schemas/analytics/schema.sql
 
--- 3. Reference data and dictionaries
--- housekeeper:import schemas/reference/countries.sql
--- housekeeper:import schemas/reference/categories.sql
+-- 3. Reporting database (depends on analytics)
+-- housekeeper:import schemas/reporting/schema.sql
+```
 
--- 4. Dependent objects (views, materialized views)
--- housekeeper:import schemas/analytics/aggregations.sql
--- housekeeper:import schemas/analytics/materialized_views.sql
+#### Database Schema Files
+Each database's `schema.sql` creates the database and imports its objects:
+
+```sql
+-- schemas/analytics/schema.sql
+-- Create the analytics database
+CREATE DATABASE analytics ENGINE = Atomic COMMENT 'Analytics database';
+
+-- Import tables first (no dependencies within database)
+-- housekeeper:import tables/users.sql
+-- housekeeper:import tables/events.sql
+-- housekeeper:import tables/sessions.sql
+
+-- Import dictionaries (may depend on tables)
+-- housekeeper:import dictionaries/segments_dict.sql
+
+-- Import views last (depend on tables and dictionaries)
+-- housekeeper:import views/daily_summary.sql
+-- housekeeper:import views/user_reports.sql
+```
+
+#### Reference Database Example
+```sql
+-- schemas/reference/schema.sql
+-- Create the reference database
+CREATE DATABASE reference ENGINE = Atomic COMMENT 'Reference data';
+
+-- Import tables
+-- housekeeper:import tables/countries.sql
+-- housekeeper:import tables/categories.sql
+
+-- Import dictionaries
+-- housekeeper:import dictionaries/countries_dict.sql
 ```
 
 ### Environment Management
@@ -57,19 +96,11 @@ db/
 # environments/production.yaml
 clickhouse:
   version: "25.7"                    # Pin specific version
+  config_dir: "db/config.d"
   cluster: "production_cluster"
 
-connection:
-  host: clickhouse-prod.example.com
-  port: 9440
-  secure: true                       # Always use TLS in production
-  username: migration_user
-  password: "${CH_PROD_PASSWORD}"    # Environment variable
-
-migration:
-  auto_approve: false                # Never auto-approve in production
-  backup_before: true                # Always backup production
-  timeout: 1800s                     # Longer timeout for large migrations
+entrypoint: db/main.sql
+dir: db/migrations
 ```
 
 #### CI/CD Integration
@@ -263,7 +294,7 @@ CREATE TABLE optimized_table (
 #### Development Process
 ```bash
 # 1. Make schema changes
-vim db/schemas/analytics/events.sql
+vim db/schemas/analytics/tables/events.sql
 
 # 2. Validate syntax
 housekeeper schema compile
@@ -306,17 +337,17 @@ set -e
 
 echo "Running pre-migration checks..."
 
-# 1. Validate configuration
-housekeeper config validate --config production.yaml
+# 1. Validate schema syntax
+housekeeper schema compile -d production
 
 # 2. Test database connection
-housekeeper schema dump --config production.yaml --limit 1
+housekeeper schema dump --url localhost:9000
 
-# 3. Validate migration syntax
-housekeeper diff --config production.yaml --dry-run
+# 3. Check migration file integrity
+housekeeper rehash -d production
 
-# 4. Check migration file integrity
-housekeeper status --config production.yaml
+# 4. Generate diff to preview changes
+housekeeper diff -d production
 
 # 5. Verify backup is recent
 if [ ! -f "backup_$(date +%Y%m%d).sql" ]; then

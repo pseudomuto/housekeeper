@@ -366,8 +366,8 @@ housekeeper schema dump --url localhost:9000
 # Check ClickHouse logs
 docker logs clickhouse-container
 
-# Verify migration syntax
-housekeeper migrate --dry-run --file migration.sql
+# Check development server status
+housekeeper dev up --help
 ```
 
 #### Forbidden Operation Errors
@@ -385,14 +385,14 @@ housekeeper migrate --dry-run --file migration.sql
 # Regenerate sum file
 housekeeper rehash
 
-# Compare with expected schema
-housekeeper diff --target db/main.sql --current-from-db
+# Compare current database with expected schema
+housekeeper diff
 ```
 
 #### Failed Migration
 ```bash
-# Check what was applied
-housekeeper status --url localhost:9000
+# Check what was applied using schema dump
+housekeeper schema dump --url localhost:9000
 
 # Manual rollback if needed
 # Apply reverse operations manually

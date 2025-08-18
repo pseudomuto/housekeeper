@@ -25,7 +25,7 @@ housekeeper/
 
 ## Code Style
 
-Follow the conventions in [CLAUDE.md](CLAUDE.md):
+Follow the project conventions:
 
 - Use `goimports` for formatting
 - Order code elements: package, imports, const, var, type, functions

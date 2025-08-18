@@ -34,17 +34,6 @@ clickhouse:
 
 entrypoint: db/main.sql
 dir: db/migrations
-
-connection:
-  host: localhost
-  port: 9000
-  database: default
-  cluster: basic_cluster
-
-migration:
-  auto_approve: false
-  backup_before: true
-  timeout: 300s
 ```
 
 ## Schema Definition
@@ -342,9 +331,10 @@ Copy the schema definition to `db/main.sql`.
 housekeeper diff
 ```
 
-### 4. Apply Migration
+### 4. Start Development Server
 ```bash
-housekeeper migrate --url localhost:9000
+# Start local ClickHouse development server with migrations applied
+housekeeper dev up
 ```
 
 ### 5. Evolve Schema

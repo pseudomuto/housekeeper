@@ -55,20 +55,11 @@ The configuration is intentionally simple - Housekeeper follows convention over 
 # development.yaml
 clickhouse:
   version: "25.7"
+  config_dir: "db/config.d"
   cluster: "dev_cluster"
 
-connection:
-  host: localhost
-  port: 9000
-  database: dev_db
-
-migration:
-  auto_approve: true                 # Auto-approve in development
-  backup_before: false               # Skip backups in development
-  dry_run_first: false               # Skip dry runs for speed
-
-logging:
-  level: debug                       # Verbose logging in development
+entrypoint: db/main.sql
+dir: db/migrations
 ```
 
 ### Staging Configuration
@@ -77,56 +68,24 @@ logging:
 # staging.yaml
 clickhouse:
   version: "25.7"
+  config_dir: "db/config.d"
   cluster: "staging_cluster"
 
-connection:
-  host: clickhouse-staging.internal
-  port: 9440
-  database: staging_db
-  secure: true                       # Use TLS in staging
-  username: staging_user
-  password: "${CH_STAGING_PASSWORD}" # Environment variable
-
-migration:
-  auto_approve: false                # Manual approval in staging
-  backup_before: true                # Always backup staging
-  timeout: 600s                      # Longer timeout for staging
-
-logging:
-  level: info
-  output: /var/log/housekeeper.log   # Log to file
+entrypoint: db/main.sql
+dir: db/migrations
 ```
 
 ### Production Configuration
 
 ```yaml
-# production.yaml
+# production.yaml  
 clickhouse:
   version: "25.7"                    # Pin specific version
+  config_dir: "db/config.d"
   cluster: "production_cluster"
 
-connection:
-  host: clickhouse-prod.example.com
-  port: 9440
-  database: production_db
-  secure: true                       # Always use TLS in production
-  username: migration_user
-  password: "${CH_PRODUCTION_PASSWORD}"
-  
-  # Production connection settings
-  max_open_conns: 5                  # Limit connections in production
-  conn_max_lifetime: 600s            # Shorter lifetime in production
-
-migration:
-  auto_approve: false                # Never auto-approve in production
-  backup_before: true                # Always backup production
-  timeout: 1800s                     # Longer timeout for large migrations
-  verify_checksums: true             # Always verify in production
-
-logging:
-  level: warn                        # Minimal logging in production
-  format: json                       # Structured logging
-  output: /var/log/housekeeper/app.log
+entrypoint: db/main.sql
+dir: db/migrations
 ```
 
 ## Environment Variables
@@ -151,18 +110,7 @@ export CH_SKIP_VERIFY=false
 
 ### Configuration in YAML
 
-Reference environment variables in your configuration:
-
-```yaml
-connection:
-  host: "${CH_HOST:-localhost}"                    # Default to localhost
-  port: "${CH_PORT:-9000}"                         # Default to 9000
-  database: "${CH_DATABASE:-default}"              # Default to default
-  username: "${CH_USERNAME:-default}"              # Default to default
-  password: "${CH_PASSWORD}"                       # Required from environment
-  cluster: "${CH_CLUSTER}"                         # Optional cluster
-  secure: "${CH_SECURE:-false}"                    # Default to false
-```
+Environment variables are used by the CLI tools for connection parameters, but are not part of the YAML configuration file. Connection details are provided via command-line flags or environment variables when running commands.
 
 ### Environment-Specific Variables
 
@@ -196,19 +144,11 @@ housekeeper diff \
   --username admin \
   --cluster production
 
-# Override migration settings
-housekeeper migrate \
-  --timeout 600s \
-  --auto-approve \
-  --no-backup
+# Start development server with specific project directory
+housekeeper dev up -d production
 
-# Override configuration file
-housekeeper diff --config production.yaml
-
-# Override schema files
-housekeeper diff \
-  --entrypoint schemas/production.sql \
-  --dir migrations/production
+# Use specific project directory (which contains housekeeper.yaml)
+housekeeper diff -d production
 ```
 
 ## ClickHouse Configuration
@@ -307,17 +247,14 @@ Configure users and permissions:
 Validate your configuration:
 
 ```bash
-# Validate configuration file syntax
-housekeeper config validate
+# Validate schema syntax
+housekeeper schema compile
 
-# Test database connection
-housekeeper config test-connection
+# Test database connection by dumping schema
+housekeeper schema dump --url localhost:9000
 
-# Show effective configuration (with environment variables resolved)
-housekeeper config show
-
-# Validate specific configuration file
-housekeeper config validate --config production.yaml
+# Show available commands and options
+housekeeper --help
 ```
 
 ## Configuration Best Practices
