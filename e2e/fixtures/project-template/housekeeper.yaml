@@ -1,0 +1,8 @@
+# Housekeeper E2E Test Configuration
+entrypoint: db/main.sql
+dir: db/migrations
+
+clickhouse:
+  version: "25.7"
+  config_dir: "db/config.d"
+  cluster: ""
