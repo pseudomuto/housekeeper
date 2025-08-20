@@ -10,7 +10,7 @@ housekeeper/
 │   └── housekeeper/     # CLI application
 ├── pkg/
 │   ├── clickhouse/      # ClickHouse client
-│   ├── schemadiff/     # Migration generation
+│   ├── schema/         # Migration generation
 │   └── parser/          # DDL parser
 ├── examples/            # Example schema files
 └── docs/               # Documentation
@@ -99,9 +99,9 @@ go test -v -run TestParserWithTestdata/your_test.sql -update
 
 3. Verify the generated YAML matches expectations
 
-## SchemaDiff Development
+## Schema Development
 
-The schemadiff package generates database migrations by comparing schemas.
+The schema package generates database migrations by comparing schemas.
 
 ### Adding New Migration Features
 
@@ -113,11 +113,11 @@ The schemadiff package generates database migrations by comparing schemas.
 ### Testing Migrations
 
 ```bash
-# Run all schemadiff tests
-go test -v ./pkg/schemadiff
+# Run all schema tests
+go test -v ./pkg/schema
 
 # Update test expectations
-go test -v -run TestMigrationGeneration -update-migration
+go test -v -run TestDiffGeneration
 ```
 
 ## Testing Guidelines
