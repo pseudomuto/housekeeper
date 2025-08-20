@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -878,7 +877,7 @@ func TestRevisionSet_IsPartiallyApplied(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			revisionSet := migrator.NewRevisionSet(tt.revisions)
 			result := revisionSet.IsPartiallyApplied(tt.migration)
-			assert.Equal(t, tt.expectedResult, result)
+			require.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
@@ -930,21 +929,21 @@ func TestRevisionSet_GetPartiallyApplied(t *testing.T) {
 		partiallyApplied := revisionSet.GetPartiallyApplied(migrationDir)
 
 		require.Len(t, partiallyApplied, 2)
-		assert.Equal(t, "002_partial", partiallyApplied[0].Version)
-		assert.Equal(t, "004_partial2", partiallyApplied[1].Version)
+		require.Equal(t, "002_partial", partiallyApplied[0].Version)
+		require.Equal(t, "004_partial2", partiallyApplied[1].Version)
 	})
 
 	t.Run("handles nil migration dir", func(t *testing.T) {
 		revisionSet := migrator.NewRevisionSet([]*migrator.Revision{})
 		result := revisionSet.GetPartiallyApplied(nil)
-		assert.Empty(t, result)
+		require.Empty(t, result)
 	})
 
 	t.Run("handles empty migration dir", func(t *testing.T) {
 		revisionSet := migrator.NewRevisionSet([]*migrator.Revision{})
 		migrationDir := &migrator.MigrationDir{Migrations: []*migrator.Migration{}}
 		result := revisionSet.GetPartiallyApplied(migrationDir)
-		assert.Empty(t, result)
+		require.Empty(t, result)
 	})
 }
 

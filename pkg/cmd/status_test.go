@@ -10,7 +10,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/cmd/testutil"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/format"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -140,7 +139,7 @@ CREATE TABLE status_test.analytics (
 		var count uint64
 		require.True(t, rows.Next())
 		require.NoError(t, rows.Scan(&count))
-		assert.Positive(t, count, "Should have recorded revisions")
+		require.Positive(t, count, "Should have recorded revisions")
 	})
 
 	t.Run("status with verbose flag", func(t *testing.T) {
@@ -162,7 +161,7 @@ CREATE TABLE status_test.analytics (
 
 		// Execute command with invalid DSN
 		err := testutil.RunCommand(t, command, []string{"--url", "invalid:9999"})
-		assert.Error(t, err, "Should fail with invalid connection")
+		require.Error(t, err, "Should fail with invalid connection")
 	})
 }
 
@@ -175,10 +174,10 @@ func TestStatusCommand_CommandStructure(t *testing.T) {
 		Config: cfg,
 	})
 
-	assert.Equal(t, "status", command.Name)
-	assert.Equal(t, "Show migration status", command.Usage)
-	assert.NotEmpty(t, command.Description)
-	assert.NotNil(t, command.Action)
+	require.Equal(t, "status", command.Name)
+	require.Equal(t, "Show migration status", command.Usage)
+	require.NotEmpty(t, command.Description)
+	require.NotNil(t, command.Action)
 
 	// Check that required flags exist
 	urlFlag := false
@@ -196,7 +195,7 @@ func TestStatusCommand_CommandStructure(t *testing.T) {
 		}
 	}
 
-	assert.True(t, urlFlag, "Should have url flag")
-	assert.True(t, clusterFlag, "Should have cluster flag")
-	assert.True(t, verboseFlag, "Should have verbose flag")
+	require.True(t, urlFlag, "Should have url flag")
+	require.True(t, clusterFlag, "Should have cluster flag")
+	require.True(t, verboseFlag, "Should have verbose flag")
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,7 +91,7 @@ func TestNew(t *testing.T) {
 		HousekeeperVersion: "1.0.0",
 	})
 
-	assert.NotNil(t, executor)
+	require.NotNil(t, executor)
 }
 
 func TestExecutor_IsBootstrapped(t *testing.T) {
@@ -172,7 +171,7 @@ func TestExecutor_IsBootstrapped(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedResult, result)
+				require.Equal(t, tt.expectedResult, result)
 			}
 		})
 	}
@@ -305,8 +304,8 @@ func TestExecutor_Execute(t *testing.T) {
 				require.Len(t, results, len(tt.expectedStatus))
 
 				for i, expectedStatus := range tt.expectedStatus {
-					assert.Equal(t, expectedStatus, results[i].Status, "result %d status mismatch", i)
-					assert.Equal(t, tt.migrations[i].Version, results[i].Version, "result %d version mismatch", i)
+					require.Equal(t, expectedStatus, results[i].Status, "result %d status mismatch", i)
+					require.Equal(t, tt.migrations[i].Version, results[i].Version, "result %d version mismatch", i)
 				}
 			}
 		})
@@ -554,18 +553,18 @@ func TestExecutor_SnapshotExecution(t *testing.T) {
 
 			for i, expectedStatus := range tt.expectedStatus {
 				result := results[i]
-				assert.Equal(t, expectedStatus, result.Status, "result %d status mismatch", i)
-				assert.Equal(t, tt.migrations[i].Version, result.Version, "result %d version mismatch", i)
+				require.Equal(t, expectedStatus, result.Status, "result %d status mismatch", i)
+				require.Equal(t, tt.migrations[i].Version, result.Version, "result %d version mismatch", i)
 
 				// Verify revision kind is correct
 				if result.Revision != nil {
-					assert.Equal(t, tt.expectedRevisionKind, result.Revision.Kind, "revision kind mismatch")
+					require.Equal(t, tt.expectedRevisionKind, result.Revision.Kind, "revision kind mismatch")
 
 					// For snapshots, verify revision structure
 					if tt.migrations[i].IsSnapshot {
-						assert.Equal(t, 1, result.Revision.Applied, "snapshot applied count should be 1")
-						assert.Equal(t, 1, result.Revision.Total, "snapshot total count should be 1")
-						assert.Nil(t, result.Revision.Error, "snapshot should not have execution error")
+						require.Equal(t, 1, result.Revision.Applied, "snapshot applied count should be 1")
+						require.Equal(t, 1, result.Revision.Total, "snapshot total count should be 1")
+						require.Nil(t, result.Revision.Error, "snapshot should not have execution error")
 					}
 				}
 			}
@@ -727,11 +726,11 @@ func TestExecutor_ResumePartialMigration(t *testing.T) {
 			require.Len(t, results, 1)
 
 			result := results[0]
-			assert.Equal(t, tt.expectedResult, result.Status)
-			assert.Equal(t, tt.migration.Version, result.Version)
+			require.Equal(t, tt.expectedResult, result.Status)
+			require.Equal(t, tt.migration.Version, result.Version)
 
 			if tt.expectedApplied > 0 {
-				assert.Equal(t, tt.expectedApplied, result.StatementsApplied)
+				require.Equal(t, tt.expectedApplied, result.StatementsApplied)
 			}
 		})
 	}

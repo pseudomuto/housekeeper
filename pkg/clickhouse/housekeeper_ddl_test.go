@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -144,7 +143,7 @@ CREATE TABLE housekeeper.revisions (version String) ENGINE = MergeTree() ORDER B
 				expected := tt.expectedResult[i]
 				actual := extractClusterInfo(stmt)
 
-				assert.Equal(t, expected, actual, "Statement %d mismatch", i)
+				require.Equal(t, expected, actual, "Statement %d mismatch", i)
 			}
 		})
 	}
@@ -166,7 +165,7 @@ func TestIsHousekeeperDatabaseUnit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isHousekeeperDatabase(tt.database)
-			assert.Equal(t, tt.expected, result)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -186,7 +185,7 @@ func TestGetDatabaseNameUnit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := getDatabaseName(tt.database)
-			assert.Equal(t, tt.expected, result)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }

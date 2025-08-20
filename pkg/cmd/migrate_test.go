@@ -10,7 +10,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/cmd/testutil"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/format"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,25 +113,25 @@ COMMENT 'User events';
 		rows, err := client.Query(ctx, "SELECT 1 FROM system.databases WHERE name = 'housekeeper'")
 		require.NoError(t, err)
 		defer rows.Close()
-		assert.True(t, rows.Next())
+		require.True(t, rows.Next())
 
 		// Check analytics database
 		rows, err = client.Query(ctx, "SELECT 1 FROM system.databases WHERE name = 'analytics'")
 		require.NoError(t, err)
 		defer rows.Close()
-		assert.True(t, rows.Next())
+		require.True(t, rows.Next())
 
 		// Check users table
 		rows, err = client.Query(ctx, "SELECT 1 FROM system.tables WHERE database = 'analytics' AND name = 'users'")
 		require.NoError(t, err)
 		defer rows.Close()
-		assert.True(t, rows.Next())
+		require.True(t, rows.Next())
 
 		// Check events table
 		rows, err = client.Query(ctx, "SELECT 1 FROM system.tables WHERE database = 'analytics' AND name = 'events'")
 		require.NoError(t, err)
 		defer rows.Close()
-		assert.True(t, rows.Next())
+		require.True(t, rows.Next())
 
 		// Check revisions were recorded
 		rows, err = client.Query(ctx, "SELECT version FROM housekeeper.revisions ORDER BY version")
@@ -147,7 +146,7 @@ COMMENT 'User events';
 		}
 
 		expected := []string{"20240101120000_create_users", "20240101130000_create_events"}
-		assert.Equal(t, expected, versions)
+		require.Equal(t, expected, versions)
 	})
 
 	// Test running migrations again (should be skipped)
@@ -199,7 +198,7 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 		var count uint64
 		require.True(t, rows.Next())
 		require.NoError(t, rows.Scan(&count))
-		assert.Equal(t, uint64(0), count, "Migration should not have been executed in dry run")
+		require.Equal(t, uint64(0), count, "Migration should not have been executed in dry run")
 	})
 
 	// Test applying the new migration
@@ -227,7 +226,7 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 		var count uint64
 		require.True(t, rows.Next())
 		require.NoError(t, rows.Scan(&count))
-		assert.Equal(t, uint64(1), count, "Migration should have been executed")
+		require.Equal(t, uint64(1), count, "Migration should have been executed")
 	})
 
 	// Test connection failure
@@ -241,7 +240,7 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 
 		// Execute command with invalid DSN
 		err := testutil.RunCommand(t, command, []string{"--url", "invalid:9999"}) //nolint:contextcheck
-		assert.Error(t, err, "Should fail with invalid connection")
+		require.Error(t, err, "Should fail with invalid connection")
 	})
 }
 
@@ -260,7 +259,7 @@ func TestMigrateCommand_Aliases(t *testing.T) {
 		Version:   version,
 	})
 
-	assert.Equal(t, "migrate", command.Name)
-	assert.Contains(t, command.Aliases, "apply")
-	assert.Equal(t, "Apply pending migrations to ClickHouse", command.Usage)
+	require.Equal(t, "migrate", command.Name)
+	require.Contains(t, command.Aliases, "apply")
+	require.Equal(t, "Apply pending migrations to ClickHouse", command.Usage)
 }
