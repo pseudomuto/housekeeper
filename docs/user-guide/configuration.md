@@ -132,23 +132,41 @@ Use environment variables for sensitive configuration:
 
 ### Connection Credentials
 
-```bash
-# Database connection
-export CH_HOST=localhost
-export CH_PORT=9000
-export CH_DATABASE=mydb
-export CH_USERNAME=myuser
-export CH_PASSWORD=secretpassword
-export CH_CLUSTER=mycluster
+The recommended way to configure database connections is using the `HOUSEKEEPER_DATABASE_URL` environment variable:
 
-# TLS settings
-export CH_SECURE=true
-export CH_SKIP_VERIFY=false
+```bash
+# Recommended: Single connection URL (used by all commands)
+export HOUSEKEEPER_DATABASE_URL="localhost:9000"
+
+# Or with full DSN including authentication
+export HOUSEKEEPER_DATABASE_URL="clickhouse://myuser:secretpassword@localhost:9000/mydb"
+
+# Or with TCP protocol and parameters
+export HOUSEKEEPER_DATABASE_URL="tcp://localhost:9000?username=myuser&password=secretpassword&database=mydb"
+```
+
+Once set, all commands will use this connection automatically:
+
+```bash
+# No need to specify --url flag when environment variable is set
+housekeeper migrate
+housekeeper status
+housekeeper schema dump
+housekeeper bootstrap
+```
+
+### Alternative: Command-Line Flags
+
+You can also specify the connection directly using the `--url` flag:
+
+```bash
+housekeeper migrate --url localhost:9000
+housekeeper status --url "clickhouse://user:pass@host:9000/db"
 ```
 
 ### Configuration in YAML
 
-Environment variables are used by the CLI tools for connection parameters, but are not part of the YAML configuration file. Connection details are provided via command-line flags or environment variables when running commands.
+Environment variables are used by the CLI tools for connection parameters, but are not part of the YAML configuration file. The `HOUSEKEEPER_DATABASE_URL` environment variable or `--url` flag provides the connection details when running commands.
 
 ### Environment-Specific Variables
 

@@ -9,6 +9,27 @@ Housekeeper's migration system compares your desired schema (defined in your sch
 > **📝 Migration Tracking**  
 > Housekeeper automatically manages migration tracking infrastructure. When you run your first migration against any ClickHouse instance, Housekeeper creates a `housekeeper.revisions` table to track which migrations have been applied. This happens automatically - no manual setup required.
 
+## Connection Configuration
+
+Before running migrations, configure your ClickHouse connection. The recommended approach is using the `HOUSEKEEPER_DATABASE_URL` environment variable:
+
+```bash
+# Set connection URL once for all commands
+export HOUSEKEEPER_DATABASE_URL="localhost:9000"
+
+# Now all commands will use this connection automatically
+housekeeper migrate
+housekeeper status
+housekeeper schema dump
+```
+
+Alternatively, use the `--url` flag with each command:
+
+```bash
+housekeeper migrate --url localhost:9000
+housekeeper status --url localhost:9000
+```
+
 ## How Migrations Work
 
 ### 1. Development Server Workflow
@@ -308,7 +329,7 @@ When you run migrations again:
 
 ```bash
 # Simply run migrate - no special flags needed
-housekeeper migrate --dsn localhost:9000
+housekeeper migrate --url localhost:9000
 ```
 
 Housekeeper automatically:
@@ -521,13 +542,13 @@ Housekeeper automatically handles partial migration failures:
 
 ```bash
 # ✅ Simply run migrate again - automatic resume
-housekeeper migrate --dsn localhost:9000
+housekeeper migrate --url localhost:9000
 
 # ✅ Check migration status to see partial progress
-housekeeper status --dsn localhost:9000 --verbose
+housekeeper status --url localhost:9000 --verbose
 
 # ✅ Use dry-run to see what would be resumed
-housekeeper migrate --dsn localhost:9000 --dry-run
+housekeeper migrate --url localhost:9000 --dry-run
 ```
 
 If you need to manually investigate:

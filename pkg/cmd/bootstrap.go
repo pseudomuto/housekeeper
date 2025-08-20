@@ -41,7 +41,7 @@ import (
 //	housekeeper bootstrap --url localhost:9000
 //
 //	# Bootstrap using environment variable for connection
-//	export CH_DATABASE_URL=tcp://localhost:9000
+//	export HOUSEKEEPER_DATABASE_URL=tcp://localhost:9000
 //	housekeeper bootstrap
 //
 // The command handles all ClickHouse object types and uses the cluster configuration
@@ -51,13 +51,7 @@ func bootstrap(p *project.Project, cfg *config.Config) *cli.Command {
 		Name:  "bootstrap",
 		Usage: "Extract schema from an existing ClickHouse server into initialized project",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "url",
-				Aliases:  []string{"u"},
-				Usage:    "ClickHouse connection DSN (host:port, clickhouse://..., tcp://...)",
-				Sources:  cli.EnvVars("CH_DATABASE_URL"),
-				Required: true,
-			},
+			urlFlag,
 		},
 		Before: requireConfig(cfg),
 		Action: func(ctx context.Context, cmd *cli.Command) error {

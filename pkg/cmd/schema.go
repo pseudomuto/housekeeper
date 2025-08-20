@@ -86,13 +86,7 @@ func schemaDump() *cli.Command {
 		Name:  "dump",
 		Usage: "Extract and format schema from a ClickHouse instance",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "url",
-				Aliases:  []string{"u"},
-				Usage:    "ClickHouse connection DSN (host:port, clickhouse://..., tcp://...)",
-				Sources:  cli.EnvVars("CH_DATABASE_URL"),
-				Required: true,
-			},
+			urlFlag,
 			&cli.StringFlag{
 				Name:    "cluster",
 				Aliases: []string{"c"},

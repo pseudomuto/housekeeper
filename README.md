@@ -43,9 +43,37 @@ go install github.com/pseudomuto/housekeeper@latest
 mkdir my-clickhouse-project && cd my-clickhouse-project
 housekeeper init
 
+# Configure database connection (recommended)
+export HOUSEKEEPER_DATABASE_URL="localhost:9000"
+
 # Define your schema in db/main.sql, then generate migrations
 housekeeper diff
+
+# Apply migrations to your database
+housekeeper migrate
+
+# Check migration status
+housekeeper status
 ```
+
+### Connection Configuration
+
+Housekeeper uses a unified connection approach for all database commands:
+
+```bash
+# Set once via environment variable (recommended)
+export HOUSEKEEPER_DATABASE_URL="localhost:9000"
+
+# Or use --url flag with each command
+housekeeper migrate --url localhost:9000
+housekeeper status --url localhost:9000
+housekeeper schema dump --url localhost:9000
+```
+
+Supported connection formats:
+- Simple: `localhost:9000`
+- Full DSN: `clickhouse://user:password@host:9000/database`
+- TCP: `tcp://host:9000?username=user&password=pass`
 
 ## Installation
 

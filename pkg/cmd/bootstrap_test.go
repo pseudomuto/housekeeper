@@ -83,7 +83,7 @@ func TestBootstrapCommand_WithEnvironmentURL(t *testing.T) {
 	defer fixture.Cleanup()
 
 	// Set environment variable
-	t.Setenv("CH_DATABASE_URL", "tcp://localhost:9000")
+	t.Setenv("HOUSEKEEPER_DATABASE_URL", "tcp://localhost:9000")
 
 	command := bootstrap(fixture.Project, fixture.Config)
 
@@ -119,7 +119,7 @@ func TestBootstrapCommand_FlagConfiguration(t *testing.T) {
 	require.Equal(t, "url", urlFlag.Name)
 	require.Equal(t, []string{"u"}, urlFlag.Aliases)
 	require.True(t, urlFlag.Required)
-	require.Equal(t, cli.EnvVars("CH_DATABASE_URL"), urlFlag.Sources)
+	require.Equal(t, cli.EnvVars("HOUSEKEEPER_DATABASE_URL"), urlFlag.Sources)
 }
 
 func TestBootstrapCommand_ClusterConfiguration(t *testing.T) {

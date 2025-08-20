@@ -27,7 +27,7 @@ type statusParams struct {
 // pending, and any that have failed.
 //
 // Command flags:
-//   - --dsn: ClickHouse connection string (required)
+//   - --url, -u: ClickHouse connection string (required)
 //   - --env: Environment name for migration directory (default: "migrations")
 //   - --cluster: ClickHouse cluster name for distributed deployments
 //   - --verbose: Show detailed migration information
@@ -35,13 +35,13 @@ type statusParams struct {
 // Example usage:
 //
 //	# Show basic migration status
-//	housekeeper status --dsn localhost:9000
+//	housekeeper status --url localhost:9000
 //
 //	# Show detailed information about each migration
-//	housekeeper status --dsn localhost:9000 --verbose
+//	housekeeper status --url localhost:9000 --verbose
 //
 //	# Show status with cluster support
-//	housekeeper status --dsn localhost:9000 --cluster production_cluster
+//	housekeeper status --url localhost:9000 --cluster production_cluster
 func status(p statusParams) *cli.Command {
 	return &cli.Command{
 		Name:  "status",
@@ -62,14 +62,7 @@ This command is useful for:
 - Verifying the state of your database schema`,
 		Before: requireConfig(p.Config),
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "dsn",
-				Usage:    "ClickHouse connection string (e.g., localhost:9000)",
-				Required: true,
-				Config: cli.StringConfig{
-					TrimSpace: true,
-				},
-			},
+			urlFlag,
 			&cli.StringFlag{
 				Name:  "cluster",
 				Usage: "ClickHouse cluster name for distributed deployments",
@@ -90,7 +83,7 @@ This command is useful for:
 }
 
 func runStatus(ctx context.Context, cmd *cli.Command, p statusParams) error {
-	dsn := cmd.String("dsn")
+	url := cmd.String("url")
 	cluster := cmd.String("cluster")
 	verbose := cmd.Bool("verbose")
 
@@ -110,7 +103,7 @@ func runStatus(ctx context.Context, cmd *cli.Command, p statusParams) error {
 	}
 
 	// Setup ClickHouse connection
-	client, err := setupClickHouseClient(ctx, dsn, cluster)
+	client, err := setupClickHouseClient(ctx, url, cluster)
 	if err != nil {
 		return err
 	}
@@ -144,8 +137,8 @@ func loadAndValidateMigrations(dir string) ([]*migrator.Migration, error) {
 	return migrationDir.Migrations, nil
 }
 
-func setupClickHouseClient(ctx context.Context, dsn, cluster string) (*clickhouse.Client, error) {
-	client, err := clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
+func setupClickHouseClient(ctx context.Context, url, cluster string) (*clickhouse.Client, error) {
+	client, err := clickhouse.NewClientWithOptions(ctx, url, clickhouse.ClientOptions{
 		Cluster: cluster,
 	})
 	if err != nil {
@@ -162,7 +155,7 @@ func setupClickHouseClient(ctx context.Context, dsn, cluster string) (*clickhous
 
 func showUnbootstrappedStatus(migrations []*migrator.Migration) {
 	fmt.Println("❗ Housekeeper infrastructure not initialized")
-	fmt.Println("   Run 'housekeeper migrate --dsn <dsn>' to initialize and apply migrations")
+	fmt.Println("   Run 'housekeeper migrate --url <url>' to initialize and apply migrations")
 	fmt.Println()
 	fmt.Printf("Found %d migration files:\n", len(migrations))
 	for _, migration := range migrations {
@@ -241,9 +234,9 @@ func showPendingMigrations(pending []*migrator.Migration) {
 
 func showRecommendations(pending, failed []*migrator.Migration) {
 	if len(pending) > 0 {
-		fmt.Println("💡 Run 'housekeeper migrate --dsn <dsn>' to apply pending migrations")
+		fmt.Println("💡 Run 'housekeeper migrate --url <url>' to apply pending migrations")
 	} else if len(failed) > 0 {
-		fmt.Println("💡 Fix failed migrations and run 'housekeeper migrate --dsn <dsn>' to retry")
+		fmt.Println("💡 Fix failed migrations and run 'housekeeper migrate --url <url>' to retry")
 	} else {
 		fmt.Println("✅ All migrations are up to date")
 	}

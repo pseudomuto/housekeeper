@@ -33,6 +33,34 @@ type (
 	}
 )
 
+// urlFlag is a standardized URL flag that can be reused across commands.
+// The flag is named --url with -u alias and uses HOUSEKEEPER_DATABASE_URL env var.
+//
+// This provides a consistent interface for ClickHouse connection strings across
+// all commands that need database connectivity.
+//
+// Supported DSN formats:
+//   - Simple host:port: "localhost:9000"
+//   - Full DSN: "clickhouse://user:pass@host:port/database"
+//   - TCP protocol: "tcp://host:port?username=user&password=pass"
+//
+// Example usage:
+//
+//	flags := []cli.Flag{
+//	    urlFlag,
+//	    // other command-specific flags...
+//	}
+var urlFlag = &cli.StringFlag{
+	Name:     "url",
+	Aliases:  []string{"u"},
+	Usage:    "ClickHouse connection DSN (host:port, clickhouse://..., tcp://...)",
+	Sources:  cli.EnvVars("HOUSEKEEPER_DATABASE_URL"),
+	Required: true,
+	Config: cli.StringConfig{
+		TrimSpace: true,
+	},
+}
+
 // Run creates and executes the main housekeeper CLI application with the given
 // version and command-line arguments. This function serves as the main entry
 // point for all CLI operations and handles global configuration.

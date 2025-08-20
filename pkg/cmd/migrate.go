@@ -33,20 +33,20 @@ type migrateParams struct {
 // It provides comprehensive progress reporting and error handling.
 //
 // Command flags:
-//   - --dsn: ClickHouse connection string (required)
+//   - --url, -u: ClickHouse connection string (required)
 //   - --dry-run: Show what would be executed without applying changes
 //   - --cluster: ClickHouse cluster name for distributed deployments
 //
 // Example usage:
 //
 //	# Apply all pending migrations
-//	housekeeper migrate --dsn localhost:9000
+//	housekeeper migrate --url localhost:9000
 //
 //	# Show what would be executed without applying
-//	housekeeper migrate --dsn localhost:9000 --dry-run
+//	housekeeper migrate --url localhost:9000 --dry-run
 //
 //	# Apply migrations with cluster support
-//	housekeeper migrate --dsn localhost:9000 --cluster production_cluster
+//	housekeeper migrate --url localhost:9000 --cluster production_cluster
 func migrate(p migrateParams) *cli.Command {
 	return &cli.Command{
 		Name:    "migrate",
@@ -71,14 +71,7 @@ The command expects migration files to follow the standard naming
 convention: yyyyMMddHHmmss_description.sql`,
 		Before: requireConfig(p.Config),
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "dsn",
-				Usage:    "ClickHouse connection string (e.g., localhost:9000)",
-				Required: true,
-				Config: cli.StringConfig{
-					TrimSpace: true,
-				},
-			},
+			urlFlag,
 			&cli.BoolFlag{
 				Name:  "dry-run",
 				Usage: "Show what would be executed without applying changes",
@@ -99,11 +92,12 @@ convention: yyyyMMddHHmmss_description.sql`,
 }
 
 func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
-	dsn := cmd.String("dsn")
+	url := cmd.String("url")
 	dryRun := cmd.Bool("dry-run")
 	cluster := cmd.String("cluster")
 
 	slog.Info("Starting migration execution",
+		"url", url,
 		"dry_run", dryRun,
 		"cluster", cluster,
 	)
@@ -123,7 +117,7 @@ func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
 	slog.Info("Loaded migrations", "count", len(migrations))
 
 	// Create ClickHouse client
-	client, err := clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
+	client, err := clickhouse.NewClientWithOptions(ctx, url, clickhouse.ClientOptions{
 		Cluster: cluster,
 	})
 	if err != nil {
@@ -269,7 +263,7 @@ func runDryRun(ctx context.Context, client *clickhouse.Client, migrations []*mig
 	if pendingCount == 0 && resumeCount == 0 {
 		fmt.Println("All migrations are up to date.")
 	} else if resumeCount > 0 {
-		fmt.Println("Use 'housekeeper migrate --dsn <dsn>' to resume the partially applied migrations.")
+		fmt.Println("Use 'housekeeper migrate --url <url>' to resume the partially applied migrations.")
 	}
 
 	return nil

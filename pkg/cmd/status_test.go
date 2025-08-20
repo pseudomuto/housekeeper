@@ -102,7 +102,7 @@ CREATE TABLE status_test.analytics (
 		})
 
 		// Execute command
-		err := testutil.RunCommand(t, command, []string{"--dsn", dsn})
+		err := testutil.RunCommand(t, command, []string{"--url", dsn})
 		require.NoError(t, err)
 	})
 
@@ -116,7 +116,7 @@ CREATE TABLE status_test.analytics (
 		})
 
 		// Apply migrations
-		err := testutil.RunCommand(t, migrateCommand, []string{"--dsn", dsn}) //nolint:contextcheck
+		err := testutil.RunCommand(t, migrateCommand, []string{"--url", dsn}) //nolint:contextcheck
 		require.NoError(t, err)
 
 		// Check status
@@ -124,7 +124,7 @@ CREATE TABLE status_test.analytics (
 			Config: cfg,
 		})
 
-		err = testutil.RunCommand(t, statusCommand, []string{"--dsn", dsn}) //nolint:contextcheck
+		err = testutil.RunCommand(t, statusCommand, []string{"--url", dsn}) //nolint:contextcheck
 		require.NoError(t, err)
 
 		// Verify that migrations were applied
@@ -150,7 +150,7 @@ CREATE TABLE status_test.analytics (
 		})
 
 		// Execute command with verbose flag
-		err := testutil.RunCommand(t, command, []string{"--dsn", dsn, "--verbose"})
+		err := testutil.RunCommand(t, command, []string{"--url", dsn, "--verbose"})
 		require.NoError(t, err)
 	})
 
@@ -161,7 +161,7 @@ CREATE TABLE status_test.analytics (
 		})
 
 		// Execute command with invalid DSN
-		err := testutil.RunCommand(t, command, []string{"--dsn", "invalid:9999"})
+		err := testutil.RunCommand(t, command, []string{"--url", "invalid:9999"})
 		assert.Error(t, err, "Should fail with invalid connection")
 	})
 }
@@ -181,14 +181,14 @@ func TestStatusCommand_CommandStructure(t *testing.T) {
 	assert.NotNil(t, command.Action)
 
 	// Check that required flags exist
-	dsnFlag := false
+	urlFlag := false
 	clusterFlag := false
 	verboseFlag := false
 
 	for _, flag := range command.Flags {
 		switch flag.Names()[0] {
-		case "dsn":
-			dsnFlag = true
+		case "url":
+			urlFlag = true
 		case "cluster":
 			clusterFlag = true
 		case "verbose":
@@ -196,7 +196,7 @@ func TestStatusCommand_CommandStructure(t *testing.T) {
 		}
 	}
 
-	assert.True(t, dsnFlag, "Should have dsn flag")
+	assert.True(t, urlFlag, "Should have url flag")
 	assert.True(t, clusterFlag, "Should have cluster flag")
 	assert.True(t, verboseFlag, "Should have verbose flag")
 }

@@ -273,10 +273,10 @@ Housekeeper automatically:
 
 ```bash
 # Check status to see partial migrations
-housekeeper status --dsn localhost:9000 --verbose
+housekeeper status --url localhost:9000 --verbose
 
 # See what would be resumed with dry-run
-housekeeper migrate --dsn localhost:9000 --dry-run
+housekeeper migrate --url localhost:9000 --dry-run
 
 # Examine revision table directly
 echo "SELECT version, applied, total, error, executed_at FROM housekeeper.revisions WHERE error IS NOT NULL ORDER BY executed_at DESC;" | clickhouse-client
@@ -353,7 +353,7 @@ Found 1 partially applied migration(s) that will be resumed:
 
 ```bash
 # 1. Examine current state
-housekeeper status --dsn localhost:9000 --verbose
+housekeeper status --url localhost:9000 --verbose
 housekeeper schema dump --url localhost:9000
 
 # 2. Check revision table
@@ -363,11 +363,11 @@ echo "SELECT * FROM housekeeper.revisions WHERE version = '20240101120000_setup_
 
 # Option A: Delete partial revision and restart migration
 echo "DELETE FROM housekeeper.revisions WHERE version = '20240101120000_setup_analytics';" | clickhouse-client
-housekeeper migrate --dsn localhost:9000  # Restarts from beginning
+housekeeper migrate --url localhost:9000  # Restarts from beginning
 
 # Option B: Fix the underlying issue and resume automatically
 # (Fix whatever caused the original failure, then run)
-housekeeper migrate --dsn localhost:9000  # Will resume automatically
+housekeeper migrate --url localhost:9000  # Will resume automatically
 
 # Option C: Mark migration as completed manually (if statements were applied outside Housekeeper)
 echo "UPDATE housekeeper.revisions SET applied = total, error = NULL WHERE version = '20240101120000_setup_analytics';" | clickhouse-client
@@ -387,7 +387,7 @@ After successful recovery:
 
 ```bash
 # Verify all migrations are completed
-housekeeper status --dsn localhost:9000
+housekeeper status --url localhost:9000
 
 # Check that schema matches expectations
 housekeeper diff  # Should show "No differences found"

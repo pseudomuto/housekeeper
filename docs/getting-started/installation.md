@@ -97,6 +97,37 @@ Housekeeper v1.0.0
 A modern ClickHouse schema management tool
 ```
 
+## Environment Configuration
+
+Housekeeper can be configured to use your ClickHouse connection automatically via environment variable:
+
+```bash
+# Set database connection for all commands
+export HOUSEKEEPER_DATABASE_URL="localhost:9000"
+
+# With authentication
+export HOUSEKEEPER_DATABASE_URL="clickhouse://user:password@host:9000/database"
+
+# Using TCP protocol
+export HOUSEKEEPER_DATABASE_URL="tcp://host:9000?username=user&password=pass"
+```
+
+Once set, all Housekeeper commands that connect to ClickHouse will use this connection automatically:
+
+```bash
+# No need to specify --url with each command
+housekeeper migrate
+housekeeper status
+housekeeper schema dump
+housekeeper bootstrap
+```
+
+Alternatively, you can specify the connection with each command using the `--url` flag:
+
+```bash
+housekeeper migrate --url localhost:9000
+```
+
 ## Next Steps
 
 Once Housekeeper is installed, you're ready to:

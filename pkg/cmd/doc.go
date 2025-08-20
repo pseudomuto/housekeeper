@@ -38,7 +38,7 @@
 //	housekeeper bootstrap --url host:9000 --cluster prod    # Bootstrap with cluster support
 //	housekeeper schema dump --url localhost:9000            # Dump schema from ClickHouse
 //	housekeeper schema compile --env production              # Compile project schema
-//	housekeeper diff --dsn host:9000 ...                   # Generate migrations (planned)
+//	housekeeper diff --url host:9000 ...                   # Generate migrations (planned)
 //
 // # ClickHouse Integration
 //

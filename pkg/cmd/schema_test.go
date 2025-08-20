@@ -41,7 +41,20 @@ func TestSchemaCommand_Structure(t *testing.T) {
 
 func TestSchemaDumpCommand_RequiresURL(t *testing.T) {
 	// Test that schema dump requires URL flag
+	// Create a custom flag without the environment variable to test flag requirement
+	testUrlFlag := &cli.StringFlag{
+		Name:     "url",
+		Aliases:  []string{"u"},
+		Usage:    "ClickHouse connection DSN (host:port, clickhouse://..., tcp://...)",
+		Required: true,
+		Config: cli.StringConfig{
+			TrimSpace: true,
+		},
+	}
+
 	command := schemaDump()
+	// Replace the flag with our test flag that has no env var
+	command.Flags[0] = testUrlFlag
 
 	// Create a test CLI app
 	app := &cli.Command{

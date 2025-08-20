@@ -102,7 +102,7 @@ COMMENT 'User events';
 		})
 
 		// Execute command
-		err := testutil.RunCommand(t, command, []string{"--dsn", dsn}) //nolint:contextcheck
+		err := testutil.RunCommand(t, command, []string{"--url", dsn}) //nolint:contextcheck
 		require.NoError(t, err)
 
 		// Verify databases and tables were created
@@ -160,7 +160,7 @@ COMMENT 'User events';
 		})
 
 		// Execute command
-		err := testutil.RunCommand(t, command, []string{"--dsn", dsn}) //nolint:contextcheck
+		err := testutil.RunCommand(t, command, []string{"--url", dsn}) //nolint:contextcheck
 		require.NoError(t, err)
 	})
 
@@ -184,7 +184,7 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 		})
 
 		// Execute command with dry-run
-		err := testutil.RunCommand(t, command, []string{"--dsn", dsn, "--dry-run"}) //nolint:contextcheck
+		err := testutil.RunCommand(t, command, []string{"--url", dsn, "--dry-run"}) //nolint:contextcheck
 		require.NoError(t, err)
 
 		// Verify the new migration wasn't actually executed
@@ -212,7 +212,7 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 		})
 
 		// Execute command
-		err := testutil.RunCommand(t, command, []string{"--dsn", dsn}) //nolint:contextcheck
+		err := testutil.RunCommand(t, command, []string{"--url", dsn}) //nolint:contextcheck
 		require.NoError(t, err)
 
 		// Verify the migration was executed
@@ -240,7 +240,7 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 		})
 
 		// Execute command with invalid DSN
-		err := testutil.RunCommand(t, command, []string{"--dsn", "invalid:9999"}) //nolint:contextcheck
+		err := testutil.RunCommand(t, command, []string{"--url", "invalid:9999"}) //nolint:contextcheck
 		assert.Error(t, err, "Should fail with invalid connection")
 	})
 }
