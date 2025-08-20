@@ -2,6 +2,7 @@ package executor_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -412,4 +413,161 @@ func (m *mockCompletedRevisionRows) ScanStruct(dest any) error {
 
 func (m *mockCompletedRevisionRows) Totals(dest ...any) error {
 	return nil
+}
+
+func TestExecutor_SnapshotExecution(t *testing.T) {
+	tests := []struct {
+		name                 string
+		migrations           []*migrator.Migration
+		setupMock            func(*mockClickHouse)
+		expectedStatus       []executor.ExecutionStatus
+		expectedRevisionKind migrator.RevisionKind
+		expectDDLExecution   bool
+	}{
+		{
+			name: "snapshot migration execution",
+			migrations: []*migrator.Migration{
+				{
+					Version:    "20240810120000_snapshot",
+					IsSnapshot: true,
+					Statements: []*parser.Statement{
+						{
+							CreateDatabase: &parser.CreateDatabaseStmt{
+								Name: "test_db",
+							},
+						},
+						{
+							CreateTable: &parser.CreateTableStmt{
+								Name: "test_table",
+								Elements: []parser.TableElement{
+									{
+										Column: &parser.Column{
+											Name: "id",
+											DataType: &parser.DataType{
+												Simple: &parser.SimpleType{Name: "UInt64"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *mockClickHouse) {
+				// Mock bootstrap checks
+				queryCallCount := 0
+				execCallCount := 0
+				m.queryFunc = func(ctx context.Context, query string, args ...any) (driver.Rows, error) {
+					queryCallCount++
+					if queryCallCount <= 2 {
+						// Bootstrap checks - return that infrastructure exists
+						return &mockRows{}, nil
+					}
+					// LoadRevisions query - return empty revisions
+					return &mockRows{nextCalled: true}, nil
+				}
+
+				// Track exec calls to ensure DDL is NOT executed for snapshots
+				m.execFunc = func(ctx context.Context, query string, args ...any) error {
+					execCallCount++
+					// Only allow revision insertion, not DDL execution
+					if strings.Contains(query, "INSERT INTO housekeeper.revisions") {
+						return nil
+					}
+					t.Errorf("Unexpected DDL execution for snapshot: %s", query)
+					return nil
+				}
+			},
+			expectedStatus:       []executor.ExecutionStatus{executor.StatusSuccess},
+			expectedRevisionKind: migrator.SnapshotRevision,
+			expectDDLExecution:   false,
+		},
+		{
+			name: "regular migration execution for comparison",
+			migrations: []*migrator.Migration{
+				{
+					Version:    "20240810120000_regular",
+					IsSnapshot: false,
+					Statements: []*parser.Statement{
+						{
+							CreateDatabase: &parser.CreateDatabaseStmt{
+								Name: "test_db",
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *mockClickHouse) {
+				// Mock bootstrap checks
+				queryCallCount := 0
+				ddlExecuted := false
+				m.queryFunc = func(ctx context.Context, query string, args ...any) (driver.Rows, error) {
+					queryCallCount++
+					if queryCallCount <= 2 {
+						// Bootstrap checks - return that infrastructure exists
+						return &mockRows{}, nil
+					}
+					// LoadRevisions query - return empty revisions
+					return &mockRows{nextCalled: true}, nil
+				}
+
+				// Track exec calls to ensure DDL IS executed for regular migrations
+				m.execFunc = func(ctx context.Context, query string, args ...any) error {
+					if strings.Contains(query, "CREATE DATABASE") {
+						ddlExecuted = true
+					}
+					return nil
+				}
+
+				// Verify DDL was executed after test
+				t.Cleanup(func() {
+					if !ddlExecuted {
+						t.Error("Expected DDL to be executed for regular migration")
+					}
+				})
+			},
+			expectedStatus:       []executor.ExecutionStatus{executor.StatusSuccess},
+			expectedRevisionKind: migrator.StandardRevision,
+			expectDDLExecution:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCH := &mockClickHouse{}
+			if tt.setupMock != nil {
+				tt.setupMock(mockCH)
+			}
+
+			executor := executor.New(executor.Config{
+				ClickHouse:         mockCH,
+				Formatter:          format.New(format.Defaults),
+				HousekeeperVersion: "test-version",
+			})
+
+			results, err := executor.Execute(context.Background(), tt.migrations)
+
+			require.NoError(t, err)
+			require.Len(t, results, len(tt.expectedStatus))
+
+			for i, expectedStatus := range tt.expectedStatus {
+				result := results[i]
+				assert.Equal(t, expectedStatus, result.Status, "result %d status mismatch", i)
+				assert.Equal(t, tt.migrations[i].Version, result.Version, "result %d version mismatch", i)
+
+				// Verify revision kind is correct
+				if result.Revision != nil {
+					assert.Equal(t, tt.expectedRevisionKind, result.Revision.Kind, "revision kind mismatch")
+
+					// For snapshots, verify revision structure
+					if tt.migrations[i].IsSnapshot {
+						assert.Equal(t, 1, result.Revision.Applied, "snapshot applied count should be 1")
+						assert.Equal(t, 1, result.Revision.Total, "snapshot total count should be 1")
+						assert.Nil(t, result.Revision.Error, "snapshot should not have execution error")
+					}
+				}
+			}
+		})
+	}
 }

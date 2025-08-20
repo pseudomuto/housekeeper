@@ -47,6 +47,11 @@ type (
 		// migration file. Each statement represents a single DDL operation
 		// such as CREATE TABLE, ALTER DATABASE, etc.
 		Statements []*parser.Statement
+
+		// IsSnapshot indicates whether this migration is a snapshot that consolidates
+		// previous migrations. Snapshot migrations are handled differently during
+		// execution - they are not executed as DDL but serve as consolidation points.
+		IsSnapshot bool
 	}
 
 	// MigrationDir represents a collection of migrations loaded from a directory
@@ -363,7 +368,20 @@ func findAndAddMigrationFile(mig *MigrationDir, version string) error {
 // Returns an error if the reader content contains invalid ClickHouse DDL syntax
 // or if the reader cannot be read.
 func LoadMigration(v string, r io.Reader) (*Migration, error) {
-	sql, err := parser.Parse(r)
+	// Read all content first so we can check for snapshot marker and parse SQL
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read migration content: %s.sql", v)
+	}
+
+	// Check if this is a snapshot file
+	isSnapshot, err := IsSnapshot(strings.NewReader(string(content)))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to check snapshot marker: %s.sql", v)
+	}
+
+	// Parse the SQL content
+	sql, err := parser.ParseString(string(content))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse: %s.sql", v)
 	}
@@ -371,6 +389,7 @@ func LoadMigration(v string, r io.Reader) (*Migration, error) {
 	return &Migration{
 		Version:    v,
 		Statements: sql.Statements,
+		IsSnapshot: isSnapshot,
 	}, nil
 }
 

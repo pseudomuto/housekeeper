@@ -326,6 +326,51 @@ func TestMigration_UnicodeContent(t *testing.T) {
 	require.Contains(t, *db.Comment, "latin")
 }
 
+func TestMigration_SnapshotDetection(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		isSnapshot bool
+	}{
+		{
+			name: "regular_migration",
+			content: `CREATE DATABASE test ENGINE = Atomic;
+CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`,
+			isSnapshot: false,
+		},
+		{
+			name: "snapshot_migration",
+			content: `-- housekeeper:snapshot
+-- version: 20240810120000_snapshot
+-- description: Test snapshot
+-- created_at: 2024-08-10T12:00:00Z
+-- included_migrations: 001_init,002_users
+-- cumulative_hash: abc123
+
+CREATE DATABASE test ENGINE = Atomic;
+CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`,
+			isSnapshot: true,
+		},
+		{
+			name: "migration_with_comment_but_not_snapshot",
+			content: `-- This is just a regular comment
+-- Not a snapshot marker
+CREATE DATABASE test ENGINE = Atomic;`,
+			isSnapshot: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			migration, err := migrator.LoadMigration("test_version", strings.NewReader(tt.content))
+			require.NoError(t, err)
+			require.Equal(t, tt.isSnapshot, migration.IsSnapshot)
+			require.Equal(t, "test_version", migration.Version)
+			require.NotEmpty(t, migration.Statements)
+		})
+	}
+}
+
 func TestMigrationDir_Rehash(t *testing.T) {
 	tests := []struct {
 		name        string

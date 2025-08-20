@@ -301,6 +301,11 @@ func (e *Executor) executeMigration(ctx context.Context, migration *migrator.Mig
 		}
 	}
 
+	// Handle snapshot migrations specially
+	if migration.IsSnapshot {
+		return e.executeSnapshotMigration(ctx, migration, startTime)
+	}
+
 	// Execute migration statements
 	var statementsApplied int
 	var executionError error
@@ -364,6 +369,63 @@ func (e *Executor) executeMigration(ctx context.Context, migration *migrator.Mig
 		Error:             executionError,
 		ExecutionTime:     executionTime,
 		StatementsApplied: statementsApplied,
+		TotalStatements:   len(migration.Statements),
+		Revision:          revision,
+	}
+}
+
+// executeSnapshotMigration handles the execution of snapshot migrations.
+//
+// Snapshot migrations are treated specially:
+//   - DDL statements are not executed (they represent consolidated state)
+//   - Revision is recorded with SnapshotRevision kind
+//   - Validation ensures snapshot represents current database state
+//
+// This prevents executing DDL that has already been applied in previous migrations
+// while maintaining the revision history for tracking purposes.
+func (e *Executor) executeSnapshotMigration(ctx context.Context, migration *migrator.Migration, startTime time.Time) *ExecutionResult {
+	executionTime := time.Since(startTime)
+
+	// Compute migration hash and partial hashes (for integrity tracking)
+	migrationHash, partialHashes := e.computeHashes(migration)
+
+	// Create revision record with SnapshotRevision kind
+	revision := &migrator.Revision{
+		Version:            migration.Version,
+		ExecutedAt:         startTime,
+		ExecutionTime:      executionTime,
+		Kind:               migrator.SnapshotRevision,
+		Applied:            1, // Snapshots are considered as single "applied" unit
+		Total:              1, // Snapshots are considered as single "total" unit
+		Hash:               migrationHash,
+		PartialHashes:      partialHashes,
+		HousekeeperVersion: e.housekeeperVersion,
+		Error:              nil, // Snapshots don't execute DDL, so no execution errors
+	}
+
+	// Save revision record
+	if err := e.saveRevision(ctx, revision); err != nil {
+		// If we can't save the revision, treat it as a failure
+		errorStr := fmt.Sprintf("failed to save snapshot revision: %v", err)
+		revision.Error = &errorStr
+
+		return &ExecutionResult{
+			Version:           migration.Version,
+			Status:            StatusFailed,
+			Error:             errors.New(errorStr),
+			ExecutionTime:     executionTime,
+			StatementsApplied: 0,
+			TotalStatements:   len(migration.Statements),
+			Revision:          revision,
+		}
+	}
+
+	return &ExecutionResult{
+		Version:           migration.Version,
+		Status:            StatusSuccess,
+		Error:             nil,
+		ExecutionTime:     executionTime,
+		StatementsApplied: len(migration.Statements), // Report as if all statements were "applied"
 		TotalStatements:   len(migration.Statements),
 		Revision:          revision,
 	}

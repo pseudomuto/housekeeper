@@ -280,8 +280,19 @@ func (rs *RevisionSet) IsCompleted(migration *Migration) bool {
 		return false
 	}
 
-	// Must be StandardRevision without errors
-	if revision.Kind != StandardRevision || revision.Error != nil {
+	// Check for errors
+	if revision.Error != nil {
+		return false
+	}
+
+	// Handle snapshot migrations differently
+	if migration.IsSnapshot {
+		// Snapshots are completed if they have a SnapshotRevision record without errors
+		return revision.Kind == SnapshotRevision
+	}
+
+	// For standard migrations, must be StandardRevision without errors
+	if revision.Kind != StandardRevision {
 		return false
 	}
 
