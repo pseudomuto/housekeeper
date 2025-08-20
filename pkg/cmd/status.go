@@ -10,7 +10,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 )
@@ -18,11 +17,10 @@ import (
 type statusParams struct {
 	fx.In
 
-	Config  *config.Config
-	Project *project.Project
+	Config *config.Config
 }
 
-// NewStatusCommand creates the status command for showing migration status.
+// status creates the status command for showing migration status.
 //
 // The status command displays comprehensive information about the current
 // migration state, including which migrations have been applied, which are
@@ -44,7 +42,7 @@ type statusParams struct {
 //
 //	# Show status with cluster support
 //	housekeeper status --dsn localhost:9000 --cluster production_cluster
-func NewStatusCommand(p statusParams) *cli.Command {
+func status(p statusParams) *cli.Command {
 	return &cli.Command{
 		Name:  "status",
 		Usage: "Show migration status",
@@ -97,7 +95,6 @@ func runStatus(ctx context.Context, cmd *cli.Command, p statusParams) error {
 	verbose := cmd.Bool("verbose")
 
 	slog.Info("Checking migration status",
-		"dsn", dsn,
 		"cluster", cluster,
 	)
 
@@ -318,8 +315,4 @@ func showVerboseStatus(migrations []*migrator.Migration, revisionSet *migrator.R
 		fmt.Printf("   Migrations since snapshot: %d\n", len(migrationsAfterSnapshot))
 		fmt.Println()
 	}
-}
-
-func init() {
-	fx.Provide(NewStatusCommand)
 }

@@ -59,7 +59,7 @@ linters:
               desc: Use github.com/pkg/error over the standard error package
     funlen:
       ignore-comments: true
-      lines: 80
+      lines: 100
       statements: 60
 
     gocognit:

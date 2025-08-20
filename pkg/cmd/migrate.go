@@ -14,7 +14,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 )
@@ -24,11 +23,10 @@ type migrateParams struct {
 
 	Config    *config.Config
 	Formatter *format.Formatter
-	Project   *project.Project
 	Version   *Version
 }
 
-// NewMigrateCommand creates the migrate command for applying pending migrations.
+// migrate creates the migrate command for applying pending migrations.
 //
 // The migrate command executes all pending migrations against the specified ClickHouse
 // instance, updating the database schema to match the current migration state.
@@ -49,7 +47,7 @@ type migrateParams struct {
 //
 //	# Apply migrations with cluster support
 //	housekeeper migrate --dsn localhost:9000 --cluster production_cluster
-func NewMigrateCommand(p migrateParams) *cli.Command {
+func migrate(p migrateParams) *cli.Command {
 	return &cli.Command{
 		Name:    "migrate",
 		Aliases: []string{"apply"},
@@ -63,6 +61,7 @@ if any statement fails, the migration is marked as failed and execution stops.
 The command automatically handles:
 - Bootstrap of housekeeper.revisions tracking table on first run
 - Detection of already-applied migrations to avoid duplicate execution
+- Automatic resume of partially failed migrations from their failure points
 - Comprehensive error reporting with statement-level details
 - Progress tracking and execution timing
 - Integration with cluster-aware ClickHouse deployments
@@ -105,7 +104,6 @@ func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
 	cluster := cmd.String("cluster")
 
 	slog.Info("Starting migration execution",
-		"dsn", dsn,
 		"dry_run", dryRun,
 		"cluster", cluster,
 	)
@@ -141,8 +139,11 @@ func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
 	slog.Info("Connected to ClickHouse successfully")
 
 	if dryRun {
-		return runDryRun(ctx, client, migrations, p)
+		return runDryRun(ctx, client, migrations, p.Formatter)
 	}
+
+	// Show information about partially applied migrations that will be resumed
+	showPartialMigrationInfo(ctx, client, migrationDir)
 
 	// Create executor
 	exec := executor.New(executor.Config{
@@ -179,7 +180,7 @@ func testConnection(ctx context.Context, client *clickhouse.Client) error {
 	return nil
 }
 
-func runDryRun(ctx context.Context, client *clickhouse.Client, migrations []*migrator.Migration, p migrateParams) error {
+func runDryRun(ctx context.Context, client *clickhouse.Client, migrations []*migrator.Migration, formatter *format.Formatter) error {
 	// Load existing revisions to determine what would be executed
 	revisionSet, err := migrator.LoadRevisions(ctx, client)
 	if err != nil {
@@ -193,42 +194,82 @@ func runDryRun(ctx context.Context, client *clickhouse.Client, migrations []*mig
 
 	pendingCount := 0
 	skippedCount := 0
+	resumeCount := 0
 
 	for _, migration := range migrations {
+		// Guard clause: handle completed migrations first
 		if revisionSet.IsCompleted(migration) {
 			fmt.Printf("  ⏭  %s (already applied)\n", migration.Version)
 			skippedCount++
-		} else {
-			fmt.Printf("  ▶  %s (%d statements)\n", migration.Version, len(migration.Statements))
-			pendingCount++
+			continue
+		}
 
-			// Show first few statements for preview
-			for i, stmt := range migration.Statements {
-				if i >= 3 { // Show max 3 statements
-					fmt.Printf("     ... and %d more statements\n", len(migration.Statements)-3)
+		// Guard clause: handle partially applied migrations
+		if revisionSet.IsPartiallyApplied(migration) {
+			revision := revisionSet.GetRevision(migration)
+			fmt.Printf("  ⚠️  %s (%d/%d statements applied - would resume)\n",
+				migration.Version, revision.Applied, revision.Total)
+			resumeCount++
+
+			// Show remaining statements for preview
+			remainingStmts := migration.Statements[revision.Applied:]
+			for i, stmt := range remainingStmts {
+				if i >= 3 { // Show max 3 remaining statements
+					fmt.Printf("     ... and %d more remaining statements\n", len(remainingStmts)-3)
 					break
 				}
 
-				stmtSQL, err := formatStatement(p.Formatter, stmt)
+				stmtSQL, err := formatStatement(formatter, stmt)
 				if err != nil {
-					return errors.Wrapf(err, "failed to format statement %d in migration %s", i+1, migration.Version)
+					return errors.Wrapf(err, "failed to format remaining statement %d in migration %s", revision.Applied+i+1, migration.Version)
 				}
 
 				// Truncate long statements
 				if len(stmtSQL) > 80 {
 					stmtSQL = stmtSQL[:77] + "..."
 				}
-				fmt.Printf("     %s\n", stmtSQL)
+				fmt.Printf("     %s (statement %d)\n", stmtSQL, revision.Applied+i+1)
 			}
+			continue
+		}
+
+		// Default case: handle pending migrations
+		fmt.Printf("  ▶  %s (%d statements)\n", migration.Version, len(migration.Statements))
+		pendingCount++
+
+		// Show first few statements for preview
+		for i, stmt := range migration.Statements {
+			if i >= 3 { // Show max 3 statements
+				fmt.Printf("     ... and %d more statements\n", len(migration.Statements)-3)
+				break
+			}
+
+			stmtSQL, err := formatStatement(formatter, stmt)
+			if err != nil {
+				return errors.Wrapf(err, "failed to format statement %d in migration %s", i+1, migration.Version)
+			}
+
+			// Truncate long statements
+			if len(stmtSQL) > 80 {
+				stmtSQL = stmtSQL[:77] + "..."
+			}
+			fmt.Printf("     %s\n", stmtSQL)
 		}
 	}
 
 	fmt.Println()
-	fmt.Printf("Summary: %d migrations would be executed, %d already applied\n",
-		pendingCount, skippedCount)
+	if resumeCount > 0 {
+		fmt.Printf("Summary: %d migrations would be executed, %d would be resumed, %d already applied\n",
+			pendingCount, resumeCount, skippedCount)
+	} else {
+		fmt.Printf("Summary: %d migrations would be executed, %d already applied\n",
+			pendingCount, skippedCount)
+	}
 
-	if pendingCount == 0 {
+	if pendingCount == 0 && resumeCount == 0 {
 		fmt.Println("All migrations are up to date.")
+	} else if resumeCount > 0 {
+		fmt.Println("Use 'housekeeper migrate --dsn <dsn>' to resume the partially applied migrations.")
 	}
 
 	return nil
@@ -307,6 +348,38 @@ func formatStatement(formatter *format.Formatter, stmt *parser.Statement) (strin
 	return buf.String(), nil
 }
 
-func init() {
-	fx.Provide(NewMigrateCommand)
+// showPartialMigrationInfo displays information about partially applied migrations that will be resumed.
+func showPartialMigrationInfo(ctx context.Context, client *clickhouse.Client, migrationDir *migrator.MigrationDir) {
+	// Load existing revisions to check for partial executions
+	revisionSet, err := migrator.LoadRevisions(ctx, client)
+	if err != nil {
+		// If we can't load revisions, we can't show partial info, but that's not a fatal error
+		slog.Warn("Could not load revisions to check for partial migrations", "error", err)
+		return
+	}
+
+	// Find partially applied migrations
+	partiallyApplied := revisionSet.GetPartiallyApplied(migrationDir)
+
+	if len(partiallyApplied) == 0 {
+		return // No partial migrations, nothing to show
+	}
+
+	fmt.Printf("Found %d partially applied migration(s) that will be resumed:\n", len(partiallyApplied))
+	fmt.Println()
+
+	for _, migration := range partiallyApplied {
+		revision := revisionSet.GetRevision(migration)
+		fmt.Printf("  ⚠️  %s: %d/%d statements applied\n",
+			migration.Version, revision.Applied, revision.Total)
+
+		if revision.Error != nil {
+			fmt.Printf("     Last error: %s\n", *revision.Error)
+		}
+
+		remainingStmts := revision.Total - revision.Applied
+		fmt.Printf("     Will resume with %d remaining statement(s)\n", remainingStmts)
+	}
+
+	fmt.Println()
 }

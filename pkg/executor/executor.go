@@ -306,11 +306,25 @@ func (e *Executor) executeMigration(ctx context.Context, migration *migrator.Mig
 		return e.executeSnapshotMigration(ctx, migration, startTime)
 	}
 
-	// Execute migration statements
-	var statementsApplied int
+	// Check for partial execution and determine starting point
+	_, startIndex, err := e.getPartialRevision(migration, revisionSet)
+	if err != nil {
+		return &ExecutionResult{
+			Version:           migration.Version,
+			Status:            StatusFailed,
+			Error:             errors.Wrap(err, "failed to validate partial revision"),
+			ExecutionTime:     time.Since(startTime),
+			StatementsApplied: 0,
+			TotalStatements:   len(migration.Statements),
+		}
+	}
+
+	// Execute migration statements starting from the determined index
+	statementsApplied := startIndex
 	var executionError error
 
-	for i, stmt := range migration.Statements {
+	for i := startIndex; i < len(migration.Statements); i++ {
+		stmt := migration.Statements[i]
 		stmtSQL, err := e.formatStatement(stmt)
 		if err != nil {
 			executionError = errors.Wrapf(err, "failed to format statement %d", i+1)
@@ -328,15 +342,13 @@ func (e *Executor) executeMigration(ctx context.Context, migration *migrator.Mig
 	executionTime := time.Since(startTime)
 
 	// Determine execution status
-	var status ExecutionStatus
+	status := StatusSuccess
 	if executionError != nil {
 		status = StatusFailed
-	} else {
-		status = StatusSuccess
 	}
 
 	// Compute migration hash and partial hashes
-	migrationHash, partialHashes := e.computeHashes(migration)
+	migrationHash, partialHashes := e.ComputeHashes(migration)
 
 	// Create revision record
 	revision := &migrator.Revision{
@@ -387,7 +399,7 @@ func (e *Executor) executeSnapshotMigration(ctx context.Context, migration *migr
 	executionTime := time.Since(startTime)
 
 	// Compute migration hash and partial hashes (for integrity tracking)
-	migrationHash, partialHashes := e.computeHashes(migration)
+	migrationHash, partialHashes := e.ComputeHashes(migration)
 
 	// Create revision record with SnapshotRevision kind
 	revision := &migrator.Revision{
@@ -429,6 +441,90 @@ func (e *Executor) executeSnapshotMigration(ctx context.Context, migration *migr
 		TotalStatements:   len(migration.Statements),
 		Revision:          revision,
 	}
+}
+
+// getPartialRevision checks for existing partial revisions and determines the starting execution index.
+//
+// Returns:
+//   - partialRevision: the existing partial revision, or nil if none exists
+//   - startIndex: the statement index to start execution from (0 for new migrations)
+//   - error: validation error if partial revision exists but is invalid
+//
+// This method enables resuming partially failed migrations by:
+//   - Detecting existing revisions with Applied < Total (partial execution)
+//   - Validating statement integrity using partial hashes
+//   - Determining the correct starting statement index for resume
+func (e *Executor) getPartialRevision(migration *migrator.Migration, revisionSet *migrator.RevisionSet) (*migrator.Revision, int, error) {
+	// Check if a revision already exists for this migration
+	revision := revisionSet.GetRevision(migration)
+	if revision == nil {
+		// No existing revision, start from beginning
+		return nil, 0, nil
+	}
+
+	// If migration is completed, this shouldn't be called (caught earlier)
+	if revision.Error == nil && revision.Applied == revision.Total {
+		return nil, 0, nil
+	}
+
+	// If revision has error but no partial execution, start from beginning
+	if revision.Applied == 0 {
+		return revision, 0, nil
+	}
+
+	// Validate partial revision integrity
+	if err := e.validatePartialRevision(migration, revision); err != nil {
+		return nil, 0, errors.Wrap(err, "partial revision validation failed")
+	}
+
+	// Resume from the next statement after the last successfully applied one
+	startIndex := revision.Applied
+
+	return revision, startIndex, nil
+}
+
+// validatePartialRevision validates that a partial revision matches the current migration file.
+//
+// This prevents resuming migrations when:
+//   - Migration file has been modified since partial execution
+//   - Statement count has changed
+//   - Statement hashes don't match (indicating content changes)
+//
+// Returns error if validation fails, nil if validation passes.
+func (e *Executor) validatePartialRevision(migration *migrator.Migration, revision *migrator.Revision) error {
+	// Check that statement count matches
+	if len(migration.Statements) != revision.Total {
+		return errors.Errorf(
+			"migration statement count changed: expected %d statements, found %d in revision",
+			len(migration.Statements), revision.Total,
+		)
+	}
+
+	// Check that we have partial hashes for validation
+	if len(revision.PartialHashes) == 0 {
+		return errors.New("partial revision has no statement hashes for validation")
+	}
+
+	// Validate hashes for the applied statements
+	for i := 0; i < revision.Applied && i < len(revision.PartialHashes); i++ {
+		stmt := migration.Statements[i]
+		stmtSQL, err := e.formatStatement(stmt)
+		if err != nil {
+			return errors.Wrapf(err, "failed to format statement %d for validation", i+1)
+		}
+
+		expectedHash := revision.PartialHashes[i]
+		actualHash := e.computeHash(stmtSQL)
+
+		if expectedHash != actualHash {
+			return errors.Errorf(
+				"statement %d hash mismatch: migration file may have been modified since partial execution (expected %s, got %s)",
+				i+1, expectedHash, actualHash,
+			)
+		}
+	}
+
+	return nil
 }
 
 // saveRevision saves a revision record to the housekeeper.revisions table.
@@ -476,8 +572,9 @@ func (e *Executor) formatStatement(stmt *parser.Statement) (string, error) {
 	return buf.String(), nil
 }
 
-// computeHashes computes the migration hash and partial hashes for each statement.
-func (e *Executor) computeHashes(migration *migrator.Migration) (string, []string) {
+// ComputeHashes computes the migration hash and partial hashes for each statement.
+// This method is exported for testing purposes.
+func (e *Executor) ComputeHashes(migration *migrator.Migration) (string, []string) {
 	// Compute hash for each statement
 	partialHashes := make([]string, 0, len(migration.Statements))
 	var allContent strings.Builder

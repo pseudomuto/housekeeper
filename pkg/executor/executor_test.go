@@ -2,6 +2,7 @@ package executor_test
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -570,4 +571,259 @@ func TestExecutor_SnapshotExecution(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExecutor_ResumePartialMigration(t *testing.T) {
+	tests := []struct {
+		name             string
+		migration        *migrator.Migration
+		existingRevision *migrator.Revision
+		setupMock        func(*mockClickHouse)
+		expectedResult   executor.ExecutionStatus
+		expectedApplied  int
+		expectError      bool
+	}{
+		{
+			name: "successful resume from partial execution",
+			migration: &migrator.Migration{
+				Version: "20240101120000_test",
+				Statements: []*parser.Statement{
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db1"}},
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db2"}},
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db3"}},
+				},
+			},
+			existingRevision: &migrator.Revision{
+				Version: "20240101120000_test",
+				Kind:    migrator.StandardRevision,
+				Applied: 1, // Only first statement applied
+				Total:   3,
+				Hash:    "test-hash",
+				// Compute actual hashes for the statements - will be set in setup
+				PartialHashes: nil,
+				Error:         stringPtr("execution failed at statement 2"),
+			},
+			setupMock: func(m *mockClickHouse) {
+				execCount := 0
+				m.execFunc = func(ctx context.Context, query string, args ...any) error {
+					execCount++
+					// Allow bootstrap and subsequent executions to succeed
+					return nil
+				}
+			},
+			expectedResult:  executor.StatusSuccess,
+			expectedApplied: 3, // Should now have all 3 applied
+		},
+		{
+			name: "hash validation failure - file modified",
+			migration: &migrator.Migration{
+				Version: "20240101120000_test",
+				Statements: []*parser.Statement{
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db1_modified"}}, // Modified!
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db2"}},
+				},
+			},
+			existingRevision: &migrator.Revision{
+				Version:       "20240101120000_test",
+				Kind:          migrator.StandardRevision,
+				Applied:       1,
+				Total:         2,
+				PartialHashes: []string{"h1:original_hash=", "h1:hash2="},
+			},
+			setupMock: func(m *mockClickHouse) {
+				m.queryFunc = func(ctx context.Context, query string, args ...any) (driver.Rows, error) {
+					if strings.Contains(query, "FROM housekeeper.revisions") {
+						return &mockResumeRows{
+							revision: &migrator.Revision{
+								Version:       "20240101120000_test",
+								ExecutedAt:    time.Now(),
+								Kind:          migrator.StandardRevision,
+								Applied:       1,
+								Total:         2,
+								PartialHashes: []string{"h1:original_hash=", "h1:hash2="},
+							},
+						}, nil
+					}
+					return &mockRows{}, nil
+				}
+			},
+			expectedResult: executor.StatusFailed,
+			expectError:    false, // Execute doesn't return error, just failed status
+		},
+		{
+			name: "statement count mismatch",
+			migration: &migrator.Migration{
+				Version: "20240101120000_test",
+				Statements: []*parser.Statement{
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db1"}},
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db2"}},
+					{CreateDatabase: &parser.CreateDatabaseStmt{Name: "db3"}}, // Extra statement added!
+				},
+			},
+			setupMock: func(m *mockClickHouse) {
+				m.queryFunc = func(ctx context.Context, query string, args ...any) (driver.Rows, error) {
+					if strings.Contains(query, "FROM housekeeper.revisions") {
+						return &mockResumeRows{
+							revision: &migrator.Revision{
+								Version:       "20240101120000_test",
+								Kind:          migrator.StandardRevision,
+								Applied:       1,
+								Total:         2, // Original had only 2 statements
+								PartialHashes: []string{"h1:hash1=", "h1:hash2="},
+							},
+						}, nil
+					}
+					return &mockRows{}, nil
+				}
+			},
+			expectedResult: executor.StatusFailed,
+			expectError:    false, // Execute doesn't return error, just failed status
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create executor to compute hashes if needed (only for cases with nil PartialHashes)
+			if tt.existingRevision != nil && tt.existingRevision.PartialHashes == nil {
+				tempExecutor := executor.New(executor.Config{
+					ClickHouse:         &mockClickHouse{},
+					Formatter:          format.New(format.Defaults),
+					HousekeeperVersion: "test-version",
+				})
+				_, partialHashes := tempExecutor.ComputeHashes(tt.migration)
+				tt.existingRevision.PartialHashes = partialHashes
+			}
+
+			mockCH := &mockClickHouse{}
+			if tt.setupMock != nil {
+				tt.setupMock(mockCH)
+			}
+
+			// Set up the queryFunc to return the existing revision if it exists and no custom setup was provided
+			if tt.existingRevision != nil && mockCH.queryFunc == nil {
+				mockCH.queryFunc = func(ctx context.Context, query string, args ...any) (driver.Rows, error) {
+					if strings.Contains(query, "FROM housekeeper.revisions") {
+						// Return the revision with the computed hashes
+						return &mockResumeRows{revision: tt.existingRevision}, nil
+					}
+					return &mockRows{}, nil
+				}
+			}
+
+			executor := executor.New(executor.Config{
+				ClickHouse:         mockCH,
+				Formatter:          format.New(format.Defaults),
+				HousekeeperVersion: "test-version",
+			})
+
+			results, err := executor.Execute(context.Background(), []*migrator.Migration{tt.migration})
+
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+
+			result := results[0]
+			assert.Equal(t, tt.expectedResult, result.Status)
+			assert.Equal(t, tt.migration.Version, result.Version)
+
+			if tt.expectedApplied > 0 {
+				assert.Equal(t, tt.expectedApplied, result.StatementsApplied)
+			}
+		})
+	}
+}
+
+// mockResumeRows simulates a revision query result for resume testing
+type mockResumeRows struct {
+	revision *migrator.Revision
+	scanned  bool
+}
+
+func (m *mockResumeRows) Next() bool {
+	return !m.scanned
+}
+
+func (m *mockResumeRows) Scan(dest ...any) error {
+	if m.scanned {
+		return nil
+	}
+	m.scanned = true
+
+	// Simulate scanning revision data into destinations
+	if len(dest) >= 10 { // nolint: nestif
+		if version, ok := dest[0].(*string); ok {
+			*version = m.revision.Version
+		}
+		if executedAt, ok := dest[1].(*time.Time); ok {
+			*executedAt = m.revision.ExecutedAt
+		}
+		if executionTime, ok := dest[2].(*uint64); ok {
+			milliseconds := m.revision.ExecutionTime.Milliseconds()
+			if milliseconds < 0 {
+				*executionTime = 0
+			} else {
+				*executionTime = uint64(milliseconds)
+			}
+		}
+		if kind, ok := dest[3].(*string); ok {
+			*kind = string(m.revision.Kind)
+		}
+		if errorPtr, ok := dest[4].(**string); ok {
+			*errorPtr = m.revision.Error
+		}
+		if applied, ok := dest[5].(*uint32); ok {
+			// Clamp to uint32 range: [0, math.MaxUint32]
+			appliedVal := max(0, min(m.revision.Applied, math.MaxUint32))
+			*applied = uint32(appliedVal) //nolint:gosec // clamped to uint32 range above
+		}
+		if total, ok := dest[6].(*uint32); ok {
+			// Clamp to uint32 range: [0, math.MaxUint32]
+			totalVal := max(0, min(m.revision.Total, math.MaxUint32))
+			*total = uint32(totalVal) //nolint:gosec // clamped to uint32 range above
+		}
+		if hash, ok := dest[7].(*string); ok {
+			*hash = m.revision.Hash
+		}
+		if partialHashes, ok := dest[8].(*[]string); ok {
+			*partialHashes = m.revision.PartialHashes
+		}
+		if housekeeperVersion, ok := dest[9].(*string); ok {
+			*housekeeperVersion = m.revision.HousekeeperVersion
+		}
+	}
+
+	return nil
+}
+
+func (m *mockResumeRows) Close() error {
+	return nil
+}
+
+func (m *mockResumeRows) Err() error {
+	return nil
+}
+
+func (m *mockResumeRows) ColumnTypes() []driver.ColumnType {
+	return nil
+}
+
+func (m *mockResumeRows) Columns() []string {
+	return []string{"version", "executed_at", "execution_time_ms", "kind", "error", "applied", "total", "hash", "partial_hashes", "housekeeper_version"}
+}
+
+func (m *mockResumeRows) ScanStruct(dest any) error {
+	return nil
+}
+
+func (m *mockResumeRows) Totals(dest ...any) error {
+	return nil
+}
+
+// Helper function to create string pointers
+func stringPtr(s string) *string {
+	return &s
 }

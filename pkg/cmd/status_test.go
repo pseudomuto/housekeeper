@@ -10,7 +10,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/cmd/testutil"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/format"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,16 +94,11 @@ CREATE TABLE status_test.analytics (
 	cfg := testutil.DefaultConfig()
 	cfg.Dir = filepath.Join(projectDir, "db", "migrations") // Set absolute path to migrations
 	formatter := format.New(format.Defaults)
-	proj := project.New(project.ProjectParams{
-		Dir:       projectDir,
-		Formatter: formatter,
-	})
 
 	t.Run("status before bootstrap", func(t *testing.T) {
 		// Create status command
-		command := NewStatusCommand(statusParams{
-			Config:  cfg,
-			Project: proj,
+		command := status(statusParams{
+			Config: cfg,
 		})
 
 		// Execute command
@@ -115,10 +109,9 @@ CREATE TABLE status_test.analytics (
 	t.Run("status after partial execution", func(t *testing.T) {
 		// First, apply some migrations using the migrate command
 		version := &Version{Version: "test-1.0.0"}
-		migrateCommand := NewMigrateCommand(migrateParams{
+		migrateCommand := migrate(migrateParams{
 			Config:    cfg,
 			Formatter: formatter,
-			Project:   proj,
 			Version:   version,
 		})
 
@@ -127,9 +120,8 @@ CREATE TABLE status_test.analytics (
 		require.NoError(t, err)
 
 		// Check status
-		statusCommand := NewStatusCommand(statusParams{
-			Config:  cfg,
-			Project: proj,
+		statusCommand := status(statusParams{
+			Config: cfg,
 		})
 
 		err = testutil.RunCommand(t, statusCommand, []string{"--dsn", dsn}) //nolint:contextcheck
@@ -153,9 +145,8 @@ CREATE TABLE status_test.analytics (
 
 	t.Run("status with verbose flag", func(t *testing.T) {
 		// Create status command
-		command := NewStatusCommand(statusParams{
-			Config:  cfg,
-			Project: proj,
+		command := status(statusParams{
+			Config: cfg,
 		})
 
 		// Execute command with verbose flag
@@ -165,9 +156,8 @@ CREATE TABLE status_test.analytics (
 
 	t.Run("status with connection failure", func(t *testing.T) {
 		// Create status command
-		command := NewStatusCommand(statusParams{
-			Config:  cfg,
-			Project: proj,
+		command := status(statusParams{
+			Config: cfg,
 		})
 
 		// Execute command with invalid DSN
@@ -178,17 +168,11 @@ CREATE TABLE status_test.analytics (
 
 func TestStatusCommand_CommandStructure(t *testing.T) {
 	// Create test dependencies
-	projectDir := t.TempDir()
 	cfg := testutil.DefaultConfig()
-	proj := project.New(project.ProjectParams{
-		Dir:       projectDir,
-		Formatter: format.New(format.Defaults),
-	})
 
 	// Test that command has correct structure
-	command := NewStatusCommand(statusParams{
-		Config:  cfg,
-		Project: proj,
+	command := status(statusParams{
+		Config: cfg,
 	})
 
 	assert.Equal(t, "status", command.Name)

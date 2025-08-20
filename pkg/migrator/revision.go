@@ -579,3 +579,69 @@ func (rs *RevisionSet) HasSnapshot() bool {
 	}
 	return false
 }
+
+// IsPartiallyApplied returns true if the migration was partially executed.
+//
+// A migration is considered partially applied if:
+//   - There exists a revision with the same version
+//   - The revision kind is StandardRevision
+//   - Some statements were applied but not all (0 < applied < total)
+//   - The revision may or may not have an error (partial execution can succeed up to the failure point)
+//
+// This method helps identify migrations that can potentially be resumed from their failure point.
+//
+// Example usage:
+//
+//	if revisionSet.IsPartiallyApplied(migration) {
+//		revision := revisionSet.GetRevision(migration)
+//		fmt.Printf("⚠ %s partially applied: %d/%d statements executed\n",
+//			migration.Version, revision.Applied, revision.Total)
+//	}
+func (rs *RevisionSet) IsPartiallyApplied(migration *Migration) bool {
+	revision, exists := rs.revisions[migration.Version]
+	if !exists {
+		return false
+	}
+
+	// Only StandardRevision entries can be partially applied
+	if revision.Kind != StandardRevision {
+		return false
+	}
+
+	// Must have some statements applied, but not all
+	return revision.Applied > 0 && revision.Applied < revision.Total
+}
+
+// GetPartiallyApplied returns all migrations that have been partially executed.
+//
+// This method filters the migrations in a MigrationDir to return only those
+// that have partial execution (some statements applied but not all). These
+// migrations are candidates for resume operations.
+//
+// The order of migrations is preserved from the original MigrationDir.
+//
+// Example usage:
+//
+//	partiallyApplied := revisionSet.GetPartiallyApplied(migrationDir)
+//	if len(partiallyApplied) > 0 {
+//		fmt.Printf("Found %d partially applied migrations:\n", len(partiallyApplied))
+//		for _, migration := range partiallyApplied {
+//			revision := revisionSet.GetRevision(migration)
+//			fmt.Printf("  ⚠ %s: %d/%d statements applied\n",
+//				migration.Version, revision.Applied, revision.Total)
+//		}
+//	}
+func (rs *RevisionSet) GetPartiallyApplied(migrationDir *MigrationDir) []*Migration {
+	if migrationDir == nil {
+		return make([]*Migration, 0)
+	}
+
+	partiallyApplied := make([]*Migration, 0)
+	for _, migration := range migrationDir.Migrations {
+		if rs.IsPartiallyApplied(migration) {
+			partiallyApplied = append(partiallyApplied, migration)
+		}
+	}
+
+	return partiallyApplied
+}

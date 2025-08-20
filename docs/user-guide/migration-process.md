@@ -248,6 +248,112 @@ This ensures:
 - **Consistency**: Same migrations across environments
 - **Chained Verification**: Each migration builds on the previous
 
+## Automatic Partial Progress Tracking
+
+Housekeeper automatically tracks the progress of migration execution at the statement level, enabling seamless recovery from failures without manual intervention.
+
+### How Partial Progress Works
+
+When applying migrations, Housekeeper:
+
+1. **Statement-Level Tracking**: Records progress after each successful statement
+2. **Hash Validation**: Stores cryptographic hashes of each statement for integrity
+3. **Automatic Resume**: Automatically detects and resumes from failure points
+4. **No User Action Required**: No flags or commands needed - happens automatically
+
+### Migration Execution Tracking
+
+Each migration execution is tracked in the `housekeeper.revisions` table:
+
+```sql
+-- Example revision record
+INSERT INTO housekeeper.revisions (
+    version,           -- Migration version (e.g., '20240101120000_create_users')
+    executed_at,       -- UTC timestamp of execution
+    execution_time_ms, -- Total execution time
+    kind,             -- 'migration' or 'snapshot'
+    error,            -- Error message if failed (NULL if successful)
+    applied,          -- Number of statements successfully applied
+    total,            -- Total statements in migration
+    hash,             -- h1 hash of entire migration
+    partial_hashes,   -- Array of h1 hashes for each statement
+    housekeeper_version -- Version of Housekeeper that ran the migration
+);
+```
+
+### Automatic Recovery Examples
+
+#### Partial Failure Scenario
+
+If a migration fails partway through:
+
+```sql
+-- Migration: 20240101120000_setup_analytics.sql (5 statements total)
+CREATE DATABASE analytics;                    -- ✅ Statement 1: Success
+CREATE TABLE analytics.events (...);          -- ✅ Statement 2: Success  
+CREATE TABLE analytics.users (...);           -- ✅ Statement 3: Success
+CREATE DICTIONARY analytics.locations (...);  -- ❌ Statement 4: Failed (network error)
+CREATE VIEW analytics.summary (...);          -- ⏸  Statement 5: Not executed
+```
+
+**Revision Record Created:**
+- `applied`: 3 (statements 1-3 completed)
+- `total`: 5 (migration has 5 statements)
+- `error`: "Network timeout connecting to dictionary source"
+- `partial_hashes`: ["h1:stmt1hash=", "h1:stmt2hash=", "h1:stmt3hash=", ...]
+
+#### Automatic Resume
+
+When you run migrations again:
+
+```bash
+# Simply run migrate - no special flags needed
+housekeeper migrate --dsn localhost:9000
+```
+
+Housekeeper automatically:
+
+1. **Detects Partial State**: Finds revision with `applied < total`
+2. **Validates Integrity**: Confirms statements 1-3 haven't changed using hashes
+3. **Shows Progress**: Displays what will be resumed
+4. **Resumes Execution**: Starts from statement 4 (the failed statement)
+
+```bash
+Found 1 partially applied migration(s) that will be resumed:
+
+  ⚠️  20240101120000_setup_analytics: 3/5 statements applied
+     Last error: Network timeout connecting to dictionary source
+     Will resume with 2 remaining statement(s)
+
+Migration execution results:
+  ⚠️  20240101120000_setup_analytics resumed from statement 4 in 1.234s (2/2 remaining statements)
+```
+
+### Safety Features
+
+#### Hash Validation
+
+Before resuming, Housekeeper validates migration file integrity:
+
+```bash
+# ❌ If migration file was modified after partial execution
+Error: statement 2 hash mismatch: migration file may have been modified 
+since partial execution (expected h1:abc123=, got h1:def456=)
+
+# ✅ If migration file is unchanged, resume proceeds safely
+Found partial migration, resuming from statement 4...
+```
+
+#### Statement Count Validation
+
+```bash
+# ❌ If statements were added/removed from migration file
+Error: migration statement count changed: expected 5 statements, 
+found 7 in revision
+
+# This prevents resuming with a different migration file
+```
+
 ## Development Workflow
 
 ### Development Cycle
@@ -410,12 +516,31 @@ housekeeper diff
 ```
 
 #### Failed Migration
+
+Housekeeper automatically handles partial migration failures:
+
+```bash
+# ✅ Simply run migrate again - automatic resume
+housekeeper migrate --dsn localhost:9000
+
+# ✅ Check migration status to see partial progress
+housekeeper status --dsn localhost:9000 --verbose
+
+# ✅ Use dry-run to see what would be resumed
+housekeeper migrate --dsn localhost:9000 --dry-run
+```
+
+If you need to manually investigate:
+
 ```bash
 # Check what was applied using schema dump
 housekeeper schema dump --url localhost:9000
 
-# Manual rollback if needed
-# Apply reverse operations manually
+# Check revision table for detailed failure info
+SELECT version, applied, total, error, executed_at 
+FROM housekeeper.revisions 
+WHERE error IS NOT NULL 
+ORDER BY executed_at DESC;
 ```
 
 ## Next Steps

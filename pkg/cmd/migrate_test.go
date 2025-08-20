@@ -10,7 +10,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/cmd/testutil"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/format"
-	"github.com/pseudomuto/housekeeper/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,19 +90,14 @@ COMMENT 'User events';
 	cfg := testutil.DefaultConfig()
 	cfg.Dir = filepath.Join(projectDir, "db", "migrations") // Set absolute path to migrations
 	formatter := format.New(format.Defaults)
-	proj := project.New(project.ProjectParams{
-		Dir:       projectDir,
-		Formatter: formatter,
-	})
 	version := &Version{Version: "test-1.0.0"}
 
 	// Test initial migration
 	t.Run("initial migrate command", func(t *testing.T) {
 		// Create migrate command
-		command := NewMigrateCommand(migrateParams{
+		command := migrate(migrateParams{
 			Config:    cfg,
 			Formatter: formatter,
-			Project:   proj,
 			Version:   version,
 		})
 
@@ -159,10 +153,9 @@ COMMENT 'User events';
 	// Test running migrations again (should be skipped)
 	t.Run("migrate command with no changes", func(t *testing.T) {
 		// Create migrate command
-		command := NewMigrateCommand(migrateParams{
+		command := migrate(migrateParams{
 			Config:    cfg,
 			Formatter: formatter,
-			Project:   proj,
 			Version:   version,
 		})
 
@@ -184,10 +177,9 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 		))
 
 		// Create migrate command
-		command := NewMigrateCommand(migrateParams{
+		command := migrate(migrateParams{
 			Config:    cfg,
 			Formatter: formatter,
-			Project:   proj,
 			Version:   version,
 		})
 
@@ -213,10 +205,9 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 	// Test applying the new migration
 	t.Run("migrate command with new migration", func(t *testing.T) {
 		// Create migrate command
-		command := NewMigrateCommand(migrateParams{
+		command := migrate(migrateParams{
 			Config:    cfg,
 			Formatter: formatter,
-			Project:   proj,
 			Version:   version,
 		})
 
@@ -242,10 +233,9 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 	// Test connection failure
 	t.Run("connection failure", func(t *testing.T) {
 		// Create migrate command
-		command := NewMigrateCommand(migrateParams{
+		command := migrate(migrateParams{
 			Config:    cfg,
 			Formatter: formatter,
-			Project:   proj,
 			Version:   version,
 		})
 
@@ -258,18 +248,15 @@ ALTER TABLE analytics.users ADD INDEX idx_email email TYPE minmax GRANULARITY 4;
 func TestMigrateCommand_Aliases(t *testing.T) {
 	// Create test dependencies
 	projectDir := t.TempDir()
+	cfg := testutil.DefaultConfig()
+	cfg.Dir = filepath.Join(projectDir, "db", "migrations")
 	formatter := format.New(format.Defaults)
-	proj := project.New(project.ProjectParams{
-		Dir:       projectDir,
-		Formatter: formatter,
-	})
 	version := &Version{Version: "test-1.0.0"}
 
 	// Test that command has correct name and aliases
-	command := NewMigrateCommand(migrateParams{
-		Config:    testutil.DefaultConfig(),
+	command := migrate(migrateParams{
+		Config:    cfg,
 		Formatter: formatter,
-		Project:   proj,
 		Version:   version,
 	})
 

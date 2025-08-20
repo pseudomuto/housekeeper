@@ -332,6 +332,72 @@ File Generator: Creates timestamped files
 Output: Ready-to-apply migration files
 ```
 
+### 6. Migration Execution & Progress Tracking
+
+Housekeeper includes a sophisticated migration execution engine with automatic partial progress tracking:
+
+```bash
+Input: Migration files
+↓
+Executor: Statement-by-statement execution
+- Bootstrap housekeeper.revisions table
+- Load existing revisions (detect partial progress)
+- Execute statements with progress tracking
+- Record revision entries with hash validation
+- Automatic resume from failure points
+↓
+Output: Execution results with detailed progress information
+```
+
+#### Execution Features
+
+**Statement-Level Progress:**
+- Each statement execution is tracked individually
+- Progress recorded in `housekeeper.revisions` table
+- Cryptographic hashes stored for integrity validation
+- Automatic detection and resume of partial failures
+
+**Example Execution Flow:**
+```go
+// Migration: 5 statements total
+for i, statement := range migration.Statements {
+    // Skip already-applied statements in partial recovery
+    if i < partialRevision.Applied {
+        continue // Statement already applied successfully
+    }
+    
+    // Execute statement
+    if err := executor.Execute(statement); err != nil {
+        // Record partial progress: i statements applied, error at statement i+1
+        revision := &Revision{
+            Applied: i,           // Successfully applied statements
+            Total:   len(statements), // Total statements in migration
+            Error:   err.Error(),     // Failure reason
+            PartialHashes: hashes[:i], // Hashes of applied statements
+        }
+        return recordRevision(revision)
+    }
+}
+```
+
+**Automatic Resume Algorithm:**
+```go
+func (e *Executor) detectPartialState(migration) (startIndex int, err error) {
+    revision := revisionSet.GetRevision(migration)
+    if revision == nil || revision.Applied == revision.Total {
+        return 0, nil // New migration or completed migration
+    }
+    
+    // Validate migration file hasn't changed
+    if err := e.validateStatementHashes(migration, revision); err != nil {
+        return 0, err // Migration file modified since partial execution
+    }
+    
+    // Resume from next statement after last successful one
+    return revision.Applied, nil
+}
+```
+
 ## Operation Ordering Algorithm
 
 Housekeeper ensures safe migration ordering by analyzing object dependencies:

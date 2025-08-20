@@ -243,6 +243,159 @@ clickhouse-client --queries-file ./db/migrations/20240806143022.sql
 housekeeper status --migrations ./db/migrations/
 ```
 
+### Partial Migration Failures & Recovery
+
+Housekeeper automatically handles partial migration failures, but you may need to troubleshoot issues with the recovery process.
+
+#### Understanding Partial Failures
+
+**What happens when a migration fails partway through?**
+
+```sql
+-- Migration: 20240101120000_setup_analytics.sql
+CREATE DATABASE analytics;              -- ✅ Statement 1: Success
+CREATE TABLE analytics.events (...);    -- ✅ Statement 2: Success  
+CREATE TABLE analytics.users (...);     -- ❌ Statement 3: Failed
+CREATE VIEW analytics.summary (...);    -- ⏸  Statement 4: Not executed
+```
+
+Housekeeper automatically:
+1. Records successful statements (1-2) in revision table
+2. Records the error at statement 3
+3. Stores statement hashes for integrity validation
+4. Sets up automatic resume for next migration run
+
+#### Automatic Recovery Process
+
+**Issue**: You want to understand what will be resumed
+
+**Diagnosis**:
+
+```bash
+# Check status to see partial migrations
+housekeeper status --dsn localhost:9000 --verbose
+
+# See what would be resumed with dry-run
+housekeeper migrate --dsn localhost:9000 --dry-run
+
+# Examine revision table directly
+echo "SELECT version, applied, total, error, executed_at FROM housekeeper.revisions WHERE error IS NOT NULL ORDER BY executed_at DESC;" | clickhouse-client
+```
+
+**Example Output**:
+```bash
+Found 1 partially applied migration(s) that will be resumed:
+
+  ⚠️  20240101120000_setup_analytics: 2/4 statements applied
+     Last error: Table 'users' already exists
+     Will resume with 2 remaining statement(s)
+```
+
+#### Troubleshooting Resume Issues
+
+**Issue**: Automatic resume fails with validation errors
+
+**Common Errors**:
+
+1. **Hash Mismatch (Migration File Modified)**:
+   ```
+   Error: statement 2 hash mismatch: migration file may have been modified since partial execution
+   Expected: h1:abc123=, Got: h1:def456=
+   ```
+   
+   **Solutions**:
+   ```bash
+   # ❌ Don't modify migration files after partial execution
+   # ✅ Either restore original file or create new migration
+   
+   # Option 1: Restore original migration file
+   git checkout db/migrations/20240101120000_setup_analytics.sql
+   
+   # Option 2: Create new migration with remaining changes
+   housekeeper diff  # Generates new migration with remaining changes
+   ```
+
+2. **Statement Count Mismatch**:
+   ```
+   Error: migration statement count changed: expected 4 statements, found 6 in migration file
+   ```
+   
+   **Solutions**:
+   ```bash
+   # Migration file had statements added/removed after partial execution
+   # Restore original file or clean up partial state
+   
+   # Option 1: Restore original file
+   git checkout db/migrations/20240101120000_setup_analytics.sql
+   
+   # Option 2: Manually clean up partial state (advanced)
+   DELETE FROM housekeeper.revisions WHERE version = '20240101120000_setup_analytics';
+   ```
+
+3. **Dependency Issues During Resume**:
+   ```
+   Error: Table 'events' doesn't exist (needed for view creation)
+   ```
+   
+   **Solution**: Check if dependent objects were created successfully
+   ```sql
+   -- Check which objects exist
+   SELECT name FROM system.tables WHERE database = 'analytics';
+   
+   -- Verify expected objects are present before resuming
+   ```
+
+#### Manual Recovery (Advanced)
+
+**Issue**: Automatic recovery is not working and you need manual intervention
+
+**⚠️ Warning**: Only use manual recovery if automatic resume fails
+
+```bash
+# 1. Examine current state
+housekeeper status --dsn localhost:9000 --verbose
+housekeeper schema dump --url localhost:9000
+
+# 2. Check revision table
+echo "SELECT * FROM housekeeper.revisions WHERE version = '20240101120000_setup_analytics';" | clickhouse-client --vertical
+
+# 3. Options for manual recovery:
+
+# Option A: Delete partial revision and restart migration
+echo "DELETE FROM housekeeper.revisions WHERE version = '20240101120000_setup_analytics';" | clickhouse-client
+housekeeper migrate --dsn localhost:9000  # Restarts from beginning
+
+# Option B: Fix the underlying issue and resume automatically
+# (Fix whatever caused the original failure, then run)
+housekeeper migrate --dsn localhost:9000  # Will resume automatically
+
+# Option C: Mark migration as completed manually (if statements were applied outside Housekeeper)
+echo "UPDATE housekeeper.revisions SET applied = total, error = NULL WHERE version = '20240101120000_setup_analytics';" | clickhouse-client
+```
+
+#### Prevention Best Practices
+
+1. **Test migrations in development first**
+2. **Don't modify migration files after they've been partially executed**
+3. **Monitor ClickHouse logs during migration execution**
+4. **Ensure sufficient resources (disk space, memory) before running large migrations**
+5. **Use `--dry-run` to preview what will be executed**
+
+#### Recovery Verification
+
+After successful recovery:
+
+```bash
+# Verify all migrations are completed
+housekeeper status --dsn localhost:9000
+
+# Check that schema matches expectations
+housekeeper diff  # Should show "No differences found"
+
+# Verify specific objects exist
+housekeeper schema dump --url localhost:9000 | grep "CREATE TABLE"
+```
+
 ## Docker Integration Issues
 
 ### Container Startup Problems
