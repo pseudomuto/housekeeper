@@ -204,15 +204,9 @@ func detectDatabaseRenames(currentDBs, targetDBs map[string]*DatabaseInfo) ([]*D
 
 // databasePropertiesMatch checks if two databases have identical properties (excluding name)
 func databasePropertiesMatch(db1, db2 *DatabaseInfo) bool {
-	// For housekeeper databases, ignore cluster differences
-	clusterMatch := db1.Cluster == db2.Cluster
-	if isHousekeeperDatabase(db1.Name) || isHousekeeperDatabase(db2.Name) {
-		clusterMatch = true // Ignore cluster differences for housekeeper objects
-	}
-
 	return db1.Engine == db2.Engine &&
 		db1.Comment == db2.Comment &&
-		clusterMatch
+		db1.Cluster == db2.Cluster
 }
 
 // generateRenameDatabaseSQL generates RENAME DATABASE SQL
@@ -229,15 +223,9 @@ func generateRenameDatabaseSQL(oldName, newName, onCluster string) string {
 
 // needsModification checks if a database needs to be modified
 func needsModification(current, target *DatabaseInfo) bool {
-	// For housekeeper databases, ignore cluster differences
-	clusterMatch := current.Cluster == target.Cluster
-	if isHousekeeperDatabase(current.Name) || isHousekeeperDatabase(target.Name) {
-		clusterMatch = true // Ignore cluster differences for housekeeper objects
-	}
-
 	return current.Comment != target.Comment ||
 		current.Engine != target.Engine ||
-		!clusterMatch
+		current.Cluster != target.Cluster
 }
 
 // generateCreateDatabaseSQL generates CREATE DATABASE SQL from database info
@@ -281,8 +269,7 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 		return "", errors.Wrapf(ErrUnsupported, "engine change from '%s' to '%s' - requires manual database recreation", current.Engine, target.Engine)
 	}
 
-	// Skip cluster validation for housekeeper databases
-	if current.Cluster != target.Cluster && current.Name != "housekeeper" {
+	if current.Cluster != target.Cluster {
 		return "", errors.Wrapf(ErrUnsupported, "cluster change from '%s' to '%s' - requires manual intervention", current.Cluster, target.Cluster)
 	}
 
@@ -348,10 +335,4 @@ func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists b
 		UpSQL:        upSQL,
 		DownSQL:      downSQL,
 	}, nil
-}
-
-// isHousekeeperDatabase determines if a database name belongs to housekeeper's internal tracking system.
-// Housekeeper databases should have cluster differences ignored during schema comparison.
-func isHousekeeperDatabase(name string) bool {
-	return name == "housekeeper"
 }

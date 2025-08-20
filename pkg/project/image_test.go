@@ -162,7 +162,6 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 		"db/schemas/analytics/tables/events.sql",
 		"db/schemas/analytics/dictionaries/lookup.sql",
 		"db/schemas/analytics/views/summary.sql",
-		"db/schemas/housekeeper/housekeeper.sql",
 	}
 
 	require.ElementsMatch(t, expectedFiles, files)

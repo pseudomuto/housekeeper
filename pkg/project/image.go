@@ -84,9 +84,6 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 		}
 	}
 
-	// Ensure housekeeper database is always included
-	ensureDB("housekeeper")
-
 	return dbObjects
 }
 
@@ -103,15 +100,6 @@ func (p *Project) generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string
 
 	for _, dbName := range dbNames {
 		objects := dbObjects[dbName]
-
-		// Special handling for housekeeper database
-		if dbName == "housekeeper" {
-			fsMap[filepath.Join("db", "schemas", dbName, "housekeeper.sql")] = &fstest.MapFile{
-				Data: defaultHousekeeperSQL,
-			}
-			mainImports = append(mainImports, fmt.Sprintf("schemas/%s/housekeeper.sql", dbName))
-			continue
-		}
 
 		// Create database schema file
 		schemaContent, err := p.generateDatabaseSchemaContent(objects)

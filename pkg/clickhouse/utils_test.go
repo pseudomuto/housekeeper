@@ -16,14 +16,14 @@ func TestBuildSystemDatabaseExclusion(t *testing.T) {
 		{
 			name:           "database column",
 			columnName:     "database",
-			expectedQuery:  "database NOT IN (?, ?, ?, ?)",
-			expectedParams: []any{"default", "system", "information_schema", "INFORMATION_SCHEMA"},
+			expectedQuery:  "database NOT IN (?, ?, ?, ?, ?)",
+			expectedParams: []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
 		},
 		{
 			name:           "name column",
 			columnName:     "name",
-			expectedQuery:  "name NOT IN (?, ?, ?, ?)",
-			expectedParams: []any{"default", "system", "information_schema", "INFORMATION_SCHEMA"},
+			expectedQuery:  "name NOT IN (?, ?, ?, ?, ?)",
+			expectedParams: []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
 		},
 	}
 
@@ -48,22 +48,22 @@ func TestBuildDatabaseExclusion(t *testing.T) {
 			name:            "only system databases",
 			columnName:      "database",
 			ignoreDatabases: []string{},
-			expectedQuery:   "database NOT IN (?, ?, ?, ?)",
-			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA"},
+			expectedQuery:   "database NOT IN (?, ?, ?, ?, ?)",
+			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
 		},
 		{
 			name:            "system and user databases",
 			columnName:      "name",
 			ignoreDatabases: []string{"testing_db", "temp_db"},
-			expectedQuery:   "name NOT IN (?, ?, ?, ?, ?, ?)",
-			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "testing_db", "temp_db"},
+			expectedQuery:   "name NOT IN (?, ?, ?, ?, ?, ?, ?)",
+			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "testing_db", "temp_db"},
 		},
 		{
 			name:            "single ignored database",
 			columnName:      "database",
 			ignoreDatabases: []string{"staging"},
-			expectedQuery:   "database NOT IN (?, ?, ?, ?, ?)",
-			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "staging"},
+			expectedQuery:   "database NOT IN (?, ?, ?, ?, ?, ?)",
+			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "staging"},
 		},
 	}
 

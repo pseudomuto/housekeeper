@@ -310,11 +310,8 @@ func viewsAreEqual(current, target *ViewInfo) bool {
 	// Note: OrReplace is ignored because it's a creation-time directive
 	// that's not preserved in ClickHouse's stored object definitions
 
-	// For housekeeper views, ignore cluster differences
-	if current.Database != "housekeeper" && target.Database != "housekeeper" {
-		if current.Cluster != target.Cluster {
-			return false
-		}
+	if current.Cluster != target.Cluster {
+		return false
 	}
 
 	// Compare the full statements for deep equality
@@ -339,11 +336,8 @@ func viewsHaveSameProperties(view1, view2 *ViewInfo) bool {
 	// Note: OrReplace is ignored because it's a creation-time directive
 	// that's not preserved in ClickHouse's stored object definitions
 
-	// For housekeeper views, ignore cluster differences
-	if view1.Database != "housekeeper" && view2.Database != "housekeeper" {
-		if view1.Cluster != view2.Cluster {
-			return false
-		}
+	if view1.Cluster != view2.Cluster {
+		return false
 	}
 
 	// Compare statements ignoring names

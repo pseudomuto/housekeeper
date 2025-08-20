@@ -1,7 +1,5 @@
 CREATE DATABASE `ecommerce` ON CLUSTER `demo` ENGINE = Atomic COMMENT 'E-commerce analytics database';
 
-CREATE DATABASE `housekeeper` ENGINE = Atomic COMMENT 'Housekeeper migration tracking database';
-
 CREATE TABLE `ecommerce`.`events` ON CLUSTER `demo` (
     `id`         UInt64,
     `user_id`    UInt64,

@@ -252,11 +252,8 @@ func dictionaryPropertiesMatch(dict1, dict2 *DictionaryInfo) bool {
 		return false
 	}
 
-	// For housekeeper dictionaries, ignore cluster differences
-	if dict1.Database != "housekeeper" && dict2.Database != "housekeeper" {
-		if dict1.Cluster != dict2.Cluster {
-			return false
-		}
+	if dict1.Cluster != dict2.Cluster {
+		return false
 	}
 
 	// Deep comparison of dictionary structure
@@ -284,11 +281,8 @@ func needsDictionaryModification(current, target *DictionaryInfo) bool {
 		return true
 	}
 
-	// For housekeeper dictionaries, ignore cluster differences
-	if current.Database != "housekeeper" && target.Database != "housekeeper" {
-		if current.Cluster != target.Cluster {
-			return true
-		}
+	if current.Cluster != target.Cluster {
+		return true
 	}
 
 	// Deep comparison of dictionary structure

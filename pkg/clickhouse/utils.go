@@ -15,6 +15,7 @@ var systemDatabases = []string{
 	"system",
 	"information_schema",
 	"INFORMATION_SCHEMA",
+	"housekeeper",
 }
 
 // buildSystemDatabaseExclusion creates a SQL "NOT IN" clause for excluding system databases

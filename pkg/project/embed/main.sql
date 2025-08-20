@@ -22,6 +22,4 @@
 --       [TABLE].sql
 --     views/
 
--- Import housekeeper system database (for migration tracking)
--- housekeeper:import schemas/housekeeper/housekeeper.sql
 

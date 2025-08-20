@@ -6,6 +6,9 @@ Learn how Housekeeper generates, manages, and applies ClickHouse schema migratio
 
 Housekeeper's migration system compares your desired schema (defined in your schema files) with the current state of your ClickHouse database and generates the necessary SQL statements to transform the current state to match your desired schema.
 
+> **📝 Migration Tracking**  
+> Housekeeper automatically manages migration tracking infrastructure. When you run your first migration against any ClickHouse instance, Housekeeper creates a `housekeeper.revisions` table to track which migrations have been applied. This happens automatically - no manual setup required.
+
 ## How Migrations Work
 
 ### 1. Development Server Workflow
