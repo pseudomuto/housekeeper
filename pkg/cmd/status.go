@@ -148,17 +148,9 @@ func loadAndValidateMigrations(dir string) ([]*migrator.Migration, error) {
 }
 
 func setupClickHouseClient(ctx context.Context, dsn, cluster string) (*clickhouse.Client, error) {
-	var client *clickhouse.Client
-	var err error
-
-	if cluster != "" {
-		client, err = clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
-			Cluster: cluster,
-		})
-	} else {
-		client, err = clickhouse.NewClient(ctx, dsn)
-	}
-
+	client, err := clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
+		Cluster: cluster,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ClickHouse client")
 	}

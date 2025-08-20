@@ -43,7 +43,7 @@ import (
 //
 // Returns a *parser.SQL containing table CREATE statements or an error if extraction fails.
 func extractTables(ctx context.Context, client *Client) (*parser.SQL, error) {
-	condition, params := buildSystemDatabaseExclusion("database")
+	condition, params := buildDatabaseExclusion("database", client.options.IgnoreDatabases)
 	query := fmt.Sprintf(`
 		SELECT 
 			create_table_query

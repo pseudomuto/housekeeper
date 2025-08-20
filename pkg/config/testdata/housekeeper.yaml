@@ -5,6 +5,13 @@ clickhouse:
   config_dir: "db/config.d"
   # The name of the cluster for DDL objects. If blank, no cluster is applied.
   cluster: "cluster"
+  # Databases to exclude from schema operations (e.g., testing databases).
+  # These databases will be ignored during dump and diff operations.
+  ignore_databases: []
+  # Example:
+  # ignore_databases:
+  #   - testing_db
+  #   - temp_db
 
 # Where to find the entrypoint for the desired schema.
 entrypoint: db/main.sql

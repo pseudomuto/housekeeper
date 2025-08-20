@@ -98,6 +98,11 @@ func schemaDump() *cli.Command {
 				Aliases: []string{"c"},
 				Usage:   "Cluster name to inject ON CLUSTER clauses for distributed deployments",
 			},
+			&cli.StringSliceFlag{
+				Name:    "ignore-databases",
+				Aliases: []string{"i"},
+				Usage:   "Databases to exclude from schema dump (can be specified multiple times)",
+			},
 			&cli.StringFlag{
 				Name:        "out",
 				Aliases:     []string{"o"},
@@ -110,7 +115,8 @@ func schemaDump() *cli.Command {
 				ctx,
 				cmd.String("url"),
 				clickhouse.ClientOptions{
-					Cluster: cmd.String("cluster"),
+					Cluster:         cmd.String("cluster"),
+					IgnoreDatabases: cmd.StringSlice("ignore-databases"),
 				},
 			)
 			if err != nil {

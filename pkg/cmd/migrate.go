@@ -125,14 +125,9 @@ func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
 	slog.Info("Loaded migrations", "count", len(migrations))
 
 	// Create ClickHouse client
-	var client *clickhouse.Client
-	if cluster != "" {
-		client, err = clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
-			Cluster: cluster,
-		})
-	} else {
-		client, err = clickhouse.NewClient(ctx, dsn)
-	}
+	client, err := clickhouse.NewClientWithOptions(ctx, dsn, clickhouse.ClientOptions{
+		Cluster: cluster,
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create ClickHouse client")
 	}

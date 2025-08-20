@@ -26,6 +26,10 @@ type (
 		// Cluster specifies the default cluster name for distributed ClickHouse deployments
 		// This is used for ON CLUSTER operations and distributed DDL statements
 		Cluster string `yaml:"cluster,omitempty"`
+
+		// IgnoreDatabases specifies a list of database names to exclude from schema operations
+		// These databases will be ignored during dump and diff operations
+		IgnoreDatabases []string `yaml:"ignore_databases,omitempty"`
 	}
 
 	// Config represents the project configuration for ClickHouse schema management.

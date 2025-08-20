@@ -277,6 +277,23 @@ housekeeper bootstrap --url localhost:9000
 # This creates initial project structure with current schema
 ```
 
+When working with existing databases, you can exclude certain databases from the extraction process:
+
+```bash
+# Extract schema while ignoring test databases
+housekeeper schema dump --url localhost:9000 \
+  --ignore-databases testing_db \
+  --ignore-databases temp_analytics
+
+# Or configure in housekeeper.yaml for permanent exclusion
+clickhouse:
+  ignore_databases:
+    - testing_db
+    - temp_analytics
+```
+
+This is useful when you have test or temporary databases that shouldn't be part of your managed schema.
+
 ## Validation and Safety
 
 ### Pre-Migration Validation

@@ -12,6 +12,7 @@ clickhouse:
   version: "25.7"                    # ClickHouse version for Docker
   config_dir: "db/config.d"         # ClickHouse configuration directory
   cluster: "cluster"                 # Default cluster name
+  ignore_databases: []               # Databases to exclude from schema operations
 
 entrypoint: db/main.sql              # Main schema file
 dir: db/migrations                   # Migration output directory
@@ -33,6 +34,11 @@ clickhouse:
   
   # Default cluster name for ON CLUSTER operations
   cluster: "cluster"                 # Used for distributed DDL statements
+  
+  # Databases to exclude from schema operations
+  ignore_databases:                  # Useful for test/staging databases
+    - testing_db
+    - temp_analytics
 ```
 
 ### Schema Configuration
@@ -46,6 +52,38 @@ dir: db/migrations                   # Migration output directory
 ```
 
 The configuration is intentionally simple - Housekeeper follows convention over configuration principles.
+
+### Ignoring Databases
+
+The `ignore_databases` configuration allows you to exclude specific databases from schema operations like `diff` and `dump`. This is particularly useful for:
+
+- **Testing databases**: Keep test databases separate from production schemas
+- **Temporary databases**: Exclude temporary or experimental databases
+- **System databases**: Additional system databases beyond the defaults
+
+```yaml
+clickhouse:
+  ignore_databases:
+    - testing_db        # Development testing database
+    - staging_temp      # Temporary staging experiments
+    - analytics_v1      # Old version being phased out
+```
+
+Ignored databases will be completely excluded from:
+- Schema dumps (`housekeeper schema dump`)
+- Migration generation (`housekeeper diff`)
+- Bootstrap operations (`housekeeper bootstrap`)
+
+You can also specify ignored databases via the command line for one-off operations:
+
+```bash
+# Exclude databases when dumping schema
+housekeeper schema dump --url localhost:9000 \
+  --ignore-databases testing_db \
+  --ignore-databases temp_db
+```
+
+Note: System databases (`default`, `system`, `information_schema`, `INFORMATION_SCHEMA`) are always excluded automatically.
 
 ## Environment-Specific Configuration
 

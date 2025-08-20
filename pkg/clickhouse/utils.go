@@ -35,6 +35,32 @@ func buildSystemDatabaseExclusion(columnName string) (string, []any) {
 	return condition, params
 }
 
+// buildDatabaseExclusion creates a SQL "NOT IN" clause for excluding both system databases
+// and user-specified ignored databases. Returns the SQL condition and the parameters to use
+// with the query. The columnName parameter specifies which column to check (e.g., "database", "name").
+func buildDatabaseExclusion(columnName string, ignoreDatabases []string) (string, []any) {
+	// Combine system databases with user-specified ignored databases
+	allExcluded := append([]string{}, systemDatabases...)
+	allExcluded = append(allExcluded, ignoreDatabases...)
+
+	// If no databases to exclude, return a trivial condition
+	if len(allExcluded) == 0 {
+		return "1=1", []any{}
+	}
+
+	// Create placeholders for all excluded databases
+	placeholders := make([]string, len(allExcluded))
+	params := make([]any, len(allExcluded))
+
+	for i, db := range allExcluded {
+		placeholders[i] = "?"
+		params[i] = db
+	}
+
+	condition := columnName + " NOT IN (" + strings.Join(placeholders, ", ") + ")"
+	return condition, params
+}
+
 // cleanCreateStatement normalizes a CREATE statement by removing extra whitespace, ensuring semicolon,
 // and normalizing data types for consistent comparison with parsed DDL
 func cleanCreateStatement(createQuery string) string {

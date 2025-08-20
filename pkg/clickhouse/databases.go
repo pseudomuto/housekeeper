@@ -39,7 +39,7 @@ import (
 //
 // Returns a *parser.SQL containing database CREATE statements or an error if extraction fails.
 func extractDatabases(ctx context.Context, client *Client) (*parser.SQL, error) {
-	condition, params := buildSystemDatabaseExclusion("name")
+	condition, params := buildDatabaseExclusion("name", client.options.IgnoreDatabases)
 	query := fmt.Sprintf(`
 		SELECT 
 			name,

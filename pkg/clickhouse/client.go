@@ -16,6 +16,11 @@ type (
 		// in dumped DDL statements. When set, all extracted DDL will include
 		// "ON CLUSTER <cluster_name>" to support distributed ClickHouse deployments.
 		Cluster string
+
+		// IgnoreDatabases specifies a list of database names to exclude from schema operations.
+		// These databases will be ignored during GetSchema, GetDatabases, GetTables, GetViews,
+		// and GetDictionaries operations. This is useful for excluding test or temporary databases.
+		IgnoreDatabases []string
 	}
 
 	// Client represents a ClickHouse database connection

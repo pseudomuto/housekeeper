@@ -143,18 +143,21 @@ func TestSchemaDumpCommand_FlagConfiguration(t *testing.T) {
 
 	require.Equal(t, "dump", command.Name)
 	require.Equal(t, "Extract and format schema from a ClickHouse instance", command.Usage)
-	require.Len(t, command.Flags, 3) // url, cluster, out
+	require.Len(t, command.Flags, 4) // url, cluster, ignore-databases, out
 
-	flagNames := make([]string, len(command.Flags))
-	for i, flag := range command.Flags {
+	flagNames := make([]string, 0, len(command.Flags))
+	for _, flag := range command.Flags {
 		switch f := flag.(type) {
 		case *cli.StringFlag:
-			flagNames[i] = f.Name
+			flagNames = append(flagNames, f.Name)
+		case *cli.StringSliceFlag:
+			flagNames = append(flagNames, f.Name)
 		}
 	}
 
 	require.Contains(t, flagNames, "url")
 	require.Contains(t, flagNames, "cluster")
+	require.Contains(t, flagNames, "ignore-databases")
 	require.Contains(t, flagNames, "out")
 }
 

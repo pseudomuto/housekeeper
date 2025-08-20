@@ -61,12 +61,13 @@ func bootstrap(p *project.Project, cfg *config.Config) *cli.Command {
 		},
 		Before: requireConfig(cfg),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// Use cluster from existing configuration
+			// Use cluster and ignore databases from existing configuration
 			client, err := clickhouse.NewClientWithOptions(
 				ctx,
 				cmd.String("url"),
 				clickhouse.ClientOptions{
-					Cluster: cfg.ClickHouse.Cluster,
+					Cluster:         cfg.ClickHouse.Cluster,
+					IgnoreDatabases: cfg.ClickHouse.IgnoreDatabases,
 				},
 			)
 			if err != nil {

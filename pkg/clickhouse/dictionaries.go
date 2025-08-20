@@ -44,7 +44,7 @@ import (
 func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, error) {
 	// First, get a list of all dictionaries (excluding system ones)
 	// Include dictionaries even if they failed to load due to external source issues
-	condition, params := buildSystemDatabaseExclusion("database")
+	condition, params := buildDatabaseExclusion("database", client.options.IgnoreDatabases)
 	query := fmt.Sprintf(`
 		SELECT 
 			database, 

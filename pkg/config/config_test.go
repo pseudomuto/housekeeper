@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed embed/housekeeper.yaml
+//go:embed testdata/housekeeper.yaml
 var testConfigYAML string
 
 func TestLoadConfig(t *testing.T) {
@@ -101,6 +101,9 @@ clickhouse:
   version: "24.8"
   config_dir: "custom/config"
   cluster: "production"
+  ignore_databases:
+    - testing_db
+    - temp_db
 entrypoint: test.sql
 dir: migrations
 `
@@ -109,6 +112,7 @@ dir: migrations
 		require.Equal(t, "24.8", config.ClickHouse.Version)
 		require.Equal(t, "custom/config", config.ClickHouse.ConfigDir)
 		require.Equal(t, "production", config.ClickHouse.Cluster)
+		require.Equal(t, []string{"testing_db", "temp_db"}, config.ClickHouse.IgnoreDatabases)
 	})
 
 	t.Run("sets default values when empty", func(t *testing.T) {
@@ -155,5 +159,48 @@ dir: migrations
 		require.Equal(t, consts.DefaultClickHouseVersion, config.ClickHouse.Version)
 		require.Equal(t, consts.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
 		require.Equal(t, consts.DefaultClickHouseCluster, config.ClickHouse.Cluster)
+	})
+}
+
+func TestLoadConfig_IgnoreDatabases(t *testing.T) {
+	t.Run("parses ignore_databases list", func(t *testing.T) {
+		yamlData := `
+clickhouse:
+  ignore_databases:
+    - testing_db
+    - staging_db
+    - temp_analytics
+entrypoint: test.sql
+dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.Len(t, config.ClickHouse.IgnoreDatabases, 3)
+		require.Equal(t, []string{"testing_db", "staging_db", "temp_analytics"}, config.ClickHouse.IgnoreDatabases)
+	})
+
+	t.Run("empty ignore_databases when not specified", func(t *testing.T) {
+		yamlData := `
+clickhouse:
+  version: "25.7"
+entrypoint: test.sql
+dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.Empty(t, config.ClickHouse.IgnoreDatabases)
+	})
+
+	t.Run("empty ignore_databases with empty array", func(t *testing.T) {
+		yamlData := `
+clickhouse:
+  ignore_databases: []
+entrypoint: test.sql
+dir: migrations
+`
+		config, err := LoadConfig(strings.NewReader(yamlData))
+		require.NoError(t, err)
+		require.NotNil(t, config.ClickHouse.IgnoreDatabases)
+		require.Empty(t, config.ClickHouse.IgnoreDatabases)
 	})
 }
