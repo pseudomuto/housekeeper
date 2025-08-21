@@ -1,0 +1,147 @@
+name: E2E Tests (Nightly)
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      clickhouse_version:
+        description: "ClickHouse version to test against"
+        required: false
+        default: "25.7"
+        type: string
+      debug:
+        description: "Enable debug mode"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GO_VERSION: "1.24"
+  CLICKHOUSE_VERSION: ${{ github.event.inputs.clickhouse_version || '25.7' }}
+  DEBUG: ${{ github.event.inputs.debug || 'false' }}
+
+jobs:
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse_version: ["25.7", "latest"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Install Task
+        run: |
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
+      - name: Build Housekeeper binary
+        run: |
+          mkdir -p bin
+          go build -o bin/housekeeper ./cmd/housekeeper/main.go
+
+      - name: Verify binary
+        run: |
+          ./bin/housekeeper --version
+          ./bin/housekeeper --help
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run E2E tests
+        env:
+          CLICKHOUSE_VERSION: ${{ matrix.clickhouse_version }}
+          DEBUG: ${{ env.DEBUG }}
+          CLEANUP_ON_EXIT: "true"
+        run: |
+          cd e2e
+          chmod +x run-e2e.sh
+          ./run-e2e.sh --version ${{ matrix.clickhouse_version }}
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-artifacts-${{ matrix.clickhouse_version }}
+          path: |
+            /tmp/housekeeper-e2e-*
+            e2e/test-*.log
+          retention-days: 7
+
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+    if: failure()
+
+    steps:
+      - name: Create Issue on Failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `E2E Tests Failed - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            ## E2E Test Failure Report
+
+            **Workflow**: ${context.workflow}
+            **Run ID**: ${context.runId}
+            **Triggered by**: ${context.eventName}
+            **Date**: ${new Date().toISOString()}
+
+            ### Details
+            The nightly E2E tests have failed. Please check the workflow logs for details.
+
+            **Workflow URL**: ${context.payload.repository.html_url}/actions/runs/${context.runId}
+
+            ### ClickHouse Versions Tested
+            - 24.8
+            - 25.7
+            - latest
+
+            ### Next Steps
+            1. Review the workflow logs
+            2. Check if this is a known issue
+            3. Investigate failing test cases
+            4. Fix any regressions or update tests as needed
+
+            This issue was automatically created by the E2E nightly workflow.
+            `;
+
+            // Check if an issue with similar title already exists
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['e2e-failure', 'automated']
+            });
+
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('E2E Tests Failed') && 
+              issue.title.includes(new Date().toISOString().split('T')[0])
+            );
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['bug', 'e2e-failure', 'automated']
+              });
+            }
+
