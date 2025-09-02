@@ -27,7 +27,7 @@ func skipIfNoDocker(t *testing.T) {
 	}
 
 	// Check if Docker daemon is running
-	cmd := exec.Command("docker", "ps")
+	cmd := exec.CommandContext(t.Context(), "docker", "ps")
 	if err := cmd.Run(); err != nil {
 		t.Skip("Docker daemon not running")
 	}

@@ -1,10 +1,5 @@
 version: "3"
 
-vars:
-  BIN_DIR: "bin"
-  LINT_VERSION: 2.1.6
-  GORELEASER_VERSION: 2.5.0
-
 tasks:
   update:
     desc: Updates all dependencies
@@ -13,6 +8,12 @@ tasks:
     cmds:
       - go mod tidy
 
+  docs:
+    desc: Build the docs site
+    silent: true
+    cmds:
+      - mkdocs serve --clean --strict
+
   run:
     desc: Run the housekeeper cli (local build)
     silent: true
@@ -20,15 +21,13 @@ tasks:
 
   lint:
     desc: Run golangci-lint on the codebase
-    deps: [install:golangci-lint]
     silent: true
-    cmd: "{{.BIN_DIR}}/golangci-lint run {{.CLI_ARGS}}"
+    cmd: "golangci-lint run {{.CLI_ARGS}}"
 
   lint:fix:
     desc: Run golangci-lint --fix on the codebase
-    deps: [install:golangci-lint]
     silent: true
-    cmd: "{{.BIN_DIR}}/golangci-lint run --fix"
+    cmd: "golangci-lint run --fix"
 
   test:
     desc: Run the test suite (unit tests only)
@@ -42,10 +41,9 @@ tasks:
 
   build:
     desc: Build a local snapshot with goreleaser (including container images)
-    deps: [install:goreleaser]
     silent: true
     cmds:
-      - "{{.BIN_DIR}}/goreleaser release --snapshot --clean --skip=publish"
+      - "goreleaser release --snapshot --clean --skip=publish"
 
   tag:
     desc: Create and push a new signed tag for release
@@ -87,28 +85,3 @@ tasks:
         vars:
           TAG:
             sh: git describe --tags --abbrev=0 2>/dev/null | awk -F. '{print $1+1".0.0"}' | sed 's/^v/v/' || echo "v1.0.0"
-
-  install:golangci-lint:
-    internal: true
-    silent: true
-    status:
-      - test -f {{.BIN_DIR}}/golangci-lint
-      - "{{.BIN_DIR}}/golangci-lint --version | grep 'version {{.LINT_VERSION}}' >/dev/null"
-    vars:
-      URL: https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
-    cmd: curl -sSfL {{.URL}} | sh -s -- -b {{.BIN_DIR}} v{{.LINT_VERSION}}
-
-  install:goreleaser:
-    internal: true
-    silent: true
-    status:
-      - test -f {{.BIN_DIR}}/goreleaser
-    vars:
-      URL: https://github.com/goreleaser/goreleaser/releases/download/nightly/goreleaser_Darwin_arm64.tar.gz
-      TMPDIR:
-        sh: mktemp -d
-    cmds:
-      - defer: rm -rf {{.TMPDIR}}
-      - curl -sSfL {{.URL}} | tar -xz -C {{.TMPDIR}}
-      - mv {{.TMPDIR}}/goreleaser {{.BIN_DIR}}/goreleaser
-      - chmod +x {{.BIN_DIR}}/goreleaser

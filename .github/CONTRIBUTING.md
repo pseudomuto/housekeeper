@@ -18,10 +18,31 @@ housekeeper/
 
 ## Development Setup
 
+### Option 1: Using Nix (Recommended)
+
+For consistent development dependencies, we recommend using [Nix](https://nixos.org/download.html):
+
+1. Clone the repository
+2. Install [Nix](https://nixos.org/download.html) if you haven't already
+3. Enter the development environment:
+   ```bash
+   nix develop
+   ```
+   Or if you use [direnv](https://direnv.net/):
+   ```bash
+   echo "use flake" > .envrc
+   direnv allow
+   ```
+4. Run tests: `task test`
+5. Build: `task build`
+
+### Option 2: Manual Setup
+
 1. Clone the repository
 2. Install Go 1.21 or later
-3. Run tests: `go test ./...`
-4. Build: `go build ./cmd/housekeeper`
+3. Install [Task](https://taskfile.dev) for running commands
+4. Run tests: `go test ./...` or `task test`
+5. Build: `go build ./cmd/housekeeper` or `task build`
 
 ## Code Style
 
