@@ -37,23 +37,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Install Task
-        run: |
-          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
 
       - name: Build Housekeeper binary
-        run: |
-          mkdir -p bin
-          go build -o bin/housekeeper ./cmd/housekeeper/main.go
+        run: nix build .#housekeeper -o bin/housekeeper
 
       - name: Verify binary
         run: |
