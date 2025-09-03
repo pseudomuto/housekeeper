@@ -46,7 +46,7 @@
           # - If clean: 0.0.0+a5b28d8 (short commit hash)
           # - If dirty: 0.0.0+a5b28d8-dirty
           # Once you add tags, it will use them: v1.0.0, v1.0.0-5-ga5b28d8, etc.
-          version = 
+          version =
             if (self ? rev) then
               "0.0.0+${builtins.substring 0 7 self.rev}"
             else if (self ? dirtyRev) then
@@ -63,7 +63,7 @@
 
             # This will need to be updated when dependencies change
             # Run `nix build .#housekeeper` and it will tell you the correct hash
-            vendorHash = "sha256-XsW4H5ea5jgVWmR4Y7H6t7tDBASR0wkyGV+DedJm2co=";
+            vendorHash = "sha256-/hYe3n7uLqxokZwvQtnDIHGx3p3mm2kAFBiGl+6xmVg=";
 
             env.CGO_ENABLED = "0";
 
