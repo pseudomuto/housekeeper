@@ -257,7 +257,21 @@ func (f *Formatter) formatWhereClause(where *parser.WhereClause) string {
 
 // formatGroupByClause formats GROUP BY clause
 func (f *Formatter) formatGroupByClause(groupBy *parser.GroupByClause) string {
-	if groupBy == nil || len(groupBy.Columns) == 0 {
+	if groupBy == nil {
+		return ""
+	}
+
+	// Handle GROUP BY ALL
+	if groupBy.All {
+		result := f.keyword("GROUP BY") + " " + f.keyword("ALL")
+		if groupBy.WithClause != nil {
+			result += " " + f.keyword("WITH") + " " + f.keyword(*groupBy.WithClause)
+		}
+		return result
+	}
+
+	// Handle regular GROUP BY with columns
+	if len(groupBy.Columns) == 0 {
 		return ""
 	}
 

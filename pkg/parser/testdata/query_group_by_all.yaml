@@ -1,0 +1,6 @@
+queries:
+    - columns:
+        - non_wildcard
+      from: events
+      has_where: true
+      has_group_by: true
