@@ -1,4 +1,4 @@
-FROM alpine@sha256:4562b419adf48c5f3c763995d6014c123b3ce1d2e0ef2613b189779caa787192
+FROM alpine:3.22.1
 
 # Install ca-certificates for HTTPS connections
 RUN apk add --no-cache ca-certificates tzdata
