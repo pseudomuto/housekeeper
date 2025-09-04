@@ -17,12 +17,42 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Key Features
 
-- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, and materialized views
+- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, materialized views, and named collections
 - **Cluster-Aware Operations** - Native `ON CLUSTER` support for distributed ClickHouse deployments
-- **Intelligent Migration Generation** - Smart schema comparison with proper operation ordering
+- **Intelligent Migration Generation** - Smart schema comparison with proper operation ordering and dependency management
 - **Modern Parser Architecture** - Built with participle for robust, maintainable SQL parsing
 - **Professional SQL Formatting** - Clean, consistent output optimized for ClickHouse
 - **Comprehensive Testing** - Extensive test suite with 100% DDL operation coverage
+
+## Supported Migration Operations
+
+| Object Type | CREATE | ALTER | ATTACH | DETACH | DROP | RENAME | Notes |
+|------------|--------|-------|---------|---------|------|--------|-------|
+| **Database** | ✅ | ✅¹ | ✅ | ✅ | ✅ | ✅ | ¹Comment changes only |
+| **Named Collection** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅ | ²Uses CREATE OR REPLACE |
+| **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Full ALTER support |
+| **Dictionary** | ✅ | ❌³ | ✅ | ✅ | ✅ | ✅ | ³Uses CREATE OR REPLACE |
+| **View** | ✅ | ❌⁴ | ✅ | ✅ | ✅ | ✅⁵ | ⁴Uses CREATE OR REPLACE |
+| **Materialized View** | ✅ | ❌⁶ | ✅⁷ | ✅⁷ | ✅⁷ | ✅⁷ | ⁶Query changes use DROP+CREATE |
+
+**Legend:**
+- ✅ Fully supported
+- ❌ Not supported (alternative strategy used)  
+- ¹ ALTER DATABASE only supports comment modifications
+- ² Named collections use CREATE OR REPLACE for all modifications
+- ³ Dictionaries use CREATE OR REPLACE for all modifications (ClickHouse limitation)
+- ⁴ Views use CREATE OR REPLACE for modifications
+- ⁵ Views use RENAME TABLE for renames
+- ⁶ Materialized view query changes use DROP+CREATE strategy for reliability
+- ⁷ Materialized views use table operations (ATTACH/DETACH/DROP/RENAME TABLE)
+
+### Migration Strategy Notes
+
+- **Dependencies**: Proper ordering ensures collections → tables → dictionaries → views
+- **Integration Engines**: Tables using Kafka, RabbitMQ, etc. automatically use DROP+CREATE strategy
+- **Cluster Operations**: Full `ON CLUSTER` support, but cluster association cannot be changed after creation
+- **Engine Changes**: Not supported for any object type (requires manual migration)
+- **Smart Rename Detection**: Avoids unnecessary DROP+CREATE when only names change
 
 ## Documentation
 

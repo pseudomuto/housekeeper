@@ -16,6 +16,7 @@ import (
 // databaseObjects holds the organized statements for a database
 type databaseObjects struct {
 	database     *parser.CreateDatabaseStmt
+	collections  []*parser.CreateNamedCollectionStmt
 	tables       []*parser.CreateTableStmt
 	dictionaries []*parser.CreateDictionaryStmt
 	views        []*parser.CreateViewStmt
@@ -28,6 +29,7 @@ type databaseObjects struct {
 // The generated fs.FS contains:
 //   - db/main.sql: Main schema file with imports to all databases
 //   - db/schemas/<database>/schema.sql: Database schema file with imports
+//   - db/schemas/<database>/collections/<collection>.sql: Individual named collection files
 //   - db/schemas/<database>/tables/<table>.sql: Individual table files
 //   - db/schemas/<database>/dictionaries/<dict>.sql: Individual dictionary files
 //   - db/schemas/<database>/views/<view>.sql: Individual view files
@@ -56,6 +58,7 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 	ensureDB := func(name string) {
 		if dbObjects[name] == nil {
 			dbObjects[name] = &databaseObjects{
+				collections:  []*parser.CreateNamedCollectionStmt{},
 				tables:       []*parser.CreateTableStmt{},
 				dictionaries: []*parser.CreateDictionaryStmt{},
 				views:        []*parser.CreateViewStmt{},
@@ -77,6 +80,11 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 			dbName := getDatabase(stmt.CreateDictionary.Database)
 			ensureDB(dbName)
 			dbObjects[dbName].dictionaries = append(dbObjects[dbName].dictionaries, stmt.CreateDictionary)
+		} else if stmt.CreateNamedCollection != nil {
+			// Named collections are global but we'll put them in the default database for organization
+			dbName := "default"
+			ensureDB(dbName)
+			dbObjects[dbName].collections = append(dbObjects[dbName].collections, stmt.CreateNamedCollection)
 		} else if stmt.CreateView != nil {
 			dbName := getDatabase(stmt.CreateView.Database)
 			ensureDB(dbName)
@@ -111,6 +119,9 @@ func (p *Project) generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string
 		}
 
 		// Create individual object files
+		if err := p.addCollectionFiles(fsMap, dbName, objects.collections); err != nil {
+			return nil, errors.Wrapf(err, "failed to add collection files for %s", dbName)
+		}
 		if err := p.addTableFiles(fsMap, dbName, objects.tables); err != nil {
 			return nil, errors.Wrapf(err, "failed to add table files for %s", dbName)
 		}
@@ -141,6 +152,8 @@ func (p *Project) formatStatement(stmt any) (string, error) {
 	switch s := stmt.(type) {
 	case *parser.CreateDatabaseStmt:
 		statement = &parser.Statement{CreateDatabase: s}
+	case *parser.CreateNamedCollectionStmt:
+		statement = &parser.Statement{CreateNamedCollection: s}
 	case *parser.CreateTableStmt:
 		statement = &parser.Statement{CreateTable: s}
 	case *parser.CreateDictionaryStmt:
@@ -172,6 +185,15 @@ func (p *Project) generateDatabaseSchemaContent(objects *databaseObjects) (strin
 		}
 		content.WriteString(stmt)
 		content.WriteString("\n\n")
+	}
+
+	// Add imports for named collections
+	if len(objects.collections) > 0 {
+		content.WriteString("-- Named Collections\n")
+		for _, collection := range objects.collections {
+			importPath := fmt.Sprintf("collections/%s.sql", collection.Name)
+			imports = append(imports, importPath)
+		}
 	}
 
 	// Add imports for tables
@@ -226,6 +248,21 @@ func (p *Project) addTableFiles(fsMap fstest.MapFS, dbName string, tables []*par
 }
 
 // addDictionaryFiles adds dictionary files to the file system map
+func (p *Project) addCollectionFiles(fsMap fstest.MapFS, dbName string, collections []*parser.CreateNamedCollectionStmt) error {
+	for _, collection := range collections {
+		stmt, err := p.formatStatement(collection)
+		if err != nil {
+			return err
+		}
+
+		path := filepath.Join("db", "schemas", dbName, "collections", collection.Name+".sql")
+		fsMap[path] = &fstest.MapFile{
+			Data: []byte(stmt),
+		}
+	}
+	return nil
+}
+
 func (p *Project) addDictionaryFiles(fsMap fstest.MapFS, dbName string, dictionaries []*parser.CreateDictionaryStmt) error {
 	for _, dict := range dictionaries {
 		stmt, err := p.formatStatement(dict)

@@ -39,6 +39,7 @@ import (
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 type (
@@ -268,6 +269,12 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return f.renameTable(w, stmt.RenameTable)
 	case stmt.CreateDictionary != nil:
 		return f.createDictionary(w, stmt.CreateDictionary)
+	case stmt.CreateNamedCollection != nil:
+		return f.createNamedCollection(w, stmt.CreateNamedCollection)
+	case stmt.AlterNamedCollection != nil:
+		return f.alterNamedCollection(w, stmt.AlterNamedCollection)
+	case stmt.DropNamedCollection != nil:
+		return f.dropNamedCollection(w, stmt.DropNamedCollection)
 	case stmt.AttachDictionary != nil:
 		return f.attachDictionary(w, stmt.AttachDictionary)
 	case stmt.DetachDictionary != nil:
@@ -300,23 +307,16 @@ func (f *Formatter) keyword(kw string) string {
 }
 
 // indent returns the specified number of indent levels as spaces
-func (f *Formatter) indent(level int) string {
+func (f *Formatter) indent(level int) string { // nolint: unparam
 	return strings.Repeat(" ", level*f.options.IndentSize)
 }
 
 // qualifiedName formats a database-qualified name with backticks
 func (f *Formatter) qualifiedName(database *string, name string) string {
-	if database != nil && *database != "" {
-		return f.identifier(*database) + "." + f.identifier(name)
-	}
-	return f.identifier(name)
+	return utils.BacktickQualifiedName(database, name)
 }
 
 // identifier formats a single identifier with backticks
 func (f *Formatter) identifier(name string) string {
-	// Don't double-backtick identifiers that are already backticked
-	if len(name) >= 2 && name[0] == '`' && name[len(name)-1] == '`' {
-		return name
-	}
-	return "`" + name + "`"
+	return utils.BacktickIdentifier(name)
 }

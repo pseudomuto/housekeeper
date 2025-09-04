@@ -72,6 +72,35 @@ func TestGenerateImage(t *testing.T) {
 			},
 		},
 		{
+			name: "named collections are organized properly",
+			sql: `
+				CREATE DATABASE analytics ENGINE = Atomic;
+				
+				CREATE NAMED COLLECTION kafka_config AS
+					host = 'localhost',
+					port = 9092;
+					
+				CREATE TABLE analytics.events (
+					id UInt64,
+					message String
+				) ENGINE = MergeTree() ORDER BY id;
+			`,
+			fileTests: []fileTest{
+				{"db/main.sql", "-- housekeeper:import schemas/analytics/schema.sql"},
+				{"db/main.sql", "-- housekeeper:import schemas/default/schema.sql"},
+				{"db/schemas/analytics/schema.sql", "CREATE DATABASE `analytics` ENGINE = Atomic"},
+				{"db/schemas/analytics/schema.sql", "-- housekeeper:import tables/events.sql"},
+				{"db/schemas/default/schema.sql", "-- Named Collections"},
+				{"db/schemas/default/schema.sql", "-- housekeeper:import collections/kafka_config.sql"},
+				{"db/schemas/analytics/tables/events.sql", "CREATE TABLE `analytics`.`events`"},
+				{"db/schemas/analytics/tables/events.sql", "`id`      UInt64"},
+				{"db/schemas/analytics/tables/events.sql", "`message` String"},
+				{"db/schemas/default/collections/kafka_config.sql", "CREATE NAMED COLLECTION `kafka_config`"},
+				{"db/schemas/default/collections/kafka_config.sql", "`host` = 'localhost'"},
+				{"db/schemas/default/collections/kafka_config.sql", "`port` = 9092"},
+			},
+		},
+		{
 			name: "table without explicit database uses default",
 			sql: `
 				CREATE TABLE events (id UInt64) ENGINE = MergeTree() ORDER BY id;
@@ -125,6 +154,7 @@ type fileTest struct {
 func TestGenerateImage_FileStructure(t *testing.T) {
 	sql := `
 		CREATE DATABASE analytics ENGINE = Atomic;
+		CREATE NAMED COLLECTION api_config AS host = 'api.example.com', port = 8080;
 		CREATE TABLE analytics.events (id UInt64) ENGINE = MergeTree() ORDER BY id;
 		CREATE DICTIONARY analytics.lookup (id UInt64) PRIMARY KEY id SOURCE(HTTP(url 'http://example.com')) LAYOUT(HASHED()) LIFETIME(3600);
 		CREATE VIEW analytics.summary AS SELECT count() FROM events;
@@ -159,6 +189,8 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 	expectedFiles := []string{
 		"db/main.sql",
 		"db/schemas/analytics/schema.sql",
+		"db/schemas/default/schema.sql",
+		"db/schemas/default/collections/api_config.sql",
 		"db/schemas/analytics/tables/events.sql",
 		"db/schemas/analytics/dictionaries/lookup.sql",
 		"db/schemas/analytics/views/summary.sql",

@@ -110,28 +110,31 @@ type (
 
 	// Statement represents any DDL or DML statement
 	Statement struct {
-		CreateDatabase   *CreateDatabaseStmt      `parser:"@@"`
-		AlterDatabase    *AlterDatabaseStmt       `parser:"| @@"`
-		AttachDatabase   *AttachDatabaseStmt      `parser:"| @@"`
-		DetachDatabase   *DetachDatabaseStmt      `parser:"| @@"`
-		DropDatabase     *DropDatabaseStmt        `parser:"| @@"`
-		RenameDatabase   *RenameDatabaseStmt      `parser:"| @@"`
-		CreateTable      *CreateTableStmt         `parser:"| @@"`
-		AlterTable       *AlterTableStmt          `parser:"| @@"`
-		CreateDictionary *CreateDictionaryStmt    `parser:"| @@"`
-		CreateView       *CreateViewStmt          `parser:"| @@"`
-		AttachView       *AttachViewStmt          `parser:"| @@"`
-		AttachDictionary *AttachDictionaryStmt    `parser:"| @@"`
-		DetachView       *DetachViewStmt          `parser:"| @@"`
-		DetachDictionary *DetachDictionaryStmt    `parser:"| @@"`
-		DropView         *DropViewStmt            `parser:"| @@"`
-		DropDictionary   *DropDictionaryStmt      `parser:"| @@"`
-		AttachTable      *AttachTableStmt         `parser:"| @@"`
-		DetachTable      *DetachTableStmt         `parser:"| @@"`
-		DropTable        *DropTableStmt           `parser:"| @@"`
-		RenameTable      *RenameTableStmt         `parser:"| @@"`
-		RenameDictionary *RenameDictionaryStmt    `parser:"| @@"`
-		SelectStatement  *TopLevelSelectStatement `parser:"| @@"`
+		CreateDatabase        *CreateDatabaseStmt        `parser:"@@"`
+		AlterDatabase         *AlterDatabaseStmt         `parser:"| @@"`
+		AttachDatabase        *AttachDatabaseStmt        `parser:"| @@"`
+		DetachDatabase        *DetachDatabaseStmt        `parser:"| @@"`
+		DropDatabase          *DropDatabaseStmt          `parser:"| @@"`
+		RenameDatabase        *RenameDatabaseStmt        `parser:"| @@"`
+		CreateTable           *CreateTableStmt           `parser:"| @@"`
+		AlterTable            *AlterTableStmt            `parser:"| @@"`
+		CreateDictionary      *CreateDictionaryStmt      `parser:"| @@"`
+		CreateView            *CreateViewStmt            `parser:"| @@"`
+		CreateNamedCollection *CreateNamedCollectionStmt `parser:"| @@"`
+		AlterNamedCollection  *AlterNamedCollectionStmt  `parser:"| @@"`
+		AttachView            *AttachViewStmt            `parser:"| @@"`
+		AttachDictionary      *AttachDictionaryStmt      `parser:"| @@"`
+		DetachView            *DetachViewStmt            `parser:"| @@"`
+		DetachDictionary      *DetachDictionaryStmt      `parser:"| @@"`
+		DropView              *DropViewStmt              `parser:"| @@"`
+		DropDictionary        *DropDictionaryStmt        `parser:"| @@"`
+		DropNamedCollection   *DropNamedCollectionStmt   `parser:"| @@"`
+		AttachTable           *AttachTableStmt           `parser:"| @@"`
+		DetachTable           *DetachTableStmt           `parser:"| @@"`
+		DropTable             *DropTableStmt             `parser:"| @@"`
+		RenameTable           *RenameTableStmt           `parser:"| @@"`
+		RenameDictionary      *RenameDictionaryStmt      `parser:"| @@"`
+		SelectStatement       *TopLevelSelectStatement   `parser:"| @@"`
 	}
 )
 

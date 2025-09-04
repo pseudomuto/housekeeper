@@ -19,11 +19,12 @@ var testdataFS embed.FS
 
 // TestCase represents expected results for a SQL file
 type TestCase struct {
-	Databases    []ExpectedDatabase   `yaml:"databases,omitempty"`
-	Dictionaries []ExpectedDictionary `yaml:"dictionaries,omitempty"`
-	Views        []ExpectedView       `yaml:"views,omitempty"`
-	Tables       []ExpectedTable      `yaml:"tables,omitempty"`
-	Queries      []ExpectedQuery      `yaml:"queries,omitempty"`
+	Databases        []ExpectedDatabase        `yaml:"databases,omitempty"`
+	Dictionaries     []ExpectedDictionary      `yaml:"dictionaries,omitempty"`
+	Views            []ExpectedView            `yaml:"views,omitempty"`
+	Tables           []ExpectedTable           `yaml:"tables,omitempty"`
+	NamedCollections []ExpectedNamedCollection `yaml:"named_collections,omitempty"`
+	Queries          []ExpectedQuery           `yaml:"queries,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -112,6 +113,19 @@ type ExpectedQuery struct {
 	WindowFuncs bool     `yaml:"window_functions,omitempty"`
 }
 
+// ExpectedNamedCollection represents expected named collection properties
+type ExpectedNamedCollection struct {
+	Name        string            `yaml:"name"`
+	Cluster     string            `yaml:"cluster,omitempty"`
+	Operation   string            `yaml:"operation"` // CREATE, ALTER, DROP
+	OrReplace   bool              `yaml:"or_replace,omitempty"`
+	IfNotExists bool              `yaml:"if_not_exists,omitempty"`
+	IfExists    bool              `yaml:"if_exists,omitempty"`
+	Parameters  map[string]string `yaml:"parameters,omitempty"`
+	Overridable *bool             `yaml:"overridable,omitempty"`
+	Comment     string            `yaml:"comment,omitempty"`
+}
+
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
@@ -189,6 +203,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
 	var expectedTables []ExpectedTable
+	var expectedNamedCollections []ExpectedNamedCollection
 	var expectedQueries []ExpectedQuery
 
 	// Keep track of accumulated ALTER operations by table name
@@ -275,6 +290,57 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				}
 				expectedDatabases = append(expectedDatabases, expectedDB)
 			}
+		} else if stmt.CreateNamedCollection != nil {
+			collection := stmt.CreateNamedCollection
+			expectedCollection := ExpectedNamedCollection{
+				Name:        collection.Name,
+				Operation:   "CREATE",
+				OrReplace:   collection.OrReplace,
+				IfNotExists: collection.IfNotExists != nil,
+			}
+			if collection.OnCluster != nil {
+				expectedCollection.Cluster = *collection.OnCluster
+			}
+			if collection.Comment != nil {
+				expectedCollection.Comment = removeQuotes(*collection.Comment)
+			}
+			if collection.GlobalOverride != nil {
+				overridable := collection.GlobalOverride.IsOverridable()
+				expectedCollection.Overridable = &overridable
+			}
+			// Extract parameters
+			if len(collection.Parameters) > 0 {
+				expectedCollection.Parameters = make(map[string]string)
+				for _, param := range collection.Parameters {
+					expectedCollection.Parameters[param.Key] = param.Value.GetValue()
+				}
+			}
+			expectedNamedCollections = append(expectedNamedCollections, expectedCollection)
+
+		} else if stmt.AlterNamedCollection != nil {
+			collection := stmt.AlterNamedCollection
+			expectedCollection := ExpectedNamedCollection{
+				Name:      collection.Name,
+				Operation: "ALTER",
+				IfExists:  collection.IfExists != nil,
+			}
+			if collection.OnCluster != nil {
+				expectedCollection.Cluster = *collection.OnCluster
+			}
+			expectedNamedCollections = append(expectedNamedCollections, expectedCollection)
+
+		} else if stmt.DropNamedCollection != nil {
+			collection := stmt.DropNamedCollection
+			expectedCollection := ExpectedNamedCollection{
+				Name:      collection.Name,
+				Operation: "DROP",
+				IfExists:  collection.IfExists != nil,
+			}
+			if collection.OnCluster != nil {
+				expectedCollection.Cluster = *collection.OnCluster
+			}
+			expectedNamedCollections = append(expectedNamedCollections, expectedCollection)
+
 		} else if stmt.CreateDictionary != nil {
 			dict := stmt.CreateDictionary
 			expectedDict := ExpectedDictionary{
@@ -770,6 +836,9 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	if len(expectedTables) > 0 {
 		testCase.Tables = expectedTables
 	}
+	if len(expectedNamedCollections) > 0 {
+		testCase.NamedCollections = expectedNamedCollections
+	}
 	if len(expectedQueries) > 0 {
 		testCase.Queries = expectedQueries
 	}
@@ -809,6 +878,8 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 		"Wrong number of views in %s", sqlFile)
 	require.Len(t, actualTestCase.Tables, len(expected.Tables),
 		"Wrong number of tables in %s", sqlFile)
+	require.Len(t, actualTestCase.NamedCollections, len(expected.NamedCollections),
+		"Wrong number of named collections in %s", sqlFile)
 	require.Len(t, actualTestCase.Queries, len(expected.Queries),
 		"Wrong number of queries in %s", sqlFile)
 
@@ -922,6 +993,31 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 			"Wrong alter operations in table %s at index %d from %s", expectedTable.Name, i, sqlFile)
 		require.Equal(t, expectedTable.Columns, actualTable.Columns,
 			"Wrong columns in table %s at index %d from %s", expectedTable.Name, i, sqlFile)
+	}
+
+	// Check named collections in order
+	for i, expectedCollection := range expected.NamedCollections {
+		actualCollection := actualTestCase.NamedCollections[i]
+		require.Equal(t, expectedCollection.Name, actualCollection.Name,
+			"Wrong named collection name at index %d in %s", i, sqlFile)
+		require.Equal(t, expectedCollection.Cluster, actualCollection.Cluster,
+			"Wrong cluster in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		require.Equal(t, expectedCollection.Operation, actualCollection.Operation,
+			"Wrong operation in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		require.Equal(t, expectedCollection.OrReplace, actualCollection.OrReplace,
+			"Wrong OR REPLACE flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		require.Equal(t, expectedCollection.IfNotExists, actualCollection.IfNotExists,
+			"Wrong IF NOT EXISTS flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		require.Equal(t, expectedCollection.IfExists, actualCollection.IfExists,
+			"Wrong IF EXISTS flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		require.Equal(t, expectedCollection.Comment, actualCollection.Comment,
+			"Wrong comment in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		require.Equal(t, expectedCollection.Parameters, actualCollection.Parameters,
+			"Wrong parameters in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		if expectedCollection.Overridable != nil {
+			require.Equal(t, expectedCollection.Overridable, actualCollection.Overridable,
+				"Wrong overridable flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
+		}
 	}
 }
 
