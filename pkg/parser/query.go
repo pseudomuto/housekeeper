@@ -115,7 +115,8 @@ type (
 	// GroupByClause represents GROUP BY clause
 	GroupByClause struct {
 		GroupBy    string       `parser:"'GROUP' 'BY'"`
-		Columns    []Expression `parser:"@@ (',' @@)*"`
+		All        bool         `parser:"(@'ALL'"`
+		Columns    []Expression `parser:"| @@ (',' @@)*)"`
 		WithClause *string      `parser:"('WITH' @('CUBE' | 'ROLLUP' | 'TOTALS'))?"`
 	}
 
