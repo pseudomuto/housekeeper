@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 // extractDictionaries retrieves all dictionary definitions from the ClickHouse instance.
@@ -69,7 +70,7 @@ func extractDictionaries(ctx context.Context, client *Client) (*parser.SQL, erro
 		}
 
 		// Use SHOW CREATE DICTIONARY to get the DDL
-		fullName := fmt.Sprintf("`%s`.`%s`", database, name)
+		fullName := utils.BacktickQualifiedName(&database, name)
 		showQuery := "SHOW CREATE DICTIONARY " + fullName
 
 		showRows, err := client.conn.Query(ctx, showQuery)

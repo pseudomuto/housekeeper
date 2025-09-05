@@ -7,7 +7,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
-// DumpSchema retrieves all schema objects (databases, tables, dictionaries, views)
+// DumpSchema retrieves all schema objects (databases, tables, named collections, dictionaries, views)
 // and returns them as a parsed SQL structure ready for use with migration generation.
 //
 // This function combines all individual extraction functions to provide a complete view of the
@@ -17,8 +17,9 @@ import (
 // The extraction follows this order:
 //  1. Databases - extracted first as they define the namespace
 //  2. Tables - extracted with full DDL statements
-//  3. Dictionaries - dictionary definitions with source/layout/lifetime
-//  4. Views - both regular and materialized views (extracted last since they may depend on dictionaries)
+//  3. Named Collections - connection configurations that dictionaries might reference
+//  4. Dictionaries - dictionary definitions with source/layout/lifetime
+//  5. Views - both regular and materialized views (extracted last since they may depend on dictionaries)
 //
 // All system objects are automatically excluded and all DDL statements are validated.
 //
@@ -51,6 +52,13 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 		return nil, errors.Wrap(err, "failed to extract databases")
 	}
 	allStatements = append(allStatements, databases.Statements...)
+
+	// Extract named collections (before tables since integration engine tables might use them)
+	namedCollections, err := extractNamedCollections(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract named collections")
+	}
+	allStatements = append(allStatements, namedCollections.Statements...)
 
 	// Extract tables
 	tables, err := extractTables(ctx, client)
@@ -90,6 +98,7 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 // The function handles:
 //   - CREATE DATABASE statements
 //   - CREATE TABLE statements
+//   - CREATE NAMED COLLECTION statements
 //   - CREATE DICTIONARY statements
 //   - CREATE VIEW statements (both regular and materialized)
 //
@@ -117,6 +126,9 @@ func injectOnCluster(statements []*parser.Statement, cluster string) []*parser.S
 			if !isHousekeeperDatabase(dbName) {
 				stmt.CreateTable.OnCluster = clusterName
 			}
+		case stmt.CreateNamedCollection != nil:
+			// Named collections are cluster-wide by nature
+			stmt.CreateNamedCollection.OnCluster = clusterName
 		case stmt.CreateDictionary != nil:
 			dbName := getDatabaseName(stmt.CreateDictionary.Database)
 			if !isHousekeeperDatabase(dbName) {

@@ -10,16 +10,16 @@
 -- db/main.sql (this file)
 --   -- housekeeper:import schemas/[DATABASE]/db.sql
 -- db/migrations/
---   [ENV]/
---     [TIMESTAMP].sql (auto-generated migrations)
---     housekeeper.sum (checksums for migrations)
+--   [TIMESTAMP].sql (auto-generated migrations)
+--   housekeeper.sum (checksums for migrations)
 -- db/schemas/
 --   [DATABASE]
 --     schema.sql
+--       -- housekeeper:import collections/[COLLECTION].sql
 --       -- housekeeper:import tables/[TABLE].sql
+--     collections/
+--       [COLLECTION].sql
 --     dictionaries/
 --     tables/
 --       [TABLE].sql
 --     views/
-
-

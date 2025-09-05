@@ -21,6 +21,9 @@ my-clickhouse-project/
 │   └── schemas/              # Modular schema organization
 │       ├── analytics/
 │       │   ├── schema.sql    # Database definition
+│       │   ├── collections/  # Named collection definitions
+│       │   │   ├── api_configs.sql
+│       │   │   └── kafka_configs.sql
 │       │   ├── tables/       # Table definitions
 │       │   │   ├── events.sql
 │       │   │   ├── users.sql

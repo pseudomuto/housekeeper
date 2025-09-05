@@ -79,7 +79,7 @@ var (
 //	format.FormatSQL(&buf, format.Defaults, diff)
 //	fmt.Println(buf.String())
 //
-//nolint:gocyclo,funlen,maintidx // Complex function handles multiple DDL statement types and migration ordering
+//nolint:gocyclo,funlen,maintidx,gocognit // Complex function handles multiple DDL statement types and migration ordering
 func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 	// Compare databases and dictionaries to find differences
 	dbDiffs, err := compareDatabases(current, target)
@@ -102,11 +102,16 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		return nil, errors.Wrap(err, "failed to compare tables")
 	}
 
-	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 {
+	collectionDiffs, err := compareNamedCollections(current, target)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compare named collections")
+	}
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 {
 		return nil, ErrNoDiff
 	}
 
-	// Process diffs in proper order: databases first, then tables, then dictionaries, then views
+	// Process diffs in proper order: databases first, then named collections, then tables, then dictionaries, then views
 	// Within each type: CREATE first, then ALTER/REPLACE, then RENAME, then DROP
 	statements := make([]string, 0, 50) // Pre-allocate with estimated capacity
 
@@ -155,6 +160,23 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		}
 	}
 
+	// Group named collection diffs by type for proper ordering
+	var collectionCreateDiffs, collectionAlterDiffs, collectionReplaceDiffs, collectionRenameDiffs, collectionDropDiffs []*NamedCollectionDiff
+	for _, diff := range collectionDiffs {
+		switch diff.Type {
+		case NamedCollectionDiffCreate:
+			collectionCreateDiffs = append(collectionCreateDiffs, diff)
+		case NamedCollectionDiffAlter:
+			collectionAlterDiffs = append(collectionAlterDiffs, diff)
+		case NamedCollectionDiffReplace:
+			collectionReplaceDiffs = append(collectionReplaceDiffs, diff)
+		case NamedCollectionDiffRename:
+			collectionRenameDiffs = append(collectionRenameDiffs, diff)
+		case NamedCollectionDiffDrop:
+			collectionDropDiffs = append(collectionDropDiffs, diff)
+		}
+	}
+
 	// Group table diffs by type for proper ordering
 	var tableCreateDiffs, tableAlterDiffs, tableRenameDiffs, tableDropDiffs []*TableDiff
 	for _, diff := range tableDiffs {
@@ -170,7 +192,7 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		}
 	}
 
-	// Migration order: Databases first, then tables, then dictionaries, then views
+	// Migration order: Databases first, then named collections, then tables, then dictionaries, then views
 	// Database order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range dbCreateDiffs {
 		statements = append(statements, diff.UpSQL)
@@ -182,6 +204,23 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		statements = append(statements, diff.UpSQL)
 	}
 	for _, diff := range dbDropDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+
+	// Named Collection order: CREATE -> ALTER -> REPLACE -> RENAME -> DROP
+	for _, diff := range collectionCreateDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range collectionAlterDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range collectionReplaceDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range collectionRenameDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range collectionDropDiffs {
 		statements = append(statements, diff.UpSQL)
 	}
 

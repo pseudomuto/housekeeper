@@ -1,0 +1,4 @@
+named_collections:
+    - name: old_s3_config
+      operation: DROP
+      if_exists: true
