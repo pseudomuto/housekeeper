@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -58,15 +57,12 @@ func generateDiff(ctx context.Context, w io.Writer, client *clickhouse.Client, c
 		return errors.Wrap(err, "failed to dump current schema")
 	}
 
-	var targetBuf bytes.Buffer
-	if err := schemapkg.Compile(cfg.Entrypoint, &targetBuf); err != nil {
-		return errors.Wrap(err, "failed to compile target schema")
+	targetStatements, err := compileProjectSchema(cfg)
+	if err != nil {
+		return err
 	}
 
-	targetSchema, err := parser.ParseString(targetBuf.String())
-	if err != nil {
-		return errors.Wrap(err, "failed to parse target schema")
-	}
+	targetSchema := &parser.SQL{Statements: targetStatements}
 
 	// Check if there are differences
 	_, err = schemapkg.GenerateDiff(currentSchema, targetSchema)

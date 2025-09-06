@@ -333,9 +333,7 @@ func parseSnapshotMetadata(lines []string) (*snapshotMetadata, int, error) {
 	if metadata.version == "" {
 		return nil, 0, errors.New("snapshot missing required version field")
 	}
-	if len(metadata.includedMigrations) == 0 {
-		return nil, 0, errors.New("snapshot missing included_migrations field")
-	}
+	// Note: includedMigrations can be empty for bootstrap snapshots, so no validation needed
 
 	return metadata, endIndex, nil
 }

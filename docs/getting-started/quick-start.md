@@ -214,11 +214,28 @@ Congratulations! You've successfully:
 - **[Migration Process](../user-guide/migration-process.md)** - Understand how migrations work under the hood
 - **[Configuration](../user-guide/configuration.md)** - Customize Housekeeper for your environment
 
+### Working with Existing Databases
+
+If you have an existing ClickHouse database, use the bootstrap workflow:
+
+```bash
+# Step 1: Extract schema from existing database
+housekeeper bootstrap --url localhost:9000
+
+# Step 2: Create initial snapshot (no migrations required)
+housekeeper snapshot --bootstrap --description "Initial baseline"
+
+# Step 3: Now you can generate migrations normally
+housekeeper diff
+```
+
+The `--bootstrap` flag creates a snapshot from your project schema instead of existing migrations, solving the chicken-and-egg problem when starting with an existing database.
+
 ### Common Next Steps
 
 1. **Set up CI/CD**: Integrate Housekeeper into your deployment pipeline
 2. **Cluster Configuration**: Configure for distributed ClickHouse deployments
-3. **Extract Existing Schema**: Import existing ClickHouse schemas using `housekeeper schema dump`
+3. **Migration Consolidation**: Use `housekeeper snapshot` to consolidate old migrations
 4. **Team Workflow**: Establish schema change processes with your team
 
 ### Getting Help

@@ -292,6 +292,51 @@ housekeeper diff --config environments/production.yaml
 3. **Branch Strategy**: Use feature branches for schema changes
 4. **Code Reviews**: Review schema changes like application code
 
+## Bootstrapping from Existing Databases
+
+When starting with an existing ClickHouse database, Housekeeper provides a complete bootstrap workflow:
+
+### Step 1: Bootstrap the Project
+
+```bash
+# Initialize project structure
+housekeeper init
+
+# Extract schema from existing database
+housekeeper bootstrap --url localhost:9000
+```
+
+This creates a fully organized project structure with:
+- Separate files for each database object
+- Proper import directives
+- Organized directory hierarchy
+
+### Step 2: Create Initial Snapshot
+
+Since you're starting with an existing database, you need to create an initial snapshot:
+
+```bash
+# Create bootstrap snapshot from project schema
+housekeeper snapshot --bootstrap --description "Initial database state"
+```
+
+This creates a snapshot file that represents your current database state. The `--bootstrap` flag tells the command to use the compiled project schema instead of existing migrations (which don't exist yet).
+
+### Step 3: Continue with Normal Workflow
+
+After bootstrapping and creating the initial snapshot, you can use the normal development workflow:
+
+```bash
+# Make changes to schema files
+# ...
+
+# Generate migrations as usual
+housekeeper diff
+
+# Apply migrations
+housekeeper migrate --url localhost:9000
+```
+
 ## Migration Management
 
 ### Migration Integrity
