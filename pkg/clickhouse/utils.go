@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -62,54 +63,43 @@ func buildDatabaseExclusion(columnName string, ignoreDatabases []string) (string
 	return condition, params
 }
 
-// cleanCreateStatement normalizes a CREATE statement by removing extra whitespace, ensuring semicolon,
-// and normalizing data types for consistent comparison with parsed DDL
+// cleanCreateStatement normalizes a CREATE statement using AST-based approach
+// This parses the DDL and reformats it to ensure consistency, avoiding fragile string manipulation
 func cleanCreateStatement(createQuery string) string {
 	cleaned := strings.TrimSpace(createQuery)
 	if !strings.HasSuffix(cleaned, ";") {
 		cleaned += ";"
 	}
 
-	// Normalize data types to match what the parser produces
+	// Only do essential security normalization (password hiding)
 	cleaned = normalizeDataTypesInDDL(cleaned)
+
+	// Try to parse and reformat using AST for consistency
+	// If parsing fails, return the minimally cleaned version
+	if parsed, err := parser.ParseString(cleaned); err == nil {
+		var buf strings.Builder
+		formatter := format.New(format.Defaults)
+		if err := formatter.Format(&buf, parsed.Statements...); err == nil {
+			return buf.String()
+		}
+	}
 
 	return cleaned
 }
 
-// normalizeDataTypesInDDL normalizes data types in DDL statements to match parser output
+// normalizeDataTypesInDDL performs minimal normalization of DDL statements
+// This function is kept minimal to avoid corrupting complex type definitions
 func normalizeDataTypesInDDL(ddl string) string {
-	// Normalize Decimal(18, X) -> Decimal64(X)
-	decimalPattern := regexp.MustCompile(`Decimal\(18,\s*(\d+)\)`)
-	ddl = decimalPattern.ReplaceAllString(ddl, "Decimal64($1)")
-
-	// Normalize DateTime64(X, 'TZ') -> DateTime(X, 'TZ')
-	datetimePattern := regexp.MustCompile(`DateTime64\((\d+),\s*'([^']+)'\)`)
-	ddl = datetimePattern.ReplaceAllString(ddl, "DateTime($1, '$2')")
-
-	// Normalize LIFETIME(MIN 0 MAX N) -> LIFETIME(N) when MIN is 0
-	// This handles ClickHouse's normalization of single lifetime values
-	lifetimePattern := regexp.MustCompile(`LIFETIME\s*\(\s*MIN\s+0\s+MAX\s+(\d+)\s*\)`)
-	ddl = lifetimePattern.ReplaceAllString(ddl, "LIFETIME($1)")
-
-	// Normalize Float32 DEFAULT 0. -> Float32 DEFAULT 0.0
-	// ClickHouse sometimes truncates trailing zeros
-	floatDefaultPattern := regexp.MustCompile(`(Float32|Float64)\s+DEFAULT\s+(\d+)\.(?:\s|,|\n|$)`)
-	ddl = floatDefaultPattern.ReplaceAllString(ddl, "$1 DEFAULT $2.0")
-
-	// Normalize hidden passwords back to empty strings to match our schema
-	// ClickHouse may use uppercase or lowercase for password keyword
+	// Normalize hidden passwords (essential for security)
 	ddl = regexp.MustCompile(`(?i)\bpassword\s+'?\[HIDDEN\]'?`).ReplaceAllString(ddl, "password ''")
 
-	// Normalize CREATE statement keywords - ClickHouse sometimes returns lowercase
-	ddl = regexp.MustCompile(`^CREATE\s+table\s+`).ReplaceAllString(ddl, "CREATE TABLE ")
-	ddl = regexp.MustCompile(`^CREATE\s+view\s+`).ReplaceAllString(ddl, "CREATE VIEW ")
-	ddl = regexp.MustCompile(`^CREATE\s+materialized\s+view\s+`).ReplaceAllString(ddl, "CREATE MATERIALIZED VIEW ")
-	ddl = regexp.MustCompile(`^CREATE\s+database\s+`).ReplaceAllString(ddl, "CREATE DATABASE ")
-	ddl = regexp.MustCompile(`^CREATE\s+dictionary\s+`).ReplaceAllString(ddl, "CREATE DICTIONARY ")
+	// Normalize Float defaults for test consistency (ClickHouse sometimes drops trailing zeros)
+	floatDefaultPattern := regexp.MustCompile(`(Float32|Float64)\s+DEFAULT\s+(\d+)\.(\s?)`)
+	ddl = floatDefaultPattern.ReplaceAllString(ddl, "$1 DEFAULT $2.0$3")
 
-	// Remove backticks from identifiers to match our schema format
-	// ClickHouse returns `column_name` but we write column_name
-	ddl = regexp.MustCompile("`([^`]+)`").ReplaceAllString(ddl, "$1")
+	// Normalize LIFETIME(MIN 0 MAX N) -> LIFETIME(N) for test consistency
+	lifetimePattern := regexp.MustCompile(`LIFETIME\s*\(\s*MIN\s+0\s+MAX\s+(\d+)\s*\)`)
+	ddl = lifetimePattern.ReplaceAllString(ddl, "LIFETIME($1)")
 
 	return ddl
 }
