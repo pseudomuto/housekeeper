@@ -234,6 +234,7 @@ RENAME TABLE analytics.user_events TO analytics.events;
 Migration files use UTC timestamps for consistent ordering:
 - Format: `yyyyMMddHHmmss.sql`
 - Example: `20240806143022.sql`
+- Snapshots: `yyyyMMddHHmmss_snapshot.sql`
 
 ### File Structure
 
@@ -253,6 +254,26 @@ CREATE TABLE analytics.events (
     event_type String
 ) ENGINE = MergeTree() ORDER BY timestamp;
 ```
+
+### Snapshot Consolidation
+
+Over time, you may accumulate many migration files. Housekeeper provides a snapshot feature to consolidate migrations:
+
+```bash
+# Consolidate all existing migrations into a single snapshot
+housekeeper snapshot --description "Q4 2024 consolidation"
+
+# This will:
+# 1. Create a timestamped snapshot file with all migration content
+# 2. Remove the individual migration files that were consolidated
+# 3. Update the migration sum file
+```
+
+Benefits of snapshot consolidation:
+- **Reduced Clutter**: Fewer migration files to manage
+- **Faster Setup**: New environments apply one snapshot instead of many migrations
+- **Preserved History**: Snapshot contains all historical changes
+- **Clean Baseline**: Easier to understand current schema state
 
 ### Migration Integrity
 
@@ -398,7 +419,9 @@ housekeeper dev up
 
 ### Working with Existing Databases
 
-Extract schema from an existing ClickHouse instance:
+When starting with an existing ClickHouse database, Housekeeper provides a complete bootstrap workflow:
+
+#### Step 1: Extract Schema from Existing Database
 
 ```bash
 # Bootstrap project from existing database
@@ -406,6 +429,26 @@ housekeeper bootstrap --url localhost:9000
 
 # This creates initial project structure with current schema
 ```
+
+#### Step 2: Create Initial Snapshot (New Feature)
+
+After bootstrapping, you need to create an initial snapshot to establish a baseline for future migrations. This solves the chicken-and-egg problem where you have schema files but no migrations yet:
+
+```bash
+# Create bootstrap snapshot from project schema (no migrations required)
+housekeeper snapshot --bootstrap --description "Initial database baseline"
+
+# This creates a snapshot file representing the current database state
+# Future migrations will be generated against this baseline
+```
+
+The `--bootstrap` flag tells the snapshot command to use the compiled project schema instead of existing migrations. This is essential when starting with an existing database because:
+
+1. You have schema files (from `bootstrap` command) but no migrations yet
+2. The snapshot becomes your "migration zero" - representing the current database state
+3. Future `diff` commands will generate migrations against this baseline
+
+#### Excluding Databases
 
 When working with existing databases, you can exclude certain databases from the extraction process:
 

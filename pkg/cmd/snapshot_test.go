@@ -19,7 +19,7 @@ func TestSnapshotCommand_WithMigrations(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -56,7 +56,7 @@ func TestSnapshotCommand_NoMigrations(t *testing.T) {
 	fixture := testutil.TestProject(t)
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -76,7 +76,7 @@ func TestSnapshotCommand_CustomDescription(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	// Create a test CLI app
 	app := &cli.Command{
@@ -102,7 +102,7 @@ func TestSnapshotCommand_DefaultDescription(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -123,26 +123,31 @@ func TestSnapshotCommand_FlagConfiguration(t *testing.T) {
 	fixture := testutil.TestProject(t)
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	require.Equal(t, "snapshot", command.Name)
-	require.Equal(t, "Create a snapshot from existing migrations", command.Usage)
-	require.Len(t, command.Flags, 1)
+	require.Equal(t, "Create a snapshot from migrations or project schema", command.Usage)
+	require.Len(t, command.Flags, 2)
 
 	// Check description flag
 	descFlag := command.Flags[0].(*cli.StringFlag)
 	require.Equal(t, "description", descFlag.Name)
-	require.Equal(t, []string{"d"}, descFlag.Aliases)
+	require.Empty(t, descFlag.Aliases) // No aliases anymore to avoid conflict with global -d
 	require.Equal(t, "Schema snapshot", descFlag.Value)
+
+	// Check bootstrap flag
+	bootstrapFlag := command.Flags[1].(*cli.BoolFlag)
+	require.Equal(t, "bootstrap", bootstrapFlag.Name)
+	require.Equal(t, "Create snapshot from project schema instead of existing migrations", bootstrapFlag.Usage)
 }
 
-func TestSnapshotCommand_DescriptionAlias(t *testing.T) {
-	// Test description flag alias
+func TestSnapshotCommand_DescriptionFlag(t *testing.T) {
+	// Test description flag with full name (no alias anymore)
 	fixture := testutil.TestProject(t).
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	// Create a test CLI app
 	app := &cli.Command{
@@ -155,11 +160,11 @@ func TestSnapshotCommand_DescriptionAlias(t *testing.T) {
 	var buf bytes.Buffer
 	app.Writer = &buf
 
-	err := app.Run(ctx, []string{"test", "-d", "Short alias test"})
+	err := app.Run(ctx, []string{"test", "--description", "Full flag test"})
 	require.NoError(t, err)
 
 	output := buf.String()
-	require.Contains(t, output, "Description: Short alias test")
+	require.Contains(t, output, "Description: Full flag test")
 }
 
 func TestSnapshotCommand_RemovesMigrationFiles(t *testing.T) {
@@ -179,7 +184,7 @@ func TestSnapshotCommand_RemovesMigrationFiles(t *testing.T) {
 	require.FileExists(t, file1)
 	require.FileExists(t, file2)
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -206,7 +211,7 @@ func TestSnapshotCommand_WithSampleMigrations(t *testing.T) {
 		WithMigrations(testutil.SampleMigrations())
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -232,7 +237,7 @@ func TestSnapshotCommand_SnapshotFileContent(t *testing.T) {
 		})
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -269,7 +274,7 @@ func TestSnapshotCommand_TimestampFormat(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -305,7 +310,7 @@ func TestSnapshotCommand_FileCreationError(t *testing.T) {
 		_ = os.Chmod(fixture.GetMigrationsDir(), 0o755)
 	}()
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -328,7 +333,7 @@ func TestSnapshotCommand_InvalidMigrationsDirectory(t *testing.T) {
 	err := os.RemoveAll(fixture.GetMigrationsDir())
 	require.NoError(t, err)
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -351,7 +356,7 @@ func TestSnapshotCommand_LongDescription(t *testing.T) {
 
 	longDesc := "This is a very long description that contains multiple words and should be properly handled by the snapshot command"
 
-	command := snapshot(fixture.Project)
+	command := snapshot(fixture.Project, fixture.Config)
 
 	// Create a test CLI app
 	app := &cli.Command{

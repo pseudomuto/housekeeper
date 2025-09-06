@@ -326,6 +326,44 @@ housekeeper backup --config environments/production.yaml
 housekeeper migrate --config environments/production.yaml
 ```
 
+### Migration Consolidation
+
+Over time, accumulating many migration files can become unwieldy. Use snapshots to consolidate:
+
+```bash
+# Consolidate existing migrations into a snapshot
+housekeeper snapshot --description "Q1 2024 consolidation"
+
+# This will:
+# - Create a single snapshot file with all migration content
+# - Remove individual migration files
+# - Update the sum file
+```
+
+Best practices for consolidation:
+- **Timing**: Consolidate after major releases or quarterly
+- **Testing**: Test snapshot application in a fresh environment
+- **Documentation**: Document what's included in each snapshot
+- **Backup**: Keep backups of original migrations before consolidation
+
+### Bootstrapping Existing Databases
+
+When adopting Housekeeper for an existing database:
+
+```bash
+# 1. Initialize and extract current schema
+housekeeper init
+housekeeper bootstrap --url production-clickhouse:9000
+
+# 2. Create initial baseline snapshot
+housekeeper snapshot --bootstrap --description "Production baseline $(date +%Y-%m-%d)"
+
+# 3. Continue with normal workflow
+housekeeper diff  # Future changes will be against this baseline
+```
+
+The `--bootstrap` flag is crucial here - it creates a snapshot from the compiled project schema rather than from migrations (which don't exist yet).
+
 ### Migration Safety
 
 #### Pre-Migration Checks

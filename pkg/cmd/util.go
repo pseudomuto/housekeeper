@@ -13,6 +13,8 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/docker"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
+	"github.com/pseudomuto/housekeeper/pkg/parser"
+	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
 )
 
 // runContainer starts a ClickHouse container with the given options, loads and executes
@@ -94,4 +96,32 @@ func runContainer(ctx context.Context, w io.Writer, opts docker.DockerOptions, c
 	}
 
 	return container, client, nil
+}
+
+// compileProjectSchema compiles the project schema from the configured entrypoint
+// and returns the parsed SQL statements. This is used by multiple commands that
+// need to work with the compiled project schema (diff, schema compile, snapshot --bootstrap).
+//
+// Example usage:
+//
+//	statements, err := compileProjectSchema(cfg)
+//	if err != nil {
+//		return err
+//	}
+//
+//	// Use statements for further processing
+func compileProjectSchema(cfg *config.Config) ([]*parser.Statement, error) {
+	// Compile project schema
+	var schemaBuf bytes.Buffer
+	if err := schemapkg.Compile(cfg.Entrypoint, &schemaBuf); err != nil {
+		return nil, errors.Wrapf(err, "failed to compile project schema from: %s", cfg.Entrypoint)
+	}
+
+	// Parse compiled schema
+	sql, err := parser.ParseString(schemaBuf.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse compiled project schema")
+	}
+
+	return sql.Statements, nil
 }
