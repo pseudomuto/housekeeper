@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
+        uses: DeterminateSystems/nix-installer-action@v19
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
