@@ -1,0 +1,29 @@
+-- This is the main entrypoint for global roles in your ClickHouse cluster.
+-- Roles are global objects that exist at the cluster level, not within specific databases.
+--
+-- You can organize your roles by importing individual role files:
+-- -- housekeeper:import analytics_reader.sql
+-- -- housekeeper:import data_writer.sql
+-- -- housekeeper:import admin_roles.sql
+--
+-- Or define roles directly in this file:
+--
+-- Example role definitions:
+--
+-- -- Create a read-only role for analytics
+-- CREATE ROLE IF NOT EXISTS analytics_reader;
+-- GRANT SELECT ON *.* TO analytics_reader;
+--
+-- -- Create a data writer role with limited permissions
+-- CREATE ROLE IF NOT EXISTS data_writer;
+-- GRANT SELECT, INSERT ON analytics.* TO data_writer;
+--
+-- -- Create an admin role with full permissions
+-- CREATE ROLE IF NOT EXISTS db_admin;
+-- GRANT ALL ON *.* TO db_admin WITH GRANT OPTION;
+--
+-- -- Create a developer role with specific settings
+-- CREATE ROLE IF NOT EXISTS developer SETTINGS max_memory_usage = 10000000000, readonly = 0;
+--
+-- Note: When running on a cluster, all role statements will automatically
+-- have ON CLUSTER clauses added if configured in housekeeper.yaml

@@ -211,6 +211,92 @@ CREATE TABLE reference.countries (
 ) ENGINE = MergeTree() ORDER BY code;
 ```
 
+## Global Object Management
+
+Global objects in ClickHouse exist at the cluster level and are shared across all databases. Housekeeper provides dedicated support for managing these objects with proper organization and migration ordering.
+
+### Role-Based Access Control
+
+Roles are the primary global objects for managing access control:
+
+```sql
+-- db/schemas/_global/roles/main.sql
+
+-- Base roles for common access patterns
+CREATE ROLE IF NOT EXISTS readonly_user;
+CREATE ROLE IF NOT EXISTS data_analyst;  
+CREATE ROLE IF NOT EXISTS service_account;
+
+-- Grant hierarchical permissions
+GRANT SELECT ON *.* TO readonly_user;
+GRANT readonly_user TO data_analyst;
+GRANT SELECT, INSERT ON analytics.* TO data_analyst;
+
+-- Service-specific roles with resource limits
+CREATE ROLE IF NOT EXISTS api_service
+SETTINGS max_concurrent_queries_for_user = 100, max_memory_usage = 2000000000;
+GRANT SELECT ON public_data.* TO api_service;
+GRANT INSERT ON logs.api_requests TO api_service;
+```
+
+### Global Object Organization
+
+Use the `_global` directory structure for better organization:
+
+```
+db/schemas/_global/
+├── roles/
+│   ├── main.sql           # Role imports and basic definitions
+│   ├── team_roles.sql     # Department/team specific roles
+│   └── service_roles.sql  # Application service accounts
+└── collections/           # Future: named collections
+    └── main.sql           # Global named collections
+```
+
+### Import Order Matters
+
+Global objects are processed first in migrations:
+
+```sql
+-- db/main.sql - Import order is critical
+-- Global objects first (roles, collections, etc.)
+-- housekeeper:import schemas/_global/roles/main.sql
+
+-- Then database-specific schemas  
+-- housekeeper:import schemas/analytics/schema.sql
+-- housekeeper:import schemas/reporting/schema.sql
+```
+
+This ensures roles are available when database objects that reference them are created.
+
+### Access Control Patterns
+
+Design role hierarchies that match your organizational structure:
+
+```sql
+-- Team-based hierarchy
+CREATE ROLE IF NOT EXISTS engineering_base;
+CREATE ROLE IF NOT EXISTS senior_engineer;
+CREATE ROLE IF NOT EXISTS tech_lead;
+
+GRANT SELECT ON system.* TO engineering_base;           -- System monitoring
+GRANT engineering_base TO senior_engineer;
+GRANT CREATE VIEW ON analytics.* TO senior_engineer;    -- Custom analysis
+GRANT senior_engineer TO tech_lead;
+GRANT ALL ON development.* TO tech_lead;                -- Full dev access
+
+-- Environment-based access
+CREATE ROLE IF NOT EXISTS prod_reader;
+CREATE ROLE IF NOT EXISTS staging_writer;
+CREATE ROLE IF NOT EXISTS dev_admin;
+
+GRANT SELECT ON prod_analytics.public_* TO prod_reader;
+GRANT SELECT, INSERT, UPDATE ON staging_*.* TO staging_writer;  
+GRANT ALL ON dev_*.* TO dev_admin;
+```
+
+See [Role Management](role-management.md) for comprehensive role management documentation and examples.
+
 ## Advanced Schema Patterns
 
 ### Materialized Columns

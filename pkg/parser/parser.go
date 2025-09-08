@@ -122,6 +122,13 @@ type (
 		CreateView            *CreateViewStmt            `parser:"| @@"`
 		CreateNamedCollection *CreateNamedCollectionStmt `parser:"| @@"`
 		AlterNamedCollection  *AlterNamedCollectionStmt  `parser:"| @@"`
+		CreateRole            *CreateRoleStmt            `parser:"| @@"`
+		AlterRole             *AlterRoleStmt             `parser:"| @@"`
+		DropRole              *DropRoleStmt              `parser:"| @@"`
+		SetRole               *SetRoleStmt               `parser:"| @@"`
+		SetDefaultRole        *SetDefaultRoleStmt        `parser:"| @@"`
+		Grant                 *GrantStmt                 `parser:"| @@"`
+		Revoke                *RevokeStmt                `parser:"| @@"`
 		AttachView            *AttachViewStmt            `parser:"| @@"`
 		AttachDictionary      *AttachDictionaryStmt      `parser:"| @@"`
 		DetachView            *DetachViewStmt            `parser:"| @@"`
