@@ -19,7 +19,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v14
 
       - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+        uses: DeterminateSystems/magic-nix-cache-action@v13
 
       - name: Run tests
         run: nix develop -c task test:all
@@ -44,7 +44,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v14
 
       - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+        uses: DeterminateSystems/magic-nix-cache-action@v13
 
       - name: Run linter
         run: nix develop -c task lint
@@ -61,7 +61,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v14
 
       - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+        uses: DeterminateSystems/magic-nix-cache-action@v13
 
       - name: Build with Go
         run: nix develop -c go build -v ./...
