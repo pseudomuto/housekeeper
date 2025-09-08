@@ -1,0 +1,38 @@
+roles:
+    - name: ""
+      operation: SET
+      set_type: DEFAULT
+    - name: ""
+      operation: SET
+      set_type: NONE
+    - name: ""
+      operation: SET
+      set_type: ALL
+    - name: admin
+      operation: SET
+      set_type: SPECIFIC
+    - name: reader,writer
+      operation: SET
+      set_type: SPECIFIC
+    - name: ""
+      operation: SET_DEFAULT
+      set_type: NONE
+      to_users:
+        - john
+    - name: ""
+      operation: SET_DEFAULT
+      set_type: ALL
+      to_users:
+        - alice
+    - name: reader
+      operation: SET_DEFAULT
+      set_type: SPECIFIC
+      to_users:
+        - bob
+    - name: developer
+      operation: SET_DEFAULT
+      set_type: SPECIFIC
+      to_users:
+        - alice
+        - bob
+        - charlie

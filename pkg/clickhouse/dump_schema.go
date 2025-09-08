@@ -81,6 +81,13 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 	}
 	allStatements = append(allStatements, views.Statements...)
 
+	// Extract roles (global objects)
+	roles, err := extractRoles(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract roles")
+	}
+	allStatements = append(allStatements, roles.Statements...)
+
 	// Inject ON CLUSTER clauses if cluster is specified
 	if client.options.Cluster != "" {
 		allStatements = injectOnCluster(allStatements, client.options.Cluster)
@@ -88,6 +95,11 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 
 	// Combine all statements into a single SQL structure
 	return &parser.SQL{Statements: allStatements}, nil
+}
+
+// extractRoles is a wrapper function that calls client.GetRoles
+func extractRoles(ctx context.Context, client *Client) (*parser.SQL, error) {
+	return client.GetRoles(ctx)
 }
 
 // injectOnCluster adds ON CLUSTER clauses to all DDL statements when cluster is specified.
@@ -101,6 +113,8 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 //   - CREATE NAMED COLLECTION statements
 //   - CREATE DICTIONARY statements
 //   - CREATE VIEW statements (both regular and materialized)
+//   - CREATE ROLE statements
+//   - GRANT/REVOKE statements
 //
 // Housekeeper internal objects (database 'housekeeper' and its objects) are excluded
 // from ON CLUSTER injection as they should be shard-local for migration tracking.
@@ -139,6 +153,15 @@ func injectOnCluster(statements []*parser.Statement, cluster string) []*parser.S
 			if !isHousekeeperDatabase(dbName) {
 				stmt.CreateView.OnCluster = clusterName
 			}
+		case stmt.CreateRole != nil:
+			// Roles are cluster-wide by nature
+			stmt.CreateRole.OnCluster = clusterName
+		case stmt.Grant != nil:
+			// Grants are cluster-wide by nature
+			stmt.Grant.OnCluster = clusterName
+		case stmt.Revoke != nil:
+			// Revokes are cluster-wide by nature
+			stmt.Revoke.OnCluster = clusterName
 		}
 	}
 

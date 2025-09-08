@@ -41,6 +41,9 @@ For larger projects, split schemas into logical modules:
 -- File: db/main.sql
 -- Main entrypoint that imports other schema files
 
+-- Global objects first (roles, users, settings profiles)
+-- housekeeper:import schemas/_global/roles/main.sql
+
 -- Database definitions
 -- housekeeper:import schemas/databases/ecommerce.sql
 
@@ -61,6 +64,55 @@ For larger projects, split schemas into logical modules:
 -- housekeeper:import schemas/views/sales_summary.sql
 -- housekeeper:import schemas/views/user_analytics.sql
 ```
+
+### Import Order and Dependencies
+
+The order of imports matters for proper migration generation. Housekeeper processes schema objects in dependency order:
+
+1. **Global Objects** (roles, users, settings profiles) - Available cluster-wide
+2. **Databases** - Container for other objects
+3. **Named Collections** - Global connection configurations
+4. **Tables** - Data storage structures
+5. **Dictionaries** - External data lookups
+6. **Views** - Query abstractions that may depend on tables/dictionaries
+
+```sql
+-- File: db/main.sql - Proper import ordering
+-- ✅ Correct order
+
+-- 1. Global objects first - processed before anything else
+-- housekeeper:import schemas/_global/roles/main.sql
+
+-- 2. Database definitions  
+-- housekeeper:import schemas/databases/main.sql
+
+-- 3. Named collections (if needed by tables)
+-- housekeeper:import schemas/collections/main.sql
+
+-- 4. Tables and core data structures
+-- housekeeper:import schemas/tables/main.sql
+
+-- 5. Dictionaries that may reference tables
+-- housekeeper:import schemas/dictionaries/main.sql
+
+-- 6. Views that query tables and dictionaries
+-- housekeeper:import schemas/views/main.sql
+```
+
+**Why Global Objects Come First:**
+
+Global objects like roles are cluster-wide and may be referenced by other objects:
+
+```sql
+-- Role must exist before being granted to table operations
+CREATE ROLE IF NOT EXISTS data_writer;
+
+-- Later in the schema, tables may reference the role in grants
+CREATE TABLE analytics.events (...) ENGINE = MergeTree() ORDER BY timestamp;
+GRANT INSERT ON analytics.events TO data_writer;
+```
+
+See the [Role Management](role-management.md) guide for comprehensive role management patterns.
 
 ## Database Design
 

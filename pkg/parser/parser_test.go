@@ -25,6 +25,8 @@ type TestCase struct {
 	Tables           []ExpectedTable           `yaml:"tables,omitempty"`
 	NamedCollections []ExpectedNamedCollection `yaml:"named_collections,omitempty"`
 	Queries          []ExpectedQuery           `yaml:"queries,omitempty"`
+	Roles            []ExpectedRole            `yaml:"roles,omitempty"`
+	Grants           []ExpectedGrant           `yaml:"grants,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -126,6 +128,33 @@ type ExpectedNamedCollection struct {
 	Comment     string            `yaml:"comment,omitempty"`
 }
 
+// ExpectedRole represents expected role properties
+type ExpectedRole struct {
+	Name        string            `yaml:"name"`
+	Operation   string            `yaml:"operation"` // CREATE, ALTER, DROP, SET, SET_DEFAULT
+	OrReplace   bool              `yaml:"or_replace,omitempty"`
+	IfNotExists bool              `yaml:"if_not_exists,omitempty"`
+	IfExists    bool              `yaml:"if_exists,omitempty"`
+	Cluster     string            `yaml:"cluster,omitempty"`
+	RenameTo    string            `yaml:"rename_to,omitempty"`
+	Settings    map[string]string `yaml:"settings,omitempty"`
+	SetType     string            `yaml:"set_type,omitempty"` // DEFAULT, NONE, ALL, SPECIFIC
+	ToUsers     []string          `yaml:"to_users,omitempty"`
+}
+
+// ExpectedGrant represents expected grant/revoke properties
+type ExpectedGrant struct {
+	Operation   string   `yaml:"operation"` // GRANT, REVOKE
+	Privileges  []string `yaml:"privileges"`
+	Target      string   `yaml:"target,omitempty"` // e.g., "*.*", "db.*"
+	Grantee     []string `yaml:"grantee"`
+	Cluster     string   `yaml:"cluster,omitempty"`
+	WithGrant   bool     `yaml:"with_grant,omitempty"`
+	WithAdmin   bool     `yaml:"with_admin,omitempty"`
+	GrantOption bool     `yaml:"grant_option,omitempty"`
+	AdminOption bool     `yaml:"admin_option,omitempty"`
+}
+
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
@@ -205,6 +234,8 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedTables []ExpectedTable
 	var expectedNamedCollections []ExpectedNamedCollection
 	var expectedQueries []ExpectedQuery
+	var expectedRoles []ExpectedRole
+	var expectedGrants []ExpectedGrant
 
 	// Keep track of accumulated ALTER operations by table name
 	alterOperations := make(map[string]map[string]int)
@@ -767,6 +798,176 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 
 			expectedTables = append(expectedTables, expectedTable)
+		} else if stmt.CreateRole != nil {
+			role := stmt.CreateRole
+			expectedRole := ExpectedRole{
+				Name:        role.Name,
+				Operation:   "CREATE",
+				OrReplace:   role.OrReplace,
+				IfNotExists: role.IfNotExists,
+			}
+			if role.OnCluster != nil {
+				expectedRole.Cluster = *role.OnCluster
+			}
+			if role.Settings != nil {
+				expectedRole.Settings = make(map[string]string)
+				for _, setting := range role.Settings.Settings {
+					if setting.Value != nil {
+						expectedRole.Settings[setting.Name] = *setting.Value
+					} else {
+						expectedRole.Settings[setting.Name] = ""
+					}
+				}
+			}
+			expectedRoles = append(expectedRoles, expectedRole)
+		} else if stmt.AlterRole != nil {
+			role := stmt.AlterRole
+			expectedRole := ExpectedRole{
+				Name:      role.Name,
+				Operation: "ALTER",
+				IfExists:  role.IfExists,
+			}
+			if role.OnCluster != nil {
+				expectedRole.Cluster = *role.OnCluster
+			}
+			if role.RenameTo != nil {
+				expectedRole.RenameTo = *role.RenameTo
+			}
+			if role.Settings != nil {
+				expectedRole.Settings = make(map[string]string)
+				for _, setting := range role.Settings.Settings {
+					if setting.Value != nil {
+						expectedRole.Settings[setting.Name] = *setting.Value
+					} else {
+						expectedRole.Settings[setting.Name] = ""
+					}
+				}
+			}
+			expectedRoles = append(expectedRoles, expectedRole)
+		} else if stmt.DropRole != nil {
+			role := stmt.DropRole
+			for _, name := range role.Names {
+				expectedRole := ExpectedRole{
+					Name:      name,
+					Operation: "DROP",
+					IfExists:  role.IfExists,
+				}
+				if role.OnCluster != nil {
+					expectedRole.Cluster = *role.OnCluster
+				}
+				expectedRoles = append(expectedRoles, expectedRole)
+			}
+		} else if stmt.SetRole != nil {
+			role := stmt.SetRole
+			expectedRole := ExpectedRole{
+				Operation: "SET",
+			}
+			if role.Default {
+				expectedRole.SetType = "DEFAULT"
+			} else if role.None {
+				expectedRole.SetType = "NONE"
+			} else if role.All {
+				expectedRole.SetType = "ALL"
+			} else if role.Roles != nil {
+				expectedRole.SetType = "SPECIFIC"
+				expectedRole.Name = strings.Join(role.Roles.Names, ",")
+			}
+			expectedRoles = append(expectedRoles, expectedRole)
+		} else if stmt.SetDefaultRole != nil {
+			role := stmt.SetDefaultRole
+			expectedRole := ExpectedRole{
+				Operation: "SET_DEFAULT",
+				ToUsers:   role.ToUsers,
+			}
+			if role.None {
+				expectedRole.SetType = "NONE"
+			} else if role.All {
+				expectedRole.SetType = "ALL"
+			} else if role.Roles != nil {
+				expectedRole.SetType = "SPECIFIC"
+				expectedRole.Name = strings.Join(role.Roles.Names, ",")
+			}
+			expectedRoles = append(expectedRoles, expectedRole)
+		} else if stmt.Grant != nil {
+			grant := stmt.Grant
+			var privileges []string
+			if grant.Privileges != nil {
+				for _, item := range grant.Privileges.Items {
+					if item.All {
+						privileges = append(privileges, "ALL")
+					} else if item.Name != "" {
+						privileges = append(privileges, item.Name)
+					}
+				}
+			}
+			var grantees []string
+			if grant.To != nil {
+				for _, item := range grant.To.Items {
+					if item.IsCurrent {
+						grantees = append(grantees, "CURRENT_USER")
+					} else {
+						grantees = append(grantees, item.Name)
+					}
+				}
+			}
+			expectedGrant := ExpectedGrant{
+				Operation:  "GRANT",
+				Privileges: privileges,
+				Grantee:    grantees,
+				WithGrant:  grant.WithGrant,
+				WithAdmin:  grant.WithAdmin,
+			}
+			if grant.OnCluster != nil {
+				expectedGrant.Cluster = *grant.OnCluster
+			}
+			if grant.On != nil {
+				if grant.On.Star1 != nil && grant.On.Star2 != nil {
+					expectedGrant.Target = "*.*"
+				} else if grant.On.Database != nil && grant.On.Table != nil {
+					expectedGrant.Target = *grant.On.Database + "." + *grant.On.Table
+				}
+			}
+			expectedGrants = append(expectedGrants, expectedGrant)
+		} else if stmt.Revoke != nil {
+			revoke := stmt.Revoke
+			var privileges []string
+			if revoke.Privileges != nil {
+				for _, item := range revoke.Privileges.Items {
+					if item.All {
+						privileges = append(privileges, "ALL")
+					} else if item.Name != "" {
+						privileges = append(privileges, item.Name)
+					}
+				}
+			}
+			var grantees []string
+			if revoke.From != nil {
+				for _, item := range revoke.From.Items {
+					if item.IsCurrent {
+						grantees = append(grantees, "CURRENT_USER")
+					} else {
+						grantees = append(grantees, item.Name)
+					}
+				}
+			}
+			expectedGrant := ExpectedGrant{
+				Operation:   "REVOKE",
+				Privileges:  privileges,
+				Grantee:     grantees,
+				GrantOption: revoke.GrantOption,
+				AdminOption: revoke.AdminOption,
+			}
+			if revoke.OnCluster != nil {
+				expectedGrant.Cluster = *revoke.OnCluster
+			}
+			if revoke.On != nil {
+				if revoke.On.Star1 != nil && revoke.On.Star2 != nil {
+					expectedGrant.Target = "*.*"
+				} else if revoke.On.Database != nil && revoke.On.Table != nil {
+					expectedGrant.Target = *revoke.On.Database + "." + *revoke.On.Table
+				}
+			}
+			expectedGrants = append(expectedGrants, expectedGrant)
 		} else if stmt.SelectStatement != nil {
 			sel := stmt.SelectStatement
 			expectedQuery := ExpectedQuery{
@@ -841,6 +1042,12 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	}
 	if len(expectedQueries) > 0 {
 		testCase.Queries = expectedQueries
+	}
+	if len(expectedRoles) > 0 {
+		testCase.Roles = expectedRoles
+	}
+	if len(expectedGrants) > 0 {
+		testCase.Grants = expectedGrants
 	}
 
 	return testCase

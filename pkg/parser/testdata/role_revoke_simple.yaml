@@ -1,0 +1,6 @@
+grants:
+    - operation: REVOKE
+      privileges:
+        - admin
+      grantee:
+        - john

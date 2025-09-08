@@ -107,13 +107,54 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		return nil, errors.Wrap(err, "failed to compare named collections")
 	}
 
-	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 {
+	roleDiffs := compareRoles(current, target)
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 && len(roleDiffs) == 0 {
 		return nil, ErrNoDiff
 	}
 
-	// Process diffs in proper order: databases first, then named collections, then tables, then dictionaries, then views
-	// Within each type: CREATE first, then ALTER/REPLACE, then RENAME, then DROP
+	// Process diffs in proper order: roles first (global objects), then databases, then named collections, then tables, then dictionaries, then views
+	// Within each type: CREATE first, then ALTER/REPLACE, then RENAME, then DROP/GRANT/REVOKE
 	statements := make([]string, 0, 50) // Pre-allocate with estimated capacity
+
+	// Group role diffs by type for proper ordering
+	var roleCreateDiffs, roleAlterDiffs, roleRenameDiffs, roleDropDiffs, roleGrantDiffs, roleRevokeDiffs []*RoleDiff
+	for _, diff := range roleDiffs {
+		switch diff.Type {
+		case RoleDiffCreate:
+			roleCreateDiffs = append(roleCreateDiffs, diff)
+		case RoleDiffAlter:
+			roleAlterDiffs = append(roleAlterDiffs, diff)
+		case RoleDiffRename:
+			roleRenameDiffs = append(roleRenameDiffs, diff)
+		case RoleDiffDrop:
+			roleDropDiffs = append(roleDropDiffs, diff)
+		case RoleDiffGrant:
+			roleGrantDiffs = append(roleGrantDiffs, diff)
+		case RoleDiffRevoke:
+			roleRevokeDiffs = append(roleRevokeDiffs, diff)
+		}
+	}
+
+	// Role order: CREATE -> ALTER -> RENAME -> GRANT -> REVOKE -> DROP
+	for _, diff := range roleCreateDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range roleAlterDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range roleRenameDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range roleGrantDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range roleRevokeDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range roleDropDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
 
 	// Group database diffs by type for proper ordering
 	var dbCreateDiffs, dbAlterDiffs, dbRenameDiffs, dbDropDiffs []*DatabaseDiff

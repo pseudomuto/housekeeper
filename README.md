@@ -17,7 +17,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Key Features
 
-- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, materialized views, and named collections
+- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, materialized views, named collections, and roles
 - **Cluster-Aware Operations** - Native `ON CLUSTER` support for distributed ClickHouse deployments
 - **Intelligent Migration Generation** - Smart schema comparison with proper operation ordering and dependency management
 - **Modern Parser Architecture** - Built with participle for robust, maintainable SQL parsing
@@ -26,18 +26,20 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Supported Migration Operations
 
-| Object Type | CREATE | ALTER | ATTACH | DETACH | DROP | RENAME | Notes |
-|------------|--------|-------|---------|---------|------|--------|-------|
-| **Database** | ✅ | ✅¹ | ✅ | ✅ | ✅ | ✅ | ¹Comment changes only |
-| **Named Collection** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅ | ²Uses CREATE OR REPLACE |
-| **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Full ALTER support |
-| **Dictionary** | ✅ | ❌³ | ✅ | ✅ | ✅ | ✅ | ³Uses CREATE OR REPLACE |
-| **View** | ✅ | ❌⁴ | ✅ | ✅ | ✅ | ✅⁵ | ⁴Uses CREATE OR REPLACE |
-| **Materialized View** | ✅ | ❌⁶ | ✅⁷ | ✅⁷ | ✅⁷ | ✅⁷ | ⁶Query changes use DROP+CREATE |
+| Object Type | CREATE | ALTER | ATTACH | DETACH | DROP | RENAME | GRANT/REVOKE | Notes |
+|------------|--------|-------|---------|---------|------|--------|--------------|-------|
+| **Database** | ✅ | ✅¹ | ✅ | ✅ | ✅ | ✅ | N/A | ¹Comment changes only |
+| **Named Collection** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅ | N/A | ²Uses CREATE OR REPLACE |
+| **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A | Full ALTER support |
+| **Dictionary** | ✅ | ❌³ | ✅ | ✅ | ✅ | ✅ | N/A | ³Uses CREATE OR REPLACE |
+| **View** | ✅ | ❌⁴ | ✅ | ✅ | ✅ | ✅⁵ | N/A | ⁴Uses CREATE OR REPLACE |
+| **Materialized View** | ✅ | ❌⁶ | ✅⁷ | ✅⁷ | ✅⁷ | ✅⁷ | N/A | ⁶Query changes use DROP+CREATE |
+| **Role** | ✅ | ✅⁸ | ❌ | ❌ | ✅ | ✅⁹ | ✅ | ⁸Settings and rename only |
 
 **Legend:**
 - ✅ Fully supported
-- ❌ Not supported (alternative strategy used)  
+- ❌ Not supported (alternative strategy used)
+- N/A Not applicable  
 - ¹ ALTER DATABASE only supports comment modifications
 - ² Named collections use CREATE OR REPLACE for all modifications
 - ³ Dictionaries use CREATE OR REPLACE for all modifications (ClickHouse limitation)
@@ -45,13 +47,16 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 - ⁵ Views use RENAME TABLE for renames
 - ⁶ Materialized view query changes use DROP+CREATE strategy for reliability
 - ⁷ Materialized views use table operations (ATTACH/DETACH/DROP/RENAME TABLE)
+- ⁸ ALTER ROLE supports RENAME TO and SETTINGS modifications
+- ⁹ Roles use ALTER ROLE...RENAME TO for rename operations
 
 ### Migration Strategy Notes
 
-- **Dependencies**: Proper ordering ensures collections → tables → dictionaries → views
+- **Dependencies**: Proper ordering ensures roles → databases → collections → tables → dictionaries → views
 - **Integration Engines**: Tables using Kafka, RabbitMQ, etc. automatically use DROP+CREATE strategy
 - **Cluster Operations**: Full `ON CLUSTER` support, but cluster association cannot be changed after creation
 - **Engine Changes**: Not supported for any object type (requires manual migration)
+- **Role Management**: Full support for CREATE/ALTER/DROP ROLE plus GRANT/REVOKE operations
 - **Smart Rename Detection**: Avoids unnecessary DROP+CREATE when only names change
 
 ## Documentation

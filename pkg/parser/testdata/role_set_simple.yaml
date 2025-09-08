@@ -1,0 +1,7 @@
+roles:
+    - name: ""
+      operation: SET
+      set_type: DEFAULT
+    - name: admin
+      operation: SET
+      set_type: SPECIFIC

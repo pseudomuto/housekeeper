@@ -6,7 +6,7 @@ Welcome to Housekeeper, a modern command-line tool for managing ClickHouse schem
 
 Housekeeper is designed to make ClickHouse schema management simple, reliable, and maintainable. It provides:
 
-- **Complete ClickHouse DDL Support**: Full support for databases, tables, dictionaries, and views
+- **Complete ClickHouse DDL Support**: Full support for databases, tables, dictionaries, views, and roles
 - **Intelligent Migration Generation**: Smart comparison and migration creation with proper operation ordering
 - **Project Management**: Complete project initialization and schema compilation with import directives
 - **Professional SQL Formatting**: Clean, readable SQL output with ClickHouse-optimized formatting
@@ -16,7 +16,7 @@ Housekeeper is designed to make ClickHouse schema management simple, reliable, a
 ## Key Features
 
 ### 🏗️ Complete DDL Support
-Support for all major ClickHouse operations including complex data types, advanced table engines, dictionary sources, and materialized views.
+Support for all major ClickHouse operations including complex data types, advanced table engines, dictionary sources, materialized views, and role-based access control.
 
 ### 🧠 Intelligent Migrations
 Automatically generates optimal migration strategies, including rename detection to avoid unnecessary DROP+CREATE operations.
@@ -52,7 +52,7 @@ housekeeper diff
 ## Documentation Structure
 
 - **[Getting Started](getting-started/installation.md)** - Installation, setup, and your first migration
-- **[User Guide](user-guide/schema-management.md)** - Day-to-day usage patterns and best practices
+- **[User Guide](user-guide/schema-management.md)** - Day-to-day usage patterns, role management, and best practices
 - **[How It Works](how-it-works/overview.md)** - Deep dive into Housekeeper's architecture and algorithms
 - **[Advanced Topics](advanced/cluster-management.md)** - Cluster management, performance tuning, and troubleshooting
 - **[Examples](examples/basic-schema.md)** - Real-world examples and common patterns

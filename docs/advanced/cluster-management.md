@@ -99,6 +99,32 @@ CREATE TABLE analytics.events_distributed ON CLUSTER production_cluster AS analy
 ENGINE = Distributed(production_cluster, analytics, events, rand());
 ```
 
+## Global Objects in Clusters
+
+### Role Management Across Clusters
+
+Roles are global objects that exist at the cluster level. When a cluster is configured, Housekeeper automatically adds `ON CLUSTER` clauses to role operations:
+
+```sql
+-- Your schema definition
+CREATE ROLE IF NOT EXISTS analytics_reader;
+GRANT SELECT ON analytics.* TO analytics_reader;
+
+-- Generated migration with cluster configured
+CREATE ROLE IF NOT EXISTS `analytics_reader` ON CLUSTER `production_cluster`;
+GRANT `SELECT` ON `analytics`.* TO `analytics_reader` ON CLUSTER `production_cluster`;
+```
+
+### Global Object Synchronization
+
+All global objects (roles, users, settings profiles) must be synchronized across the cluster:
+
+- **Consistent State**: Ensure all nodes have the same role definitions
+- **Migration Order**: Global objects are processed first to be available cluster-wide
+- **Access Control**: Role permissions apply uniformly across all cluster nodes
+
+For detailed role management patterns, see the [Role Management](../user-guide/role-management.md) guide.
+
 ## ClickHouse Configuration
 
 ### Cluster Definition

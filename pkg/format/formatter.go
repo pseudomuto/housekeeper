@@ -242,6 +242,27 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return nil
 	}
 
+	// Use a slice of formatting functions for cleaner code structure
+	steps := []func(io.Writer, *parser.Statement) error{
+		f.formatDatabaseStatements,
+		f.formatTableStatements,
+		f.formatDictionaryStatements,
+		f.formatViewStatements,
+		f.formatRoleStatements,
+		f.formatOtherStatements,
+	}
+
+	for _, step := range steps {
+		if err := step(w, stmt); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// formatDatabaseStatements handles database-related statements
+func (f *Formatter) formatDatabaseStatements(w io.Writer, stmt *parser.Statement) error {
 	switch {
 	case stmt.CreateDatabase != nil:
 		return f.createDatabase(w, stmt.CreateDatabase)
@@ -255,6 +276,13 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return f.dropDatabase(w, stmt.DropDatabase)
 	case stmt.RenameDatabase != nil:
 		return f.renameDatabase(w, stmt.RenameDatabase)
+	}
+	return nil
+}
+
+// formatTableStatements handles table-related statements
+func (f *Formatter) formatTableStatements(w io.Writer, stmt *parser.Statement) error {
+	switch {
 	case stmt.CreateTable != nil:
 		return f.createTable(w, stmt.CreateTable)
 	case stmt.AlterTable != nil:
@@ -267,6 +295,13 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return f.dropTable(w, stmt.DropTable)
 	case stmt.RenameTable != nil:
 		return f.renameTable(w, stmt.RenameTable)
+	}
+	return nil
+}
+
+// formatDictionaryStatements handles dictionary-related statements
+func (f *Formatter) formatDictionaryStatements(w io.Writer, stmt *parser.Statement) error {
+	switch {
 	case stmt.CreateDictionary != nil:
 		return f.createDictionary(w, stmt.CreateDictionary)
 	case stmt.CreateNamedCollection != nil:
@@ -283,6 +318,13 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return f.dropDictionary(w, stmt.DropDictionary)
 	case stmt.RenameDictionary != nil:
 		return f.renameDictionary(w, stmt.RenameDictionary)
+	}
+	return nil
+}
+
+// formatViewStatements handles view-related statements
+func (f *Formatter) formatViewStatements(w io.Writer, stmt *parser.Statement) error {
+	switch {
 	case stmt.CreateView != nil:
 		return f.createView(w, stmt.CreateView)
 	case stmt.AttachView != nil:
@@ -291,11 +333,38 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return f.detachView(w, stmt.DetachView)
 	case stmt.DropView != nil:
 		return f.dropView(w, stmt.DropView)
+	}
+	return nil
+}
+
+// formatRoleStatements handles role-related statements
+func (f *Formatter) formatRoleStatements(w io.Writer, stmt *parser.Statement) error {
+	switch {
+	case stmt.CreateRole != nil:
+		return f.createRole(w, stmt.CreateRole)
+	case stmt.AlterRole != nil:
+		return f.alterRole(w, stmt.AlterRole)
+	case stmt.DropRole != nil:
+		return f.dropRole(w, stmt.DropRole)
+	case stmt.SetRole != nil:
+		return f.setRole(w, stmt.SetRole)
+	case stmt.SetDefaultRole != nil:
+		return f.setDefaultRole(w, stmt.SetDefaultRole)
+	case stmt.Grant != nil:
+		return f.grant(w, stmt.Grant)
+	case stmt.Revoke != nil:
+		return f.revoke(w, stmt.Revoke)
+	}
+	return nil
+}
+
+// formatOtherStatements handles other statements
+func (f *Formatter) formatOtherStatements(w io.Writer, stmt *parser.Statement) error {
+	switch {
 	case stmt.SelectStatement != nil:
 		return f.selectStatement(w, stmt.SelectStatement)
-	default:
-		return nil
 	}
+	return nil
 }
 
 // keyword formats a keyword according to the formatter options

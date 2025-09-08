@@ -8,11 +8,18 @@
 -- following:
 --
 -- db/main.sql (this file)
+--   -- housekeeper:import schemas/_global/roles/main.sql
 --   -- housekeeper:import schemas/[DATABASE]/db.sql
 -- db/migrations/
 --   [TIMESTAMP].sql (auto-generated migrations)
 --   housekeeper.sum (checksums for migrations)
 -- db/schemas/
+--   _global/
+--     roles/ (global cluster-wide roles)
+--       main.sql
+--       [ROLE_NAME].sql (individual role definitions)
+--     collections/ (future: global named collections)
+--     users/ (future: global user definitions)
 --   [DATABASE]
 --     schema.sql
 --       -- housekeeper:import collections/[COLLECTION].sql
@@ -23,3 +30,6 @@
 --     tables/
 --       [TABLE].sql
 --     views/
+--
+-- Import global objects first (roles, users, settings profiles, etc.)
+-- housekeeper:import schemas/_global/roles/main.sql

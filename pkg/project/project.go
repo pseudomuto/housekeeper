@@ -27,14 +27,20 @@ var (
 	//go:embed embed/_clickhouse.xml
 	defaultClickHouseXML []byte
 
+	//go:embed embed/_global_roles.sql
+	defaultGlobalRoles []byte
+
 	image = fstest.MapFS{
-		"db":                          {Mode: os.ModeDir | consts.ModeDir},
-		"db/config.d":                 {Mode: os.ModeDir | consts.ModeDir},
-		"db/config.d/_clickhouse.xml": {Data: defaultClickHouseXML},
-		"db/main.sql":                 {Data: defaultMainSQL},
-		"db/migrations":               {Mode: os.ModeDir | consts.ModeDir},
-		"db/schemas":                  {Mode: os.ModeDir | consts.ModeDir},
-		"housekeeper.yaml":            {Data: defaultHouseKeeper},
+		"db":                                {Mode: os.ModeDir | consts.ModeDir},
+		"db/config.d":                       {Mode: os.ModeDir | consts.ModeDir},
+		"db/config.d/_clickhouse.xml":       {Data: defaultClickHouseXML},
+		"db/main.sql":                       {Data: defaultMainSQL},
+		"db/migrations":                     {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas":                        {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas/_global":                {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas/_global/roles":          {Mode: os.ModeDir | consts.ModeDir},
+		"db/schemas/_global/roles/main.sql": {Data: defaultGlobalRoles},
+		"housekeeper.yaml":                  {Data: defaultHouseKeeper},
 	}
 )
 

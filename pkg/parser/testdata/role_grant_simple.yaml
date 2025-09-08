@@ -1,0 +1,12 @@
+grants:
+    - operation: GRANT
+      privileges:
+        - SELECT
+      target: '*.*'
+      grantee:
+        - reader
+    - operation: GRANT
+      privileges:
+        - admin
+      grantee:
+        - john
