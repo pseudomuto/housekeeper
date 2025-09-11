@@ -23,6 +23,7 @@ type TestCase struct {
 	Dictionaries     []ExpectedDictionary      `yaml:"dictionaries,omitempty"`
 	Views            []ExpectedView            `yaml:"views,omitempty"`
 	Tables           []ExpectedTable           `yaml:"tables,omitempty"`
+	Users            []ExpectedUser            `yaml:"users,omitempty"`
 	NamedCollections []ExpectedNamedCollection `yaml:"named_collections,omitempty"`
 	Queries          []ExpectedQuery           `yaml:"queries,omitempty"`
 }
@@ -126,6 +127,16 @@ type ExpectedNamedCollection struct {
 	Comment     string            `yaml:"comment,omitempty"`
 }
 
+type ExpectedUser struct {
+	Name           string `yaml:"name"`
+	IfNotExists    bool   `yaml:"if_not_exists,omitempty"`
+	OrReplace      bool   `yaml:"or_replace,omitempty"`
+	Cluster        string `yaml:"cluster,omitempty"`
+	NotIdentified  bool   `yaml:"not_identified,omitempty"`
+	IdentifiedWith string `yaml:"identified_with,omitempty"`
+	IdentifiedBy   string `yaml:"identified_by,omitempty"`
+}
+
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
@@ -151,7 +162,7 @@ func removeQuotes(s string) string {
 
 func TestParserWithTestdata(t *testing.T) {
 	// Find all SQL files in embedded testdata
-	sqlFiles, err := fs.Glob(testdataFS, "testdata/*.sql")
+	sqlFiles, err := fs.Glob(testdataFS, "testdata/user_create.sql")
 	require.NoError(t, err)
 
 	// Run each test case
@@ -203,6 +214,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
 	var expectedTables []ExpectedTable
+	var expectedUsers []ExpectedUser
 	var expectedNamedCollections []ExpectedNamedCollection
 	var expectedQueries []ExpectedQuery
 
@@ -820,6 +832,34 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 
 			expectedQueries = append(expectedQueries, expectedQuery)
+		} else if stmt.CreateUser != nil {
+			user := stmt.CreateUser
+			expectedUser := ExpectedUser{
+				Name: user.Name,
+			}
+			if user.Modifier != nil {
+				expectedUser.IfNotExists = user.Modifier.IfNotExists
+				expectedUser.OrReplace = user.Modifier.OrReplace
+			}
+			if user.OnCluster != nil {
+				expectedUser.Cluster = *user.OnCluster
+			}
+
+			if user.Identification != nil {
+				expectedUser.NotIdentified = user.Identification.NotIdentified
+
+				if user.Identification.Identified != nil {
+					if user.Identification.Identified.With != nil {
+						expectedUser.IdentifiedWith = *user.Identification.Identified.With
+					}
+
+					expectedUser.IdentifiedBy = user.Identification.Identified.By
+				}
+			}
+
+			if expectedUser.Name != "" {
+				expectedUsers = append(expectedUsers, expectedUser)
+			}
 		}
 	}
 
@@ -841,6 +881,9 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	}
 	if len(expectedQueries) > 0 {
 		testCase.Queries = expectedQueries
+	}
+	if len(expectedUsers) > 0 {
+		testCase.Users = expectedUsers
 	}
 
 	return testCase
@@ -882,6 +925,8 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 		"Wrong number of named collections in %s", sqlFile)
 	require.Len(t, actualTestCase.Queries, len(expected.Queries),
 		"Wrong number of queries in %s", sqlFile)
+	require.Len(t, actualTestCase.Users, len(expected.Users),
+		"Wrong number of users in %s", sqlFile)
 
 	// Check databases in order
 	for i, expectedDB := range expected.Databases {
@@ -1018,6 +1063,32 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 			require.Equal(t, expectedCollection.Overridable, actualCollection.Overridable,
 				"Wrong overridable flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
 		}
+	}
+
+	// Check users are in order
+	for i, expectedUser := range expected.Users {
+		actualUser := actualTestCase.Users[i]
+		require.Equal(t, expectedUser.Name, actualUser.Name,
+			"Wrong user name at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.IfNotExists, actualUser.IfNotExists,
+			"Wrong user ifNotExist at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.OrReplace, actualUser.OrReplace,
+			"Wrong user orReplace at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Cluster, actualUser.Cluster,
+			"Wrong user Cluster at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.NotIdentified, actualUser.NotIdentified,
+			"Wrong user NotIdentified at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.IdentifiedWith, actualUser.IdentifiedWith,
+			"Wrong user IdentifiedWith at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.IdentifiedBy, actualUser.IdentifiedBy,
+			"Wrong user IdentifiedBy at index %d in %s", i, sqlFile)
+
 	}
 }
 

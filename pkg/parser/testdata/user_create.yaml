@@ -1,0 +1,21 @@
+users:
+  - name: name1
+  - name: "`special-user`"
+  - name: alice
+    if_not_exists: true
+  - name: alice2
+    or_replace: true
+  - name: alice
+    if_not_exists: true
+    cluster: production
+  - name: name1
+    not_identified: true
+  - name: name2
+    identified_with: plaintext_password
+    identified_by: "'my_password'"
+  - name: name3
+    identified_by: "'qwerty'"
+  - name: name4
+    identified_with: sha256_hash
+    identified_by: "'0C268556C1680BEF0640AAC1E7187566704208398DA31F03D18C74F5C5BE5053'"
+

@@ -18,6 +18,7 @@ type databaseObjects struct {
 	database     *parser.CreateDatabaseStmt
 	collections  []*parser.CreateNamedCollectionStmt
 	tables       []*parser.CreateTableStmt
+	users        []*parser.CreateUserStmt
 	dictionaries []*parser.CreateDictionaryStmt
 	views        []*parser.CreateViewStmt
 }
@@ -60,6 +61,7 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 			dbObjects[name] = &databaseObjects{
 				collections:  []*parser.CreateNamedCollectionStmt{},
 				tables:       []*parser.CreateTableStmt{},
+				users:        []*parser.CreateUserStmt{},
 				dictionaries: []*parser.CreateDictionaryStmt{},
 				views:        []*parser.CreateViewStmt{},
 			}
@@ -156,6 +158,8 @@ func (p *Project) formatStatement(stmt any) (string, error) {
 		statement = &parser.Statement{CreateNamedCollection: s}
 	case *parser.CreateTableStmt:
 		statement = &parser.Statement{CreateTable: s}
+	case *parser.CreateUserStmt:
+		statement = &parser.Statement{CreateUser: s}
 	case *parser.CreateDictionaryStmt:
 		statement = &parser.Statement{CreateDictionary: s}
 	case *parser.CreateViewStmt:
