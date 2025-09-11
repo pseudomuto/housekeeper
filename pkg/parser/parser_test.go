@@ -23,6 +23,7 @@ type TestCase struct {
 	Dictionaries     []ExpectedDictionary      `yaml:"dictionaries,omitempty"`
 	Views            []ExpectedView            `yaml:"views,omitempty"`
 	Tables           []ExpectedTable           `yaml:"tables,omitempty"`
+	Users            []ExpectedUser            `yaml:"users,omitempty"`
 	NamedCollections []ExpectedNamedCollection `yaml:"named_collections,omitempty"`
 	Queries          []ExpectedQuery           `yaml:"queries,omitempty"`
 }
@@ -126,6 +127,35 @@ type ExpectedNamedCollection struct {
 	Comment     string            `yaml:"comment,omitempty"`
 }
 
+type ExpectedUser struct {
+	Name           string         `yaml:"name"`
+	IfNotExists    bool           `yaml:"if_not_exists,omitempty"`
+	OrReplace      bool           `yaml:"or_replace,omitempty"`
+	Cluster        string         `yaml:"cluster,omitempty"`
+	Identification Identification `yaml:"identification,omitempty"`
+	Host           *Host          `yaml:"host,omitempty"`
+}
+
+type Identification struct {
+	NotIdentified bool `yaml:"not_identified,omitempty"`
+
+	// common fields
+	With string `yaml:"with,omitempty"`
+	By   string `yaml:"by,omitempty"`
+
+	// type specific fields
+	Salt          string `yaml:"salt,omitempty"`
+	HttpServer    string `yaml:"http_server,omitempty"`
+	LdapServer    string `yaml:"ldap_server,omitempty"`
+	KerberosRealm string `yaml:"kerberos_realm,omitempty"`
+	SslCn         string `yaml:"ssl_cn,omitempty"`
+}
+
+type Host struct {
+	Type  string `yaml:"type"`
+	Value string `yaml:"value,omitempty"`
+}
+
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
@@ -151,7 +181,7 @@ func removeQuotes(s string) string {
 
 func TestParserWithTestdata(t *testing.T) {
 	// Find all SQL files in embedded testdata
-	sqlFiles, err := fs.Glob(testdataFS, "testdata/*.sql")
+	sqlFiles, err := fs.Glob(testdataFS, "testdata/user_create.sql")
 	require.NoError(t, err)
 
 	// Run each test case
@@ -203,6 +233,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
 	var expectedTables []ExpectedTable
+	var expectedUsers []ExpectedUser
 	var expectedNamedCollections []ExpectedNamedCollection
 	var expectedQueries []ExpectedQuery
 
@@ -820,6 +851,87 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 
 			expectedQueries = append(expectedQueries, expectedQuery)
+		} else if stmt.CreateUser != nil {
+			user := stmt.CreateUser
+			expectedUser := ExpectedUser{
+				Name: user.Name,
+			}
+			if user.Modifier != nil {
+				expectedUser.IfNotExists = user.Modifier.IfNotExists
+				expectedUser.OrReplace = user.Modifier.OrReplace
+			}
+			if user.OnCluster != nil {
+				expectedUser.Cluster = *user.OnCluster
+			}
+
+			if user.Identification != nil {
+				identification := Identification{
+					NotIdentified: user.Identification.NotIdentified,
+				}
+
+				if user.Identification.IdentifiedWithHttp != nil {
+					identification.With = "http"
+					identification.HttpServer = *user.Identification.IdentifiedWithHttp
+				}
+
+				if user.Identification.IdentifiedWithLdap != nil {
+					identification.With = "ldap"
+					identification.LdapServer = *user.Identification.IdentifiedWithLdap
+				}
+
+				if user.Identification.IdentifiedWithKerberos != nil {
+					identification.With = "kerberos"
+
+					if user.Identification.IdentifiedWithKerberos.Realm != nil {
+						identification.KerberosRealm = *user.Identification.IdentifiedWithKerberos.Realm
+					}
+				}
+
+				if user.Identification.IdentifiedWithSslCertificate != nil {
+					identification.With = "ssl_certificate"
+					identification.SslCn = *user.Identification.IdentifiedWithSslCertificate
+				}
+
+				if user.Identification.IdentifiedWithOther != nil {
+					if user.Identification.IdentifiedWithOther.With != nil {
+						identification.With = *user.Identification.IdentifiedWithOther.With
+					}
+
+					identification.By = user.Identification.IdentifiedWithOther.By
+
+					if user.Identification.IdentifiedWithOther.Salt != nil {
+						identification.Salt = *user.Identification.IdentifiedWithOther.Salt
+					}
+				}
+
+				expectedUser.Identification = identification
+			}
+
+			if user.Host != nil {
+				host := &Host{}
+				if user.Host.IP != nil {
+					host.Type = "ip"
+					host.Value = *user.Host.IP
+				} else if user.Host.Any {
+					host.Type = "any"
+				} else if user.Host.Local {
+					host.Type = "local"
+				} else if user.Host.Name != nil {
+					host.Type = "name"
+					host.Value = *user.Host.Name
+				} else if user.Host.Regexp != nil {
+					host.Type = "regexp"
+					host.Value = *user.Host.Regexp
+				} else if user.Host.Like != nil {
+					host.Type = "like"
+					host.Value = *user.Host.Like
+				}
+				expectedUser.Host = host
+			}
+
+			if expectedUser.Name != "" {
+				expectedUsers = append(expectedUsers, expectedUser)
+			}
 		}
 	}
 
@@ -841,6 +953,9 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	}
 	if len(expectedQueries) > 0 {
 		testCase.Queries = expectedQueries
+	}
+	if len(expectedUsers) > 0 {
+		testCase.Users = expectedUsers
 	}
 
 	return testCase
@@ -882,6 +997,8 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 		"Wrong number of named collections in %s", sqlFile)
 	require.Len(t, actualTestCase.Queries, len(expected.Queries),
 		"Wrong number of queries in %s", sqlFile)
+	require.Len(t, actualTestCase.Users, len(expected.Users),
+		"Wrong number of users in %s", sqlFile)
 
 	// Check databases in order
 	for i, expectedDB := range expected.Databases {
@@ -1018,6 +1135,57 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 			require.Equal(t, expectedCollection.Overridable, actualCollection.Overridable,
 				"Wrong overridable flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
 		}
+	}
+
+	// Check users are in order
+	for i, expectedUser := range expected.Users {
+		actualUser := actualTestCase.Users[i]
+		require.Equal(t, expectedUser.Name, actualUser.Name,
+			"Wrong user name at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.IfNotExists, actualUser.IfNotExists,
+			"Wrong user ifNotExist at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.OrReplace, actualUser.OrReplace,
+			"Wrong user orReplace at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Cluster, actualUser.Cluster,
+			"Wrong user Cluster at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.NotIdentified, actualUser.Identification.NotIdentified,
+			"Wrong user (%s) NotIdentified at index %d in %s", actualUser.Name, i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.With, actualUser.Identification.With,
+			"Wrong user With at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.By, actualUser.Identification.By,
+			"Wrong user By at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.Salt, actualUser.Identification.Salt,
+			"Wrong user Salt at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.HttpServer, actualUser.Identification.HttpServer,
+			"Wrong user IdentifiedHttpServer at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.LdapServer, actualUser.Identification.LdapServer,
+			"Wrong user IdentifiedLdapServer at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.KerberosRealm, actualUser.Identification.KerberosRealm,
+			"Wrong user IdentifiedKerberosRealm at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.SslCn, actualUser.Identification.SslCn,
+			"Wrong user IdentifiedSslCn at index %d in %s", i, sqlFile)
+
+		if expectedUser.Host != nil {
+			require.NotNil(t, actualUser.Host, "Expected user host but got nil at index %d in %s", i, sqlFile)
+			require.Equal(t, expectedUser.Host.Type, actualUser.Host.Type,
+				"Wrong user host type at index %d in %s", i, sqlFile)
+			require.Equal(t, expectedUser.Host.Value, actualUser.Host.Value,
+				"Wrong user host value at index %d in %s", i, sqlFile)
+		} else {
+			require.Nil(t, actualUser.Host, "Expected no user host but got one at index %d in %s", i, sqlFile)
+		}
+
 	}
 }
 
