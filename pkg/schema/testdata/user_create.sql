@@ -1,0 +1,1 @@
+CREATE USER `alice` IDENTIFIED BY 'password123' HOST ANY DEFAULT ROLE `admin`;

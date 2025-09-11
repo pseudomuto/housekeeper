@@ -18,6 +18,7 @@ type databaseObjects struct {
 	database     *parser.CreateDatabaseStmt
 	collections  []*parser.CreateNamedCollectionStmt
 	tables       []*parser.CreateTableStmt
+	users        []*parser.CreateUserStmt
 	dictionaries []*parser.CreateDictionaryStmt
 	views        []*parser.CreateViewStmt
 }
@@ -60,6 +61,7 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 			dbObjects[name] = &databaseObjects{
 				collections:  []*parser.CreateNamedCollectionStmt{},
 				tables:       []*parser.CreateTableStmt{},
+				users:        []*parser.CreateUserStmt{},
 				dictionaries: []*parser.CreateDictionaryStmt{},
 				views:        []*parser.CreateViewStmt{},
 			}
@@ -89,6 +91,11 @@ func organizeStatementsByDatabase(sql *parser.SQL) map[string]*databaseObjects {
 			dbName := getDatabase(stmt.CreateView.Database)
 			ensureDB(dbName)
 			dbObjects[dbName].views = append(dbObjects[dbName].views, stmt.CreateView)
+		} else if stmt.CreateUser != nil {
+			// Users are global but we'll put them in the default database for organization
+			dbName := "default"
+			ensureDB(dbName)
+			dbObjects[dbName].users = append(dbObjects[dbName].users, stmt.CreateUser)
 		}
 	}
 
@@ -131,6 +138,9 @@ func (p *Project) generateDatabaseFiles(fsMap fstest.MapFS, dbObjects map[string
 		if err := p.addViewFiles(fsMap, dbName, objects.views); err != nil {
 			return nil, errors.Wrapf(err, "failed to add view files for %s", dbName)
 		}
+		if err := p.addUserFiles(fsMap, dbName, objects.users); err != nil {
+			return nil, errors.Wrapf(err, "failed to add user files for %s", dbName)
+		}
 
 		mainImports = append(mainImports, fmt.Sprintf("schemas/%s/schema.sql", dbName))
 	}
@@ -156,6 +166,8 @@ func (p *Project) formatStatement(stmt any) (string, error) {
 		statement = &parser.Statement{CreateNamedCollection: s}
 	case *parser.CreateTableStmt:
 		statement = &parser.Statement{CreateTable: s}
+	case *parser.CreateUserStmt:
+		statement = &parser.Statement{CreateUser: s}
 	case *parser.CreateDictionaryStmt:
 		statement = &parser.Statement{CreateDictionary: s}
 	case *parser.CreateViewStmt:
@@ -219,6 +231,15 @@ func (p *Project) generateDatabaseSchemaContent(objects *databaseObjects) (strin
 		content.WriteString("-- Views\n")
 		for _, view := range objects.views {
 			importPath := fmt.Sprintf("views/%s.sql", view.Name)
+			imports = append(imports, importPath)
+		}
+	}
+
+	// Add imports for users
+	if len(objects.users) > 0 {
+		content.WriteString("-- Users\n")
+		for _, user := range objects.users {
+			importPath := fmt.Sprintf("users/%s.sql", user.Name)
 			imports = append(imports, importPath)
 		}
 	}
@@ -287,6 +308,22 @@ func (p *Project) addViewFiles(fsMap fstest.MapFS, dbName string, views []*parse
 		}
 
 		path := filepath.Join("db", "schemas", dbName, "views", view.Name+".sql")
+		fsMap[path] = &fstest.MapFile{
+			Data: []byte(stmt),
+		}
+	}
+	return nil
+}
+
+// addUserFiles adds user files to the file system map
+func (p *Project) addUserFiles(fsMap fstest.MapFS, dbName string, users []*parser.CreateUserStmt) error {
+	for _, user := range users {
+		stmt, err := p.formatStatement(user)
+		if err != nil {
+			return err
+		}
+
+		path := filepath.Join("db", "schemas", dbName, "users", user.Name+".sql")
 		fsMap[path] = &fstest.MapFile{
 			Data: []byte(stmt),
 		}

@@ -1,0 +1,151 @@
+users:
+    - name: name1
+    - name: '`special-user`'
+    - name: name2
+      if_not_exists: true
+    - name: name3
+      or_replace: true
+    - name: name4
+      if_not_exists: true
+      cluster: production
+    - name: name5
+      identification:
+        not_identified: true
+    - name: name6
+      identification:
+        with: plaintext_password
+        by: my_password
+    - name: name7
+      identification:
+        by: qwerty
+    - name: name8
+      identification:
+        with: sha256_hash
+        by: 0C268556C1680BEF0640AAC1E7187566704208398DA31F03D18C74F5C5BE5053
+        salt: 4FB16307F5E10048196966DD7E6876AE53DE6A1D1F625488482C75F14A5097C7
+    - name: name9
+      identification:
+        with: http
+        http_server: test_http_server
+    - name: name10
+      identification:
+        by: qwerty
+    - name: name11
+      identification:
+        with: ldap
+        ldap_server: server_name
+    - name: name12
+      identification:
+        with: kerberos
+    - name: name13
+      identification:
+        with: kerberos
+        kerberos_realm: test_realm
+    - name: name14
+      identification:
+        with: ssl_certificate
+        ssl_cn: mysite.com:user
+    - name: name15
+      host:
+        type: ip
+        value: 192.168.0.0/16
+    - name: name16
+      host:
+        type: ip
+        value: 2001:DB8::/32
+    - name: name17
+      host:
+        type: any
+    - name: name18
+      host:
+        type: local
+    - name: name19
+      host:
+        type: name
+        value: mysite.com
+    - name: name20
+      host:
+        type: regexp
+        value: .*\.mysite\.com
+    - name: name21
+      host:
+        type: like
+        value: '%'
+    - name: name22
+      host:
+        type: like
+        value: '%.mysite.com'
+    - name: name23
+      valid_until: "2025-01-01"
+    - name: name24
+      valid_until: 2025-01-01 12:00:00 UTC
+    - name: name25
+      valid_until: infinity
+    - name: name26
+      valid_until: 2025-01-01 12:00:00 `Asia/Tokyo`
+    - name: name27
+      identification:
+        by: password
+        valid_until: "2025-01-01"
+    - name: name28
+      identification:
+        by: hash_value
+        valid_until: 2025-12-31 23:59:59 UTC
+    - name: name29
+      grantees:
+        items:
+            - user_or_role: user1
+            - user_or_role: user2
+            - user_or_role: special-user
+    - name: name31
+      grantees:
+        items:
+            - user_or_role: ANY
+    - name: name32
+      grantees:
+        items:
+            - user_or_role: NONE
+    - name: name30
+      grantees:
+        items:
+            - user_or_role: simple_user
+    - name: name33
+      access_storage_type: local_directory
+    - name: name34
+      valid_until: 2025-12-31 23:59:59 UTC
+      access_storage_type: ldap_directory
+    - name: name35
+      identification:
+        by: password123
+        valid_until: "2025-06-01"
+      access_storage_type: memory
+    - name: name36
+      roles:
+        - admin
+    - name: name37
+      roles:
+        - admin
+        - user
+        - reader
+    - name: name38
+      roles:
+        - special-role
+        - guest
+    - name: name39
+      roles:
+        - ALL
+      roles_except:
+        - role1
+        - role2
+    - name: name40
+      roles:
+        - ALL
+      roles_except:
+        - admin-role
+        - guest
+    - name: name41
+      default_database: analytics
+    - name: name42
+      default_database: special-db
+    - name: name43
+      default_database_none: true

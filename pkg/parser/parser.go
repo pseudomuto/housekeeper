@@ -116,6 +116,8 @@ type (
 		DetachDatabase        *DetachDatabaseStmt        `parser:"| @@"`
 		DropDatabase          *DropDatabaseStmt          `parser:"| @@"`
 		RenameDatabase        *RenameDatabaseStmt        `parser:"| @@"`
+		CreateUser            *CreateUserStmt            `parser:"| @@"`
+		DropUser              *DropUserStmt              `parser:"| @@"`
 		CreateTable           *CreateTableStmt           `parser:"| @@"`
 		AlterTable            *AlterTableStmt            `parser:"| @@"`
 		CreateDictionary      *CreateDictionaryStmt      `parser:"| @@"`

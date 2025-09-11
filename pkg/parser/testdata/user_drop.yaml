@@ -1,0 +1,7 @@
+users:
+    - name: alice
+      operation: DROP
+    - name: bob
+      if_exists: true
+      cluster: cluster1
+      operation: DROP

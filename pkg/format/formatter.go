@@ -291,6 +291,10 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		return f.detachView(w, stmt.DetachView)
 	case stmt.DropView != nil:
 		return f.dropView(w, stmt.DropView)
+	case stmt.CreateUser != nil:
+		return f.createUser(w, stmt.CreateUser)
+	case stmt.DropUser != nil:
+		return f.dropUser(w, stmt.DropUser)
 	case stmt.SelectStatement != nil:
 		return f.selectStatement(w, stmt.SelectStatement)
 	default:

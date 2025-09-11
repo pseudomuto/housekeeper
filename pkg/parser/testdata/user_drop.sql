@@ -1,0 +1,2 @@
+DROP USER alice;
+DROP USER IF EXISTS bob ON CLUSTER cluster1;

@@ -107,11 +107,16 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		return nil, errors.Wrap(err, "failed to compare named collections")
 	}
 
-	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 {
+	userDiffs, err := compareUsers(current, target)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compare users")
+	}
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 && len(userDiffs) == 0 {
 		return nil, ErrNoDiff
 	}
 
-	// Process diffs in proper order: databases first, then named collections, then tables, then dictionaries, then views
+	// Process diffs in proper order: databases first, then named collections, then tables, then dictionaries, then views, then users
 	// Within each type: CREATE first, then ALTER/REPLACE, then RENAME, then DROP
 	statements := make([]string, 0, 50) // Pre-allocate with estimated capacity
 
@@ -192,7 +197,7 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		}
 	}
 
-	// Migration order: Databases first, then named collections, then tables, then dictionaries, then views
+	// Migration order: Databases first, then named collections, then tables, then dictionaries, then views, then users
 	// Database order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range dbCreateDiffs {
 		statements = append(statements, diff.UpSQL)
@@ -263,6 +268,30 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		statements = append(statements, diff.UpSQL)
 	}
 	for _, diff := range viewDropDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+
+	// Group user diffs by type for proper ordering
+	var userCreateDiffs, userAlterDiffs, userDropDiffs []*UserDiff
+	for _, diff := range userDiffs {
+		switch diff.Type {
+		case UserDiffCreate:
+			userCreateDiffs = append(userCreateDiffs, diff)
+		case UserDiffAlter:
+			userAlterDiffs = append(userAlterDiffs, diff)
+		case UserDiffDrop:
+			userDropDiffs = append(userDropDiffs, diff)
+		}
+	}
+
+	// User order: CREATE -> ALTER -> DROP
+	for _, diff := range userCreateDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range userAlterDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range userDropDiffs {
 		statements = append(statements, diff.UpSQL)
 	}
 

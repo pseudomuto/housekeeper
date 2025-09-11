@@ -111,6 +111,36 @@ func TestGenerateImage(t *testing.T) {
 				{"db/schemas/default/tables/events.sql", "CREATE TABLE `events`"},
 			},
 		},
+		{
+			name: "users are organized properly",
+			sql: `
+				CREATE DATABASE analytics ENGINE = Atomic;
+
+				CREATE USER alice IDENTIFIED BY 'password123';
+				CREATE USER bob DEFAULT ROLE admin;
+
+				CREATE TABLE analytics.events (
+					id UInt64,
+					message String
+				) ENGINE = MergeTree() ORDER BY id;
+			`,
+			fileTests: []fileTest{
+				{"db/main.sql", "-- housekeeper:import schemas/analytics/schema.sql"},
+				{"db/main.sql", "-- housekeeper:import schemas/default/schema.sql"},
+				{"db/schemas/analytics/schema.sql", "CREATE DATABASE `analytics` ENGINE = Atomic"},
+				{"db/schemas/analytics/schema.sql", "-- housekeeper:import tables/events.sql"},
+				{"db/schemas/default/schema.sql", "-- Users"},
+				{"db/schemas/default/schema.sql", "-- housekeeper:import users/alice.sql"},
+				{"db/schemas/default/schema.sql", "-- housekeeper:import users/bob.sql"},
+				{"db/schemas/analytics/tables/events.sql", "CREATE TABLE `analytics`.`events`"},
+				{"db/schemas/analytics/tables/events.sql", "`id`      UInt64"},
+				{"db/schemas/analytics/tables/events.sql", "`message` String"},
+				{"db/schemas/default/users/alice.sql", "CREATE USER `alice`"},
+				{"db/schemas/default/users/alice.sql", "IDENTIFIED BY 'password123'"},
+				{"db/schemas/default/users/bob.sql", "CREATE USER `bob`"},
+				{"db/schemas/default/users/bob.sql", "DEFAULT ROLE `admin`"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -155,6 +185,7 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 	sql := `
 		CREATE DATABASE analytics ENGINE = Atomic;
 		CREATE NAMED COLLECTION api_config AS host = 'api.example.com', port = 8080;
+		CREATE USER admin IDENTIFIED BY 'secret';
 		CREATE TABLE analytics.events (id UInt64) ENGINE = MergeTree() ORDER BY id;
 		CREATE DICTIONARY analytics.lookup (id UInt64) PRIMARY KEY id SOURCE(HTTP(url 'http://example.com')) LAYOUT(HASHED()) LIFETIME(3600);
 		CREATE VIEW analytics.summary AS SELECT count() FROM events;
@@ -191,6 +222,7 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 		"db/schemas/analytics/schema.sql",
 		"db/schemas/default/schema.sql",
 		"db/schemas/default/collections/api_config.sql",
+		"db/schemas/default/users/admin.sql",
 		"db/schemas/analytics/tables/events.sql",
 		"db/schemas/analytics/dictionaries/lookup.sql",
 		"db/schemas/analytics/views/summary.sql",

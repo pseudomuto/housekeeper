@@ -23,6 +23,7 @@ type TestCase struct {
 	Dictionaries     []ExpectedDictionary      `yaml:"dictionaries,omitempty"`
 	Views            []ExpectedView            `yaml:"views,omitempty"`
 	Tables           []ExpectedTable           `yaml:"tables,omitempty"`
+	Users            []ExpectedUser            `yaml:"users,omitempty"`
 	NamedCollections []ExpectedNamedCollection `yaml:"named_collections,omitempty"`
 	Queries          []ExpectedQuery           `yaml:"queries,omitempty"`
 }
@@ -126,6 +127,56 @@ type ExpectedNamedCollection struct {
 	Comment     string            `yaml:"comment,omitempty"`
 }
 
+type ExpectedUser struct {
+	Name              string            `yaml:"name"`
+	Operation         string            `yaml:"operation,omitempty"` // CREATE, DROP
+	IfNotExists       bool              `yaml:"if_not_exists,omitempty"`
+	IfExists          bool              `yaml:"if_exists,omitempty"`
+	OrReplace         bool              `yaml:"or_replace,omitempty"`
+	Cluster           string            `yaml:"cluster,omitempty"`
+	Identification    Identification    `yaml:"identification,omitempty"`
+	Host              *Host             `yaml:"host,omitempty"`
+	ValidUntil        string            `yaml:"valid_until,omitempty"`
+	AccessStorageType string            `yaml:"access_storage_type,omitempty"`
+	Grantees          *ExpectedGrantees `yaml:"grantees,omitempty"`
+	Roles             []string          `yaml:"roles,omitempty"`
+	RolesExcept       []string          `yaml:"roles_except,omitempty"`
+	DefaultDatabase   string            `yaml:"default_database,omitempty"`
+	DefaultDbNone     bool              `yaml:"default_database_none,omitempty"`
+}
+
+type Identification struct {
+	NotIdentified bool `yaml:"not_identified,omitempty"`
+
+	// common fields
+	With string `yaml:"with,omitempty"`
+	By   string `yaml:"by,omitempty"`
+
+	// type specific fields
+	Salt          string `yaml:"salt,omitempty"`
+	HttpServer    string `yaml:"http_server,omitempty"`
+	LdapServer    string `yaml:"ldap_server,omitempty"`
+	KerberosRealm string `yaml:"kerberos_realm,omitempty"`
+	SslCn         string `yaml:"ssl_cn,omitempty"`
+	ValidUntil    string `yaml:"valid_until,omitempty"`
+}
+
+type Host struct {
+	Type  string `yaml:"type"`
+	Value string `yaml:"value,omitempty"`
+}
+
+type ExpectedGrantees struct {
+	Items  []ExpectedGranteeItem `yaml:"items,omitempty"`
+	Except []ExpectedGranteeItem `yaml:"except,omitempty"`
+}
+
+type ExpectedGranteeItem struct {
+	UserOrRole *string `yaml:"user_or_role,omitempty"`
+	Any        bool    `yaml:"any,omitempty"`
+	None       bool    `yaml:"none,omitempty"`
+}
+
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
@@ -151,7 +202,7 @@ func removeQuotes(s string) string {
 
 func TestParserWithTestdata(t *testing.T) {
 	// Find all SQL files in embedded testdata
-	sqlFiles, err := fs.Glob(testdataFS, "testdata/*.sql")
+	sqlFiles, err := fs.Glob(testdataFS, "testdata/user_*.sql")
 	require.NoError(t, err)
 
 	// Run each test case
@@ -203,6 +254,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedDictionaries []ExpectedDictionary
 	var expectedViews []ExpectedView
 	var expectedTables []ExpectedTable
+	var expectedUsers []ExpectedUser
 	var expectedNamedCollections []ExpectedNamedCollection
 	var expectedQueries []ExpectedQuery
 
@@ -820,6 +872,168 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 
 			expectedQueries = append(expectedQueries, expectedQuery)
+		} else if stmt.CreateUser != nil {
+			user := stmt.CreateUser
+			expectedUser := ExpectedUser{
+				Name:      user.Name,
+				Operation: "CREATE",
+			}
+			if user.Modifier != nil {
+				expectedUser.IfNotExists = user.Modifier.IfNotExists
+				expectedUser.OrReplace = user.Modifier.OrReplace
+			}
+			if user.OnCluster != nil {
+				expectedUser.Cluster = *user.OnCluster
+			}
+
+			if user.Identification != nil {
+				identification := Identification{
+					NotIdentified: user.Identification.NotIdentified,
+				}
+
+				if user.Identification.IdentifiedWithHttp != nil {
+					identification.With = "http"
+					identification.HttpServer = removeQuotes(*user.Identification.IdentifiedWithHttp)
+				}
+
+				if user.Identification.IdentifiedWithLdap != nil {
+					identification.With = "ldap"
+					identification.LdapServer = removeQuotes(*user.Identification.IdentifiedWithLdap)
+				}
+
+				if user.Identification.IdentifiedWithKerberos != nil {
+					identification.With = "kerberos"
+
+					if user.Identification.IdentifiedWithKerberos.Realm != nil {
+						identification.KerberosRealm = removeQuotes(*user.Identification.IdentifiedWithKerberos.Realm)
+					}
+				}
+
+				if user.Identification.IdentifiedWithSslCertificate != nil {
+					identification.With = "ssl_certificate"
+					identification.SslCn = removeQuotes(*user.Identification.IdentifiedWithSslCertificate)
+				}
+
+				if user.Identification.IdentifiedWithOther != nil {
+					if user.Identification.IdentifiedWithOther.With != nil {
+						identification.With = *user.Identification.IdentifiedWithOther.With
+					}
+
+					identification.By = removeQuotes(user.Identification.IdentifiedWithOther.By)
+
+					if user.Identification.IdentifiedWithOther.Salt != nil {
+						identification.Salt = removeQuotes(*user.Identification.IdentifiedWithOther.Salt)
+					}
+
+					if user.Identification.IdentifiedWithOther.ValidUntil != nil {
+						identification.ValidUntil = removeQuotes(*user.Identification.IdentifiedWithOther.ValidUntil)
+					}
+				}
+
+				expectedUser.Identification = identification
+			}
+
+			if user.ValidUntil != nil {
+				expectedUser.ValidUntil = removeQuotes(*user.ValidUntil)
+			}
+
+			if user.AccessStorageType != nil {
+				expectedUser.AccessStorageType = *user.AccessStorageType
+			}
+
+			if user.Host != nil {
+				host := &Host{}
+				if user.Host.IP != nil {
+					host.Type = "ip"
+					host.Value = removeQuotes(*user.Host.IP)
+				} else if user.Host.Any {
+					host.Type = "any"
+				} else if user.Host.Local {
+					host.Type = "local"
+				} else if user.Host.Name != nil {
+					host.Type = "name"
+					host.Value = removeQuotes(*user.Host.Name)
+				} else if user.Host.Regexp != nil {
+					host.Type = "regexp"
+					host.Value = removeQuotes(*user.Host.Regexp)
+				} else if user.Host.Like != nil {
+					host.Type = "like"
+					host.Value = removeQuotes(*user.Host.Like)
+				}
+				expectedUser.Host = host
+			}
+
+			if user.Grantees != nil {
+				grantees := &ExpectedGrantees{}
+
+				// Process main grantee items
+				for _, item := range user.Grantees.Items {
+					granteeItem := ExpectedGranteeItem{}
+					if item.UserOrRole != nil {
+						cleanedValue := removeQuotes(*item.UserOrRole)
+						granteeItem.UserOrRole = &cleanedValue
+					}
+					granteeItem.Any = item.Any
+					granteeItem.None = item.None
+					grantees.Items = append(grantees.Items, granteeItem)
+				}
+
+				// Process EXCEPT items if present
+				if user.Grantees.Except != nil {
+					for _, item := range user.Grantees.Except.Items {
+						granteeItem := ExpectedGranteeItem{}
+						if item.UserOrRole != nil {
+							cleanedValue := removeQuotes(*item.UserOrRole)
+							granteeItem.UserOrRole = &cleanedValue
+						}
+						granteeItem.Any = item.Any
+						granteeItem.None = item.None
+						grantees.Except = append(grantees.Except, granteeItem)
+					}
+				}
+
+				expectedUser.Grantees = grantees
+			}
+
+			if user.Roles != nil {
+				if user.Roles.Roles != nil {
+					var cleanedRoles []string
+					for _, role := range user.Roles.Roles {
+						cleanedRoles = append(cleanedRoles, removeQuotes(role))
+					}
+					expectedUser.Roles = cleanedRoles
+				}
+
+				if user.Roles.Except != nil {
+					var cleanedExcept []string
+					for _, role := range user.Roles.Except {
+						cleanedExcept = append(cleanedExcept, removeQuotes(role))
+					}
+					expectedUser.RolesExcept = cleanedExcept
+				}
+			}
+
+			if user.DefaultDatabase != nil {
+				if user.DefaultDatabase.Database != nil {
+					expectedUser.DefaultDatabase = removeQuotes(*user.DefaultDatabase.Database)
+				}
+				expectedUser.DefaultDbNone = user.DefaultDatabase.None
+			}
+
+			if expectedUser.Name != "" {
+				expectedUsers = append(expectedUsers, expectedUser)
+			}
+		} else if stmt.DropUser != nil {
+			user := stmt.DropUser
+			expectedUser := ExpectedUser{
+				Name:      user.Name,
+				Operation: "DROP",
+				IfExists:  user.IfExists,
+			}
+			if user.OnCluster != nil {
+				expectedUser.Cluster = *user.OnCluster
+			}
+			expectedUsers = append(expectedUsers, expectedUser)
 		}
 	}
 
@@ -841,6 +1055,9 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	}
 	if len(expectedQueries) > 0 {
 		testCase.Queries = expectedQueries
+	}
+	if len(expectedUsers) > 0 {
+		testCase.Users = expectedUsers
 	}
 
 	return testCase
@@ -882,6 +1099,8 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 		"Wrong number of named collections in %s", sqlFile)
 	require.Len(t, actualTestCase.Queries, len(expected.Queries),
 		"Wrong number of queries in %s", sqlFile)
+	require.Len(t, actualTestCase.Users, len(expected.Users),
+		"Wrong number of users in %s", sqlFile)
 
 	// Check databases in order
 	for i, expectedDB := range expected.Databases {
@@ -1018,6 +1237,104 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 			require.Equal(t, expectedCollection.Overridable, actualCollection.Overridable,
 				"Wrong overridable flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
 		}
+	}
+
+	// Check users are in order
+	for i, expectedUser := range expected.Users {
+		actualUser := actualTestCase.Users[i]
+		require.Equal(t, expectedUser.Name, actualUser.Name,
+			"Wrong user name at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.IfNotExists, actualUser.IfNotExists,
+			"Wrong user ifNotExist at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.OrReplace, actualUser.OrReplace,
+			"Wrong user orReplace at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Cluster, actualUser.Cluster,
+			"Wrong user Cluster at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.NotIdentified, actualUser.Identification.NotIdentified,
+			"Wrong user (%s) NotIdentified at index %d in %s", actualUser.Name, i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.With, actualUser.Identification.With,
+			"Wrong user With at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.By, actualUser.Identification.By,
+			"Wrong user By at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.Salt, actualUser.Identification.Salt,
+			"Wrong user Salt at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.HttpServer, actualUser.Identification.HttpServer,
+			"Wrong user IdentifiedHttpServer at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.LdapServer, actualUser.Identification.LdapServer,
+			"Wrong user IdentifiedLdapServer at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.KerberosRealm, actualUser.Identification.KerberosRealm,
+			"Wrong user IdentifiedKerberosRealm at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.SslCn, actualUser.Identification.SslCn,
+			"Wrong user IdentifiedSslCn at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.ValidUntil, actualUser.Identification.ValidUntil,
+			"Wrong user identification ValidUntil at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.ValidUntil, actualUser.ValidUntil,
+			"Wrong user ValidUntil at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.AccessStorageType, actualUser.AccessStorageType,
+			"Wrong user AccessStorageType at index %d in %s", i, sqlFile)
+
+		if expectedUser.Host != nil {
+			require.NotNil(t, actualUser.Host, "Expected user host but got nil at index %d in %s", i, sqlFile)
+			require.Equal(t, expectedUser.Host.Type, actualUser.Host.Type,
+				"Wrong user host type at index %d in %s", i, sqlFile)
+			require.Equal(t, expectedUser.Host.Value, actualUser.Host.Value,
+				"Wrong user host value at index %d in %s", i, sqlFile)
+		} else {
+			require.Nil(t, actualUser.Host, "Expected no user host but got one at index %d in %s", i, sqlFile)
+		}
+
+		if expectedUser.Grantees != nil {
+			require.NotNil(t, actualUser.Grantees, "Expected user grantees but got nil at index %d in %s", i, sqlFile)
+			require.Len(t, actualUser.Grantees.Items, len(expectedUser.Grantees.Items),
+				"Wrong number of grantee items for user %s at index %d in %s", expectedUser.Name, i, sqlFile)
+			require.Len(t, actualUser.Grantees.Except, len(expectedUser.Grantees.Except),
+				"Wrong number of grantee except items for user %s at index %d in %s", expectedUser.Name, i, sqlFile)
+
+			// Check main grantee items
+			for j, expectedItem := range expectedUser.Grantees.Items {
+				actualItem := actualUser.Grantees.Items[j]
+				require.Equal(t, expectedItem.UserOrRole, actualItem.UserOrRole,
+					"Wrong user or role in grantee item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.Any, actualItem.Any,
+					"Wrong ANY flag in grantee item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.None, actualItem.None,
+					"Wrong NONE flag in grantee item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+			}
+
+			// Check except grantee items
+			for j, expectedItem := range expectedUser.Grantees.Except {
+				actualItem := actualUser.Grantees.Except[j]
+				require.Equal(t, expectedItem.UserOrRole, actualItem.UserOrRole,
+					"Wrong user or role in except item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.Any, actualItem.Any,
+					"Wrong ANY flag in except item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.None, actualItem.None,
+					"Wrong NONE flag in except item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+			}
+		} else {
+			require.Nil(t, actualUser.Grantees, "Expected no user grantees but got one at index %d in %s", i, sqlFile)
+		}
+
+		require.Equal(t, expectedUser.Roles, actualUser.Roles,
+			"Wrong user DefaultRoles at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.RolesExcept, actualUser.RolesExcept,
+			"Wrong user DefaultRoles at index %d in %s", i, sqlFile)
+
 	}
 }
 
