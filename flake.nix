@@ -28,7 +28,7 @@
           };
 
           # Pick language/tool versions here (adjust as you like)
-          go = pkgs.go;
+          go = pkgs.go_1_25;
           python = pkgs.python314;
 
           # Common build utils
