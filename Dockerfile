@@ -4,11 +4,12 @@ FROM alpine:3.22.1
 RUN apk add --no-cache ca-certificates tzdata
 
 # Copy the pre-built binary (goreleaser will provide this).
-COPY housekeeper /usr/local/bin/housekeeper
-RUN chmod +x /usr/local/bin/housekeeper
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/housekeeper /usr/local/bin/
+RUN chmod +x /usr/local/bin/housekeeper; \
+  adduser -D -u 1000 housekeeper
 
 # Use non-root user for security
-RUN adduser -D -u 1000 housekeeper
 USER housekeeper
 
 VOLUME ["/schema"]

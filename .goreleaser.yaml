@@ -33,22 +33,24 @@ archives:
       - README.md
 
 # Docker image configuration
-dockers:
-  - image_templates:
-      - "ghcr.io/pseudomuto/{{ .ProjectName }}:{{ .Version }}"
-      - "ghcr.io/pseudomuto/{{ .ProjectName }}:latest"
-    dockerfile: Dockerfile
-    goos: linux
-    goarch: amd64
-    build_flag_templates:
-      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=ClickHouse schema migration tool"
-      - "--label=org.opencontainers.image.url=https://github.com/pseudomuto/{{ .ProjectName }}"
-      - "--label=org.opencontainers.image.source=https://github.com/pseudomuto/{{ .ProjectName }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.licenses=GPLv3"
+dockers_v2:
+  - images:
+      - "ghcr.io/pseudomuto/{{ .ProjectName }}"
+
+    tags:
+      - "v{{.Version }}"
+      - "{{ if .IsNightly }}nightly{{ end }}"
+      - "{{ if not .IsNightly }}latest{{ end }}"
+
+    labels:
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.description": "ClickHouse schema migration tool"
+      "org.opencontainers.image.url": "https://github.com/pseudomuto/{{ .ProjectName }}"
+      "org.opencontainers.image.source": "https://github.com/pseudomuto/{{ .ProjectName }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.licenses": "GPLv3"
 
 # Checksum configuration
 checksum:
