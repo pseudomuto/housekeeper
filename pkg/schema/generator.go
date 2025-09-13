@@ -37,15 +37,18 @@ var (
 // It analyzes the differences between the current schema and the desired target schema,
 // then generates appropriate DDL statements.
 //
-// The migration includes all schema objects (databases, tables, dictionaries, views), processing them in the correct order:
-// Databases → Tables → Dictionaries → Views (CREATE → ALTER → RENAME → DROP)
+// The migration includes all schema objects (roles, functions, databases, tables, dictionaries, views), processing them in the correct order:
+// Roles → Functions → Databases → Named Collections → Tables → Dictionaries → Views (CREATE → ALTER → RENAME → DROP)
 //
 // Migration strategies for different object types:
+//   - Roles: Standard DDL operations (CREATE, ALTER, DROP, RENAME, GRANT, REVOKE)
+//   - Functions: DROP+CREATE for modifications (since they can't be altered)
 //   - Databases: Standard DDL operations (CREATE, ALTER, DROP, RENAME)
+//   - Named Collections: Standard DDL operations (CREATE, ALTER, DROP)
 //   - Tables: Full DDL support including column modifications (CREATE, ALTER, DROP, RENAME)
 //   - Dictionaries: CREATE OR REPLACE for modifications (since they can't be altered)
 //   - Regular Views: CREATE OR REPLACE for modifications
-//   - Materialized Views: ALTER TABLE MODIFY QUERY for query changes
+//   - Materialized Views: DROP+CREATE for query modifications (more reliable than ALTER TABLE MODIFY QUERY)
 //
 // The function returns a *parser.SQL containing the migration statements, or an error if:
 //   - No differences are found between current and target schemas (returns ErrNoDiff)
@@ -109,11 +112,13 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 
 	roleDiffs := compareRoles(current, target)
 
-	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 && len(roleDiffs) == 0 {
+	functionDiffs := compareFunctions(current, target)
+
+	if len(dbDiffs) == 0 && len(dictDiffs) == 0 && len(viewDiffs) == 0 && len(tableDiffs) == 0 && len(collectionDiffs) == 0 && len(roleDiffs) == 0 && len(functionDiffs) == 0 {
 		return nil, ErrNoDiff
 	}
 
-	// Process diffs in proper order: roles first (global objects), then databases, then named collections, then tables, then dictionaries, then views
+	// Process diffs in proper order: roles first (global objects), then functions (global objects), then databases, then named collections, then tables, then dictionaries, then views
 	// Within each type: CREATE first, then ALTER/REPLACE, then RENAME, then DROP/GRANT/REVOKE
 	statements := make([]string, 0, 50) // Pre-allocate with estimated capacity
 
@@ -153,6 +158,35 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		statements = append(statements, diff.UpSQL)
 	}
 	for _, diff := range roleDropDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+
+	// Group function diffs by type for proper ordering
+	var functionCreateDiffs, functionReplaceDiffs, functionRenameDiffs, functionDropDiffs []*FunctionDiff
+	for _, diff := range functionDiffs {
+		switch diff.Type {
+		case FunctionDiffCreate:
+			functionCreateDiffs = append(functionCreateDiffs, diff)
+		case FunctionDiffReplace:
+			functionReplaceDiffs = append(functionReplaceDiffs, diff)
+		case FunctionDiffRename:
+			functionRenameDiffs = append(functionRenameDiffs, diff)
+		case FunctionDiffDrop:
+			functionDropDiffs = append(functionDropDiffs, diff)
+		}
+	}
+
+	// Function order: CREATE -> REPLACE -> RENAME -> DROP
+	for _, diff := range functionCreateDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range functionReplaceDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range functionRenameDiffs {
+		statements = append(statements, diff.UpSQL)
+	}
+	for _, diff := range functionDropDiffs {
 		statements = append(statements, diff.UpSQL)
 	}
 
@@ -233,7 +267,7 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 		}
 	}
 
-	// Migration order: Databases first, then named collections, then tables, then dictionaries, then views
+	// Migration order: Roles first, then functions, then databases, then named collections, then tables, then dictionaries, then views
 	// Database order: CREATE -> ALTER -> RENAME -> DROP
 	for _, diff := range dbCreateDiffs {
 		statements = append(statements, diff.UpSQL)

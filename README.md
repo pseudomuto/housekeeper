@@ -17,7 +17,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Key Features
 
-- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, materialized views, named collections, and roles
+- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, materialized views, named collections, functions, and roles
 - **Cluster-Aware Operations** - Native `ON CLUSTER` support for distributed ClickHouse deployments
 - **Intelligent Migration Generation** - Smart schema comparison with proper operation ordering and dependency management
 - **Modern Parser Architecture** - Built with participle for robust, maintainable SQL parsing
@@ -30,11 +30,12 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 |------------|--------|-------|---------|---------|------|--------|--------------|-------|
 | **Database** | ✅ | ✅¹ | ✅ | ✅ | ✅ | ✅ | N/A | ¹Comment changes only |
 | **Named Collection** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅ | N/A | ²Uses CREATE OR REPLACE |
+| **Function** | ✅ | ❌³ | ❌ | ❌ | ✅ | ✅⁴ | N/A | ³Uses DROP+CREATE strategy |
 | **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A | Full ALTER support |
-| **Dictionary** | ✅ | ❌³ | ✅ | ✅ | ✅ | ✅ | N/A | ³Uses CREATE OR REPLACE |
-| **View** | ✅ | ❌⁴ | ✅ | ✅ | ✅ | ✅⁵ | N/A | ⁴Uses CREATE OR REPLACE |
-| **Materialized View** | ✅ | ❌⁶ | ✅⁷ | ✅⁷ | ✅⁷ | ✅⁷ | N/A | ⁶Query changes use DROP+CREATE |
-| **Role** | ✅ | ✅⁸ | ❌ | ❌ | ✅ | ✅⁹ | ✅ | ⁸Settings and rename only |
+| **Dictionary** | ✅ | ❌⁵ | ✅ | ✅ | ✅ | ✅ | N/A | ⁵Uses CREATE OR REPLACE |
+| **View** | ✅ | ❌⁶ | ✅ | ✅ | ✅ | ✅⁷ | N/A | ⁶Uses CREATE OR REPLACE |
+| **Materialized View** | ✅ | ❌⁸ | ✅⁹ | ✅⁹ | ✅⁹ | ✅⁹ | N/A | ⁸Query changes use DROP+CREATE |
+| **Role** | ✅ | ✅¹⁰ | ❌ | ❌ | ✅ | ✅¹¹ | ✅ | ¹⁰Settings and rename only |
 
 **Legend:**
 - ✅ Fully supported
@@ -42,17 +43,20 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 - N/A Not applicable  
 - ¹ ALTER DATABASE only supports comment modifications
 - ² Named collections use CREATE OR REPLACE for all modifications
-- ³ Dictionaries use CREATE OR REPLACE for all modifications (ClickHouse limitation)
-- ⁴ Views use CREATE OR REPLACE for modifications
-- ⁵ Views use RENAME TABLE for renames
-- ⁶ Materialized view query changes use DROP+CREATE strategy for reliability
-- ⁷ Materialized views use table operations (ATTACH/DETACH/DROP/RENAME TABLE)
-- ⁸ ALTER ROLE supports RENAME TO and SETTINGS modifications
-- ⁹ Roles use ALTER ROLE...RENAME TO for rename operations
+- ³ Functions use DROP+CREATE for all modifications (no ALTER FUNCTION in ClickHouse)
+- ⁴ Functions use DROP+CREATE for renames (no RENAME FUNCTION in ClickHouse)
+- ⁵ Dictionaries use CREATE OR REPLACE for all modifications (ClickHouse limitation)
+- ⁶ Views use CREATE OR REPLACE for modifications
+- ⁷ Views use RENAME TABLE for renames
+- ⁸ Materialized view query changes use DROP+CREATE strategy for reliability
+- ⁹ Materialized views use table operations (ATTACH/DETACH/DROP/RENAME TABLE)
+- ¹⁰ ALTER ROLE supports RENAME TO and SETTINGS modifications
+- ¹¹ Roles use ALTER ROLE...RENAME TO for rename operations
 
 ### Migration Strategy Notes
 
-- **Dependencies**: Proper ordering ensures roles → databases → collections → tables → dictionaries → views
+- **Dependencies**: Proper ordering ensures roles → functions → databases → collections → tables → dictionaries → views
+- **Function Support**: CREATE/DROP FUNCTION with lambda expressions (→) and ON CLUSTER support
 - **Integration Engines**: Tables using Kafka, RabbitMQ, etc. automatically use DROP+CREATE strategy
 - **Cluster Operations**: Full `ON CLUSTER` support, but cluster association cannot be changed after creation
 - **Engine Changes**: Not supported for any object type (requires manual migration)
@@ -109,6 +113,11 @@ Supported connection formats:
 - Simple: `localhost:9000`
 - Full DSN: `clickhouse://user:password@host:9000/database`
 - TCP: `tcp://host:9000?username=user&password=pass`
+
+## Requirements
+
+- **ClickHouse**: 24.0+ 
+- **Go**: 1.21+ (for development)
 
 ## Installation
 
