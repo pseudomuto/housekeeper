@@ -249,6 +249,7 @@ func (f *Formatter) statement(w io.Writer, stmt *parser.Statement) error {
 		f.formatDictionaryStatements,
 		f.formatViewStatements,
 		f.formatRoleStatements,
+		f.formatFunctionStatements,
 		f.formatOtherStatements,
 	}
 
@@ -354,6 +355,17 @@ func (f *Formatter) formatRoleStatements(w io.Writer, stmt *parser.Statement) er
 		return f.grant(w, stmt.Grant)
 	case stmt.Revoke != nil:
 		return f.revoke(w, stmt.Revoke)
+	}
+	return nil
+}
+
+// formatFunctionStatements handles function-related statements
+func (f *Formatter) formatFunctionStatements(w io.Writer, stmt *parser.Statement) error {
+	switch {
+	case stmt.CreateFunction != nil:
+		return f.formatCreateFunction(w, stmt.CreateFunction)
+	case stmt.DropFunction != nil:
+		return f.formatDropFunction(w, stmt.DropFunction)
 	}
 	return nil
 }

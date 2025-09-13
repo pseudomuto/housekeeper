@@ -27,6 +27,7 @@ type TestCase struct {
 	Queries          []ExpectedQuery           `yaml:"queries,omitempty"`
 	Roles            []ExpectedRole            `yaml:"roles,omitempty"`
 	Grants           []ExpectedGrant           `yaml:"grants,omitempty"`
+	Functions        []ExpectedFunction        `yaml:"functions,omitempty"`
 }
 
 // ExpectedDatabase represents expected database properties
@@ -155,6 +156,16 @@ type ExpectedGrant struct {
 	AdminOption bool     `yaml:"admin_option,omitempty"`
 }
 
+// ExpectedFunction represents expected function properties
+type ExpectedFunction struct {
+	Name       string   `yaml:"name"`
+	Operation  string   `yaml:"operation"` // CREATE, DROP
+	Cluster    string   `yaml:"cluster,omitempty"`
+	IfExists   bool     `yaml:"if_exists,omitempty"`
+	Parameters []string `yaml:"parameters,omitempty"`
+	Expression string   `yaml:"expression,omitempty"`
+}
+
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
 // formatEngine formats a database engine with optional parameters
@@ -236,6 +247,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	var expectedQueries []ExpectedQuery
 	var expectedRoles []ExpectedRole
 	var expectedGrants []ExpectedGrant
+	var expectedFunctions []ExpectedFunction
 
 	// Keep track of accumulated ALTER operations by table name
 	alterOperations := make(map[string]map[string]int)
@@ -968,6 +980,39 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				}
 			}
 			expectedGrants = append(expectedGrants, expectedGrant)
+		} else if stmt.CreateFunction != nil {
+			fn := stmt.CreateFunction
+			expectedFunction := ExpectedFunction{
+				Name:      fn.Name,
+				Operation: "CREATE",
+			}
+			if fn.OnCluster != nil {
+				expectedFunction.Cluster = *fn.OnCluster
+			}
+			// Extract parameter names
+			if len(fn.Parameters) > 0 {
+				for _, param := range fn.Parameters {
+					expectedFunction.Parameters = append(expectedFunction.Parameters, param.Name)
+				}
+			}
+			// Extract expression as string (simplified)
+			if fn.Expression != nil {
+				expectedFunction.Expression = "expression"
+			}
+			expectedFunctions = append(expectedFunctions, expectedFunction)
+
+		} else if stmt.DropFunction != nil {
+			fn := stmt.DropFunction
+			expectedFunction := ExpectedFunction{
+				Name:      fn.Name,
+				Operation: "DROP",
+				IfExists:  fn.IfExists,
+			}
+			if fn.OnCluster != nil {
+				expectedFunction.Cluster = *fn.OnCluster
+			}
+			expectedFunctions = append(expectedFunctions, expectedFunction)
+
 		} else if stmt.SelectStatement != nil {
 			sel := stmt.SelectStatement
 			expectedQuery := ExpectedQuery{
@@ -1048,6 +1093,9 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 	}
 	if len(expectedGrants) > 0 {
 		testCase.Grants = expectedGrants
+	}
+	if len(expectedFunctions) > 0 {
+		testCase.Functions = expectedFunctions
 	}
 
 	return testCase

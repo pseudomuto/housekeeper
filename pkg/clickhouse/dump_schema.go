@@ -7,7 +7,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
-// DumpSchema retrieves all schema objects (databases, tables, named collections, dictionaries, views)
+// DumpSchema retrieves all schema objects (databases, tables, named collections, dictionaries, views, roles, functions)
 // and returns them as a parsed SQL structure ready for use with migration generation.
 //
 // This function combines all individual extraction functions to provide a complete view of the
@@ -20,6 +20,8 @@ import (
 //  3. Named Collections - connection configurations that dictionaries might reference
 //  4. Dictionaries - dictionary definitions with source/layout/lifetime
 //  5. Views - both regular and materialized views (extracted last since they may depend on dictionaries)
+//  6. Roles - global role definitions and privilege grants
+//  7. Functions - user-defined function definitions (global objects)
 //
 // All system objects are automatically excluded and all DDL statements are validated.
 //
@@ -88,6 +90,13 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 	}
 	allStatements = append(allStatements, roles.Statements...)
 
+	// Extract functions (global objects, after roles)
+	functions, err := extractFunctions(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract functions")
+	}
+	allStatements = append(allStatements, functions.Statements...)
+
 	// Inject ON CLUSTER clauses if cluster is specified
 	if client.options.Cluster != "" {
 		allStatements = injectOnCluster(allStatements, client.options.Cluster)
@@ -100,6 +109,10 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 // extractRoles is a wrapper function that calls client.GetRoles
 func extractRoles(ctx context.Context, client *Client) (*parser.SQL, error) {
 	return client.GetRoles(ctx)
+}
+
+func extractFunctions(ctx context.Context, client *Client) (*parser.SQL, error) {
+	return client.GetFunctions(ctx)
 }
 
 // injectOnCluster adds ON CLUSTER clauses to all DDL statements when cluster is specified.

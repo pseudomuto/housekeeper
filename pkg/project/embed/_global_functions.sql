@@ -1,0 +1,36 @@
+-- This is the main entrypoint for global functions in your ClickHouse cluster.
+-- Functions are global objects that exist at the cluster level, not within specific databases.
+--
+-- You can organize your functions by importing individual function files:
+-- -- housekeeper:import math_functions.sql
+-- -- housekeeper:import string_helpers.sql
+-- -- housekeeper:import business_logic.sql
+--
+-- Or define functions directly in this file:
+--
+-- Example function definitions:
+--
+-- -- Create a linear equation function
+-- CREATE FUNCTION linear_equation AS (x, k, b) -> k*x + b;
+--
+-- -- Create a parity string function
+-- CREATE FUNCTION parity_str AS (n) -> if(n % 2, 'odd', 'even');
+--
+-- -- Create a safe division function
+-- CREATE FUNCTION safe_divide AS (a, b) -> if(b = 0, 0, a / b);
+--
+-- -- Create a string truncation function
+-- CREATE FUNCTION truncate_string AS (str, max_len) -> 
+--     if(length(str) > max_len, concat(substring(str, 1, max_len - 3), '...'), str);
+--
+-- -- Create a date range validation function
+-- CREATE FUNCTION is_valid_date_range AS (start_date, end_date) -> 
+--     start_date <= end_date AND start_date >= '1900-01-01' AND end_date <= '2100-12-31';
+--
+-- Note: When running on a cluster, all function statements will automatically
+-- have ON CLUSTER clauses added if configured in housekeeper.yaml
+--
+-- Function Limitations:
+-- - Recursive functions are not allowed
+-- - All variables must be in the parameter list
+-- - Function names must be unique across the cluster

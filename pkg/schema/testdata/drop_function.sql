@@ -1,0 +1,3 @@
+DROP FUNCTION IF EXISTS `old_function`;
+
+DROP FUNCTION IF EXISTS `safe_divide`;

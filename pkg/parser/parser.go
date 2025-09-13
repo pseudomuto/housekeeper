@@ -19,6 +19,7 @@ var (
 		{Name: "BacktickIdent", Pattern: "`([^`\\\\]|\\\\.)*`"},
 		{Name: "Number", Pattern: `\d+(\.\d*)?`},
 		{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
+		{Name: "Arrow", Pattern: `->`},
 		{Name: "NotEq", Pattern: `!=|<>`},
 		{Name: "LtEq", Pattern: `<=`},
 		{Name: "GtEq", Pattern: `>=`},
@@ -129,6 +130,8 @@ type (
 		SetDefaultRole        *SetDefaultRoleStmt        `parser:"| @@"`
 		Grant                 *GrantStmt                 `parser:"| @@"`
 		Revoke                *RevokeStmt                `parser:"| @@"`
+		CreateFunction        *CreateFunctionStmt        `parser:"| @@"`
+		DropFunction          *DropFunctionStmt          `parser:"| @@"`
 		AttachView            *AttachViewStmt            `parser:"| @@"`
 		AttachDictionary      *AttachDictionaryStmt      `parser:"| @@"`
 		DetachView            *DetachViewStmt            `parser:"| @@"`
