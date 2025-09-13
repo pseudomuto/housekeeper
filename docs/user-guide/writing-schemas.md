@@ -48,8 +48,8 @@ For larger projects, split schemas into logical modules:
 -- housekeeper:import schemas/databases/ecommerce.sql
 
 -- Named collections (connection configs)
--- housekeeper:import schemas/collections/api_configs.sql
--- housekeeper:import schemas/collections/kafka_configs.sql
+-- housekeeper:import schemas/_global/collections/api_configs.sql
+-- housekeeper:import schemas/_global/collections/kafka_configs.sql
 
 -- Core tables
 -- housekeeper:import schemas/tables/users.sql
@@ -87,7 +87,7 @@ The order of imports matters for proper migration generation. Housekeeper proces
 -- housekeeper:import schemas/databases/main.sql
 
 -- 3. Named collections (if needed by tables)
--- housekeeper:import schemas/collections/main.sql
+-- housekeeper:import schemas/_global/collections/main.sql
 
 -- 4. Tables and core data structures
 -- housekeeper:import schemas/tables/main.sql

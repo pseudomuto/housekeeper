@@ -19,11 +19,16 @@ my-clickhouse-project/
 │   │   ├── 20240101130000.sql
 │   │   └── housekeeper.sum   # Migration integrity checksum
 │   └── schemas/              # Modular schema organization
+│       ├── _global/          # Global objects (not tied to databases)
+│       │   ├── schema.sql    # Global objects import file
+│       │   ├── roles/        # Role definitions and grants
+│       │   │   ├── admin_role.sql
+│       │   │   └── readonly_role.sql
+│       │   └── collections/  # Named collection definitions
+│       │       ├── api_configs.sql
+│       │       └── kafka_configs.sql
 │       ├── analytics/
 │       │   ├── schema.sql    # Database definition
-│       │   ├── collections/  # Named collection definitions
-│       │   │   ├── api_configs.sql
-│       │   │   └── kafka_configs.sql
 │       │   ├── tables/       # Table definitions
 │       │   │   ├── events.sql
 │       │   │   ├── users.sql

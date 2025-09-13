@@ -86,18 +86,49 @@ func TestGenerateImage(t *testing.T) {
 				) ENGINE = MergeTree() ORDER BY id;
 			`,
 			fileTests: []fileTest{
+				{"db/main.sql", "-- housekeeper:import schemas/_global/schema.sql"},
 				{"db/main.sql", "-- housekeeper:import schemas/analytics/schema.sql"},
-				{"db/main.sql", "-- housekeeper:import schemas/default/schema.sql"},
 				{"db/schemas/analytics/schema.sql", "CREATE DATABASE `analytics` ENGINE = Atomic"},
 				{"db/schemas/analytics/schema.sql", "-- housekeeper:import tables/events.sql"},
-				{"db/schemas/default/schema.sql", "-- Named Collections"},
-				{"db/schemas/default/schema.sql", "-- housekeeper:import collections/kafka_config.sql"},
+				{"db/schemas/_global/schema.sql", "-- Global objects"},
+				{"db/schemas/_global/schema.sql", "-- Named Collections"},
+				{"db/schemas/_global/schema.sql", "-- housekeeper:import collections/kafka_config.sql"},
 				{"db/schemas/analytics/tables/events.sql", "CREATE TABLE `analytics`.`events`"},
 				{"db/schemas/analytics/tables/events.sql", "`id`      UInt64"},
 				{"db/schemas/analytics/tables/events.sql", "`message` String"},
-				{"db/schemas/default/collections/kafka_config.sql", "CREATE NAMED COLLECTION `kafka_config`"},
-				{"db/schemas/default/collections/kafka_config.sql", "`host` = 'localhost'"},
-				{"db/schemas/default/collections/kafka_config.sql", "`port` = 9092"},
+				{"db/schemas/_global/collections/kafka_config.sql", "CREATE NAMED COLLECTION `kafka_config`"},
+				{"db/schemas/_global/collections/kafka_config.sql", "`host` = 'localhost'"},
+				{"db/schemas/_global/collections/kafka_config.sql", "`port` = 9092"},
+			},
+		},
+		{
+			name: "roles and grants are organized in _global",
+			sql: `
+				CREATE DATABASE analytics ENGINE = Atomic;
+				
+				CREATE ROLE admin_role;
+				CREATE ROLE readonly_role;
+				
+				GRANT SELECT ON *.* TO readonly_role;
+				GRANT ALL ON analytics.* TO admin_role;
+				GRANT readonly_role TO admin_role;
+				
+				CREATE TABLE analytics.users (id UInt64) ENGINE = MergeTree() ORDER BY id;
+			`,
+			fileTests: []fileTest{
+				{"db/main.sql", "-- housekeeper:import schemas/_global/schema.sql"},
+				{"db/main.sql", "-- housekeeper:import schemas/analytics/schema.sql"},
+				{"db/schemas/_global/schema.sql", "-- Global objects"},
+				{"db/schemas/_global/schema.sql", "-- Roles and Permissions"},
+				{"db/schemas/_global/schema.sql", "-- housekeeper:import roles/admin_role.sql"},
+				{"db/schemas/_global/schema.sql", "-- housekeeper:import roles/readonly_role.sql"},
+				{"db/schemas/_global/roles/admin_role.sql", "CREATE ROLE `admin_role`"},
+				{"db/schemas/_global/roles/admin_role.sql", "GRANT ALL ON `analytics`.*"},
+				{"db/schemas/_global/roles/admin_role.sql", "GRANT `readonly_role` TO `admin_role`"},
+				{"db/schemas/_global/roles/readonly_role.sql", "CREATE ROLE `readonly_role`"},
+				{"db/schemas/_global/roles/readonly_role.sql", "GRANT `SELECT` ON *.* TO `readonly_role`"},
+				{"db/schemas/analytics/schema.sql", "CREATE DATABASE `analytics`"},
+				{"db/schemas/analytics/tables/users.sql", "CREATE TABLE `analytics`.`users`"},
 			},
 		},
 		{
@@ -188,9 +219,9 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 	// Expected file structure
 	expectedFiles := []string{
 		"db/main.sql",
+		"db/schemas/_global/schema.sql",
+		"db/schemas/_global/collections/api_config.sql",
 		"db/schemas/analytics/schema.sql",
-		"db/schemas/default/schema.sql",
-		"db/schemas/default/collections/api_config.sql",
 		"db/schemas/analytics/tables/events.sql",
 		"db/schemas/analytics/dictionaries/lookup.sql",
 		"db/schemas/analytics/views/summary.sql",
