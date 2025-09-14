@@ -63,8 +63,11 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
-      - name: Build with Go
-        run: nix develop -c go build -v ./...
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build package
+      - name: Run GoReleaser (no publish)
+        run: nix develop -c goreleaser release --snapshot --clean --skip=publish
+
+      - name: Build Nix package
         run: nix build .#housekeeper
