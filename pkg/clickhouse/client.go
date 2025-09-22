@@ -21,12 +21,22 @@ type (
 		// These databases will be ignored during GetSchema, GetDatabases, GetTables, GetViews,
 		// and GetDictionaries operations. This is useful for excluding test or temporary databases.
 		IgnoreDatabases []string
+
+		// TLSSettings specifies the CA and client certificate for mTLS between the client and server
+		TLSSettings
 	}
 
 	// Client represents a ClickHouse database connection
 	Client struct {
 		conn    driver.Conn
 		options ClientOptions
+	}
+
+	// Specify the CA and client certificate + key for mTLS
+	TLSSettings struct {
+		CAFile   string
+		CertFile string
+		KeyFile  string
 	}
 )
 
@@ -101,6 +111,14 @@ func NewClientWithOptions(ctx context.Context, dsn string, clientOpts ClientOpti
 		options = &clickhouse.Options{
 			Addr: []string{dsn},
 		}
+	}
+
+	if clientOpts.CertFile != "" {
+		tlsOpts, err := GetTLSConfig(clientOpts)
+		if err != nil {
+			return nil, err
+		}
+		options.TLS = tlsOpts
 	}
 
 	conn, err := clickhouse.Open(options)

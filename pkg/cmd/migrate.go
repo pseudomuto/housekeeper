@@ -47,6 +47,9 @@ type migrateParams struct {
 //
 //	# Apply migrations with cluster support
 //	housekeeper migrate --url localhost:9000 --cluster production_cluster
+//
+//	# Apply migrations by connecting via mtls
+//	housekeeper migrate --url localhost:9000 --certfile /cert/tls.crt --cafile /cert/ca.crt --keyfile /cert/tls.key
 func migrate(p migrateParams) *cli.Command {
 	return &cli.Command{
 		Name:    "migrate",
@@ -84,6 +87,27 @@ convention: yyyyMMddHHmmss_description.sql`,
 					TrimSpace: true,
 				},
 			},
+			&cli.StringFlag{
+				Name:  "cafile",
+				Usage: "Certificate authority pem",
+				Config: cli.StringConfig{
+					TrimSpace: true,
+				},
+			},
+			&cli.StringFlag{
+				Name:  "certfile",
+				Usage: "Certificate public key file",
+				Config: cli.StringConfig{
+					TrimSpace: true,
+				},
+			},
+			&cli.StringFlag{
+				Name:  "keyfile",
+				Usage: "Certificate private key file",
+				Config: cli.StringConfig{
+					TrimSpace: true,
+				},
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			return runMigrate(ctx, cmd, p)
@@ -96,10 +120,18 @@ func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
 	dryRun := cmd.Bool("dry-run")
 	cluster := cmd.String("cluster")
 
+	// TLS related settings
+	ca := cmd.String("cafile")
+	cert := cmd.String("certfile")
+	key := cmd.String("keyfile")
+
 	slog.Info("Starting migration execution",
 		"url", url,
 		"dry_run", dryRun,
 		"cluster", cluster,
+		"cafile", ca,
+		"certfile", cert,
+		"keyfile", key,
 	)
 
 	// Load migrations from the configured directory
@@ -119,6 +151,11 @@ func runMigrate(ctx context.Context, cmd *cli.Command, p migrateParams) error {
 	// Create ClickHouse client
 	client, err := clickhouse.NewClientWithOptions(ctx, url, clickhouse.ClientOptions{
 		Cluster: cluster,
+		TLSSettings: clickhouse.TLSSettings{
+			CAFile:   ca,
+			CertFile: cert,
+			KeyFile:  key,
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create ClickHouse client")
