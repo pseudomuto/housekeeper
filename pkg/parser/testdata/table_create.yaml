@@ -137,7 +137,7 @@ tables:
         - name: value
           data_type: Decimal(10, 4)
         - name: precision_value
-          data_type: Decimal128(6)
+          data_type: Decimal(38, 6)
         - name: created_at
           data_type: DateTime64(3, 'UTC')
         - name: config_data

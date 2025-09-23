@@ -115,6 +115,43 @@ func normalizeImplicitAliases(sql string) string {
 	return result
 }
 
+// normalizeDataTypes walks through all statements and normalizes data types
+func normalizeDataTypes(sql *SQL) {
+	if sql == nil {
+		return
+	}
+
+	for _, stmt := range sql.Statements {
+		if stmt == nil {
+			continue
+		}
+
+		// Normalize CreateTable columns
+		if stmt.CreateTable != nil && stmt.CreateTable.Elements != nil {
+			for _, elem := range stmt.CreateTable.Elements {
+				if elem.Column != nil {
+					NormalizeDataType(elem.Column.DataType)
+				}
+			}
+		}
+
+		// Normalize AlterTable operations
+		if stmt.AlterTable != nil && stmt.AlterTable.Operations != nil {
+			for _, op := range stmt.AlterTable.Operations {
+				if op.AddColumn != nil {
+					NormalizeDataType(op.AddColumn.Column.DataType)
+				}
+				if op.ModifyColumn != nil {
+					NormalizeDataType(op.ModifyColumn.Type)
+				}
+			}
+		}
+
+		// Dictionary columns use string type names, not DataType structs
+		// No normalization needed for dictionaries
+	}
+}
+
 type (
 	// SQL defines the complete ClickHouse DDL/DML SQL structure
 	SQL struct {
@@ -216,6 +253,9 @@ func Parse(reader io.Reader) (*SQL, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse SQL")
 	}
+
+	// Normalize data types in all statements
+	normalizeDataTypes(sqlResult)
 
 	return sqlResult, nil
 }

@@ -146,6 +146,98 @@ type (
 	}
 )
 
+// NormalizeDataType converts ClickHouse shorthand types to their canonical forms.
+// ClickHouse internally represents certain types differently than their shorthand:
+//   - Decimal32(S) → Decimal(9, S)
+//   - Decimal64(S) → Decimal(18, S)
+//   - Decimal128(S) → Decimal(38, S)
+//   - Decimal256(S) → Decimal(76, S)
+func NormalizeDataType(dt *DataType) {
+	if dt == nil {
+		return
+	}
+
+	// Recursively normalize nested types
+	if dt.Nullable != nil {
+		NormalizeDataType(dt.Nullable.Type)
+	}
+	if dt.Array != nil {
+		NormalizeDataType(dt.Array.Type)
+	}
+	if dt.LowCardinality != nil {
+		NormalizeDataType(dt.LowCardinality.Type)
+	}
+	if dt.Map != nil {
+		NormalizeDataType(dt.Map.KeyType)
+		NormalizeDataType(dt.Map.ValueType)
+	}
+	if dt.Tuple != nil {
+		for i := range dt.Tuple.Elements {
+			if dt.Tuple.Elements[i].Type != nil {
+				NormalizeDataType(dt.Tuple.Elements[i].Type)
+			}
+			if dt.Tuple.Elements[i].UnnamedType != nil {
+				NormalizeDataType(dt.Tuple.Elements[i].UnnamedType)
+			}
+		}
+	}
+	if dt.Nested != nil {
+		for i := range dt.Nested.Columns {
+			NormalizeDataType(dt.Nested.Columns[i].Type)
+		}
+	}
+
+	// Normalize SimpleType Decimal variants
+	if dt.Simple != nil {
+		switch dt.Simple.Name {
+		case "Decimal32":
+			dt.Simple.Name = "Decimal"
+			precision := "9"
+			scale := "0"
+			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
+				scale = *dt.Simple.Parameters[0].Number
+			}
+			dt.Simple.Parameters = []TypeParameter{
+				{Number: &precision},
+				{Number: &scale},
+			}
+		case "Decimal64":
+			dt.Simple.Name = "Decimal"
+			precision := "18"
+			scale := "0"
+			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
+				scale = *dt.Simple.Parameters[0].Number
+			}
+			dt.Simple.Parameters = []TypeParameter{
+				{Number: &precision},
+				{Number: &scale},
+			}
+		case "Decimal128":
+			dt.Simple.Name = "Decimal"
+			precision := "38"
+			scale := "0"
+			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
+				scale = *dt.Simple.Parameters[0].Number
+			}
+			dt.Simple.Parameters = []TypeParameter{
+				{Number: &precision},
+				{Number: &scale},
+			}
+		case "Decimal256":
+			dt.Simple.Name = "Decimal"
+			precision := "76"
+			scale := "0"
+			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
+				scale = *dt.Simple.Parameters[0].Number
+			}
+			dt.Simple.Parameters = []TypeParameter{
+				{Number: &precision},
+				{Number: &scale},
+			}
+		}
+	}
+}
+
 // Equal compares two CodecClause instances for equality
 func (c *CodecClause) Equal(other *CodecClause) bool {
 	if c == nil && other == nil {
