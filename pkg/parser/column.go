@@ -146,6 +146,122 @@ type (
 	}
 )
 
+// Equal compares two CodecClause instances for equality
+func (c *CodecClause) Equal(other *CodecClause) bool {
+	if c == nil && other == nil {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+	if len(c.Codecs) != len(other.Codecs) {
+		return false
+	}
+	for i := range c.Codecs {
+		if !c.Codecs[i].Equal(&other.Codecs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Equal compares two CodecSpec instances for equality
+func (c *CodecSpec) Equal(other *CodecSpec) bool {
+	if c.Name != other.Name {
+		return false
+	}
+	if len(c.Parameters) != len(other.Parameters) {
+		return false
+	}
+	for i := range c.Parameters {
+		if !c.Parameters[i].Equal(&other.Parameters[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Equal compares two TTLClause instances for equality
+func (t *TTLClause) Equal(other *TTLClause) bool {
+	if t == nil && other == nil {
+		return true
+	}
+	if t == nil || other == nil {
+		return false
+	}
+	return t.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two DefaultClause instances for equality
+func (d *DefaultClause) Equal(other *DefaultClause) bool {
+	if d == nil && other == nil {
+		return true
+	}
+	if d == nil || other == nil {
+		return false
+	}
+	return d.Type == other.Type && d.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two TypeParameter instances for equality
+func (t *TypeParameter) Equal(other *TypeParameter) bool {
+	// Check Function
+	if (t.Function != nil) != (other.Function != nil) {
+		return false
+	}
+	if t.Function != nil && !t.Function.Equal(other.Function) {
+		return false
+	}
+
+	// Check Number
+	if (t.Number != nil) != (other.Number != nil) {
+		return false
+	}
+	if t.Number != nil && *t.Number != *other.Number {
+		return false
+	}
+
+	// Check String
+	if (t.String != nil) != (other.String != nil) {
+		return false
+	}
+	if t.String != nil && *t.String != *other.String {
+		return false
+	}
+
+	// Check Ident
+	if (t.Ident != nil) != (other.Ident != nil) {
+		return false
+	}
+	if t.Ident != nil && *t.Ident != *other.Ident {
+		return false
+	}
+
+	return true
+}
+
+// Equal compares two ParametricFunction instances for equality
+func (p *ParametricFunction) Equal(other *ParametricFunction) bool {
+	if p == nil && other == nil {
+		return true
+	}
+	if p == nil || other == nil {
+		return false
+	}
+	if p.Name != other.Name {
+		return false
+	}
+	if len(p.Parameters) != len(other.Parameters) {
+		return false
+	}
+	for i := range p.Parameters {
+		if !p.Parameters[i].Equal(&other.Parameters[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // GetDefault returns the default clause for the column, if present
 func (c *Column) GetDefault() *DefaultClause {
 	for _, attr := range c.Attributes {
@@ -184,4 +300,131 @@ func (c *Column) GetComment() *string {
 		}
 	}
 	return nil
+}
+
+// Equal compares two DataType instances for equality
+func (d *DataType) Equal(other *DataType) bool {
+	if d == nil && other == nil {
+		return true
+	}
+	if d == nil || other == nil {
+		return false
+	}
+
+	// Compare Nullable
+	if (d.Nullable != nil) != (other.Nullable != nil) {
+		return false
+	}
+	if d.Nullable != nil {
+		return d.Nullable.Type.Equal(other.Nullable.Type)
+	}
+
+	// Compare Array
+	if (d.Array != nil) != (other.Array != nil) {
+		return false
+	}
+	if d.Array != nil {
+		return d.Array.Type.Equal(other.Array.Type)
+	}
+
+	// Compare Tuple
+	if (d.Tuple != nil) != (other.Tuple != nil) {
+		return false
+	}
+	if d.Tuple != nil {
+		if len(d.Tuple.Elements) != len(other.Tuple.Elements) {
+			return false
+		}
+		for i := range d.Tuple.Elements {
+			if !tupleElementsEqual(&d.Tuple.Elements[i], &other.Tuple.Elements[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Compare Nested
+	if (d.Nested != nil) != (other.Nested != nil) {
+		return false
+	}
+	if d.Nested != nil {
+		if len(d.Nested.Columns) != len(other.Nested.Columns) {
+			return false
+		}
+		for i := range d.Nested.Columns {
+			if !nestedColumnsEqual(&d.Nested.Columns[i], &other.Nested.Columns[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Compare Map
+	if (d.Map != nil) != (other.Map != nil) {
+		return false
+	}
+	if d.Map != nil {
+		return d.Map.KeyType.Equal(other.Map.KeyType) && d.Map.ValueType.Equal(other.Map.ValueType)
+	}
+
+	// Compare LowCardinality
+	if (d.LowCardinality != nil) != (other.LowCardinality != nil) {
+		return false
+	}
+	if d.LowCardinality != nil {
+		return d.LowCardinality.Type.Equal(other.LowCardinality.Type)
+	}
+
+	// Compare Simple
+	if (d.Simple != nil) != (other.Simple != nil) {
+		return false
+	}
+	if d.Simple != nil {
+		if d.Simple.Name != other.Simple.Name {
+			return false
+		}
+		if len(d.Simple.Parameters) != len(other.Simple.Parameters) {
+			return false
+		}
+		for i := range d.Simple.Parameters {
+			if !d.Simple.Parameters[i].Equal(&other.Simple.Parameters[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	return true
+}
+
+func tupleElementsEqual(a, b *TupleElement) bool {
+	// Compare name
+	if (a.Name != nil) != (b.Name != nil) {
+		return false
+	}
+	if a.Name != nil && *a.Name != *b.Name {
+		return false
+	}
+
+	// Compare Type
+	if (a.Type != nil) != (b.Type != nil) {
+		return false
+	}
+	if a.Type != nil {
+		return a.Type.Equal(b.Type)
+	}
+
+	// Compare UnnamedType
+	if (a.UnnamedType != nil) != (b.UnnamedType != nil) {
+		return false
+	}
+	if a.UnnamedType != nil {
+		return a.UnnamedType.Equal(b.UnnamedType)
+	}
+
+	return true
+}
+
+func nestedColumnsEqual(a, b *NestedColumn) bool {
+	return a.Name == b.Name && a.Type.Equal(b.Type)
 }

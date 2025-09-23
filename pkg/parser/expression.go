@@ -282,7 +282,7 @@ type (
 )
 
 // String returns the string representation of an Expression.
-func (e Expression) String() string {
+func (e *Expression) String() string {
 	if e.Case != nil {
 		return e.Case.String()
 	}
@@ -293,7 +293,7 @@ func (e Expression) String() string {
 }
 
 // String returns the string representation of an OrExpression with proper OR operator placement.
-func (o OrExpression) String() string {
+func (o *OrExpression) String() string {
 	if o.And != nil {
 		result := o.And.String()
 		for _, rest := range o.Rest {
@@ -305,7 +305,7 @@ func (o OrExpression) String() string {
 }
 
 // String returns the string representation of an AndExpression with proper AND operator placement.
-func (a AndExpression) String() string {
+func (a *AndExpression) String() string {
 	if a.Not != nil {
 		result := a.Not.String()
 		for _, rest := range a.Rest {
@@ -317,7 +317,7 @@ func (a AndExpression) String() string {
 }
 
 // String returns the string representation of a NotExpression with optional NOT prefix.
-func (n NotExpression) String() string {
+func (n *NotExpression) String() string {
 	prefix := ""
 	if n.Not {
 		prefix = "NOT "
@@ -331,7 +331,7 @@ func (n NotExpression) String() string {
 // String returns the string representation of a ComparisonExpression including operators and IS NULL checks.
 //
 //nolint:nestif // Complex nested logic needed for expression string formatting
-func (c ComparisonExpression) String() string {
+func (c *ComparisonExpression) String() string {
 	if c.Addition != nil {
 		result := c.Addition.String()
 		if c.Rest != nil {
@@ -362,7 +362,7 @@ func (c ComparisonExpression) String() string {
 }
 
 // String returns the string representation of a SimpleComparisonOp (=, !=, <, >, <=, >=, LIKE, NOT LIKE).
-func (c SimpleComparisonOp) String() string {
+func (c *SimpleComparisonOp) String() string {
 	if c.Eq {
 		return "="
 	}
@@ -390,7 +390,7 @@ func (c SimpleComparisonOp) String() string {
 	return ""
 }
 
-func (a AdditionExpression) String() string {
+func (a *AdditionExpression) String() string {
 	if a.Multiplication != nil {
 		result := a.Multiplication.String()
 		for _, rest := range a.Rest {
@@ -401,7 +401,7 @@ func (a AdditionExpression) String() string {
 	return ""
 }
 
-func (m MultiplicationExpression) String() string {
+func (m *MultiplicationExpression) String() string {
 	if m.Unary != nil {
 		result := m.Unary.String()
 		for _, rest := range m.Rest {
@@ -412,7 +412,7 @@ func (m MultiplicationExpression) String() string {
 	return ""
 }
 
-func (u UnaryExpression) String() string {
+func (u *UnaryExpression) String() string {
 	prefix := u.Op
 	if u.Primary != nil {
 		return prefix + u.Primary.String()
@@ -420,7 +420,7 @@ func (u UnaryExpression) String() string {
 	return prefix
 }
 
-func (p PrimaryExpression) String() string {
+func (p *PrimaryExpression) String() string {
 	if p.Literal != nil {
 		return p.Literal.String()
 	}
@@ -452,7 +452,7 @@ func (p PrimaryExpression) String() string {
 }
 
 // String returns the string representation of a Literal value (string, number, boolean, or NULL).
-func (l Literal) String() string {
+func (l *Literal) String() string {
 	if l.StringValue != nil {
 		return *l.StringValue
 	}
@@ -469,7 +469,7 @@ func (l Literal) String() string {
 }
 
 // String returns the string representation of an IdentifierExpr with optional database and table qualifiers.
-func (i IdentifierExpr) String() string {
+func (i *IdentifierExpr) String() string {
 	result := ""
 	if i.Database != nil {
 		result += *i.Database + "."
@@ -482,7 +482,7 @@ func (i IdentifierExpr) String() string {
 }
 
 // String returns the string representation of a FunctionCall with function name and arguments.
-func (f FunctionCall) String() string {
+func (f *FunctionCall) String() string {
 	result := f.Name
 
 	// First set of parentheses
@@ -515,7 +515,7 @@ func (f FunctionCall) String() string {
 	return result
 }
 
-func (a FunctionArg) String() string {
+func (a *FunctionArg) String() string {
 	if a.Star != nil {
 		return "*"
 	}
@@ -526,7 +526,7 @@ func (a FunctionArg) String() string {
 }
 
 // String returns the string representation of an OverClause for window functions
-func (o OverClause) String() string {
+func (o *OverClause) String() string {
 	result := "OVER ("
 
 	// Add PARTITION BY clause if present
@@ -567,7 +567,7 @@ func (o OverClause) String() string {
 }
 
 // String returns the string representation of an OrderByExpr for ORDER BY in OVER clauses
-func (o OrderByExpr) String() string {
+func (o *OrderByExpr) String() string {
 	result := o.Expression.String()
 	if o.Desc {
 		result += " DESC"
@@ -579,7 +579,7 @@ func (o OrderByExpr) String() string {
 }
 
 // String returns the string representation of a WindowFrame for window functions
-func (w WindowFrame) String() string {
+func (w *WindowFrame) String() string {
 	result := w.Type
 	if w.Between {
 		result += " BETWEEN " + w.Start.String()
@@ -593,7 +593,7 @@ func (w WindowFrame) String() string {
 }
 
 // String returns the string representation of a FrameBound for window frame boundaries
-func (f FrameBound) String() string {
+func (f *FrameBound) String() string {
 	result := f.Type
 	if f.Direction != "" {
 		result += " " + f.Direction
@@ -601,7 +601,7 @@ func (f FrameBound) String() string {
 	return result
 }
 
-func (t TupleExpression) String() string {
+func (t *TupleExpression) String() string {
 	result := "("
 	for i, elem := range t.Elements {
 		if i > 0 {
@@ -613,7 +613,7 @@ func (t TupleExpression) String() string {
 	return result
 }
 
-func (a ArrayExpression) String() string {
+func (a *ArrayExpression) String() string {
 	result := "["
 	for i, elem := range a.Elements {
 		if i > 0 {
@@ -625,11 +625,11 @@ func (a ArrayExpression) String() string {
 	return result
 }
 
-func (i IntervalExpr) String() string {
+func (i *IntervalExpr) String() string {
 	return "INTERVAL " + i.Value + " " + i.Unit
 }
 
-func (c CaseExpression) String() string {
+func (c *CaseExpression) String() string {
 	result := "CASE"
 	for _, when := range c.WhenClauses {
 		result += " WHEN " + when.Condition + " THEN " + when.Result
@@ -641,12 +641,473 @@ func (c CaseExpression) String() string {
 	return result
 }
 
-func (c CastExpression) String() string {
+func (c *CastExpression) String() string {
 	return "CAST(" + c.Expression.String() + " AS " + formatDataTypeForExpression(c.Type) + ")"
 }
 
-func (e ExtractExpression) String() string {
+func (e *ExtractExpression) String() string {
 	return "EXTRACT(" + e.Part + " FROM " + e.Expr.String() + ")"
+}
+
+// Equal compares two Expression instances for structural equality
+func (e *Expression) Equal(other *Expression) bool {
+	if e == nil && other == nil {
+		return true
+	}
+	if e == nil || other == nil {
+		return false
+	}
+
+	// Compare CASE expressions
+	if e.Case != nil && other.Case != nil {
+		return e.Case.Equal(other.Case)
+	}
+	if e.Case != nil || other.Case != nil {
+		return false
+	}
+
+	// Compare OR expressions
+	if e.Or != nil && other.Or != nil {
+		return e.Or.Equal(other.Or)
+	}
+
+	return e.Or == nil && other.Or == nil
+}
+
+// Equal compares two Case expressions
+func (c *CaseExpression) Equal(other *CaseExpression) bool {
+	if c == nil && other == nil {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+
+	if len(c.WhenClauses) != len(other.WhenClauses) {
+		return false
+	}
+
+	for i := range c.WhenClauses {
+		if c.WhenClauses[i].Condition != other.WhenClauses[i].Condition ||
+			c.WhenClauses[i].Result != other.WhenClauses[i].Result {
+			return false
+		}
+	}
+
+	if (c.ElseClause == nil) != (other.ElseClause == nil) {
+		return false
+	}
+	if c.ElseClause != nil && c.ElseClause.Result != other.ElseClause.Result {
+		return false
+	}
+
+	return true
+}
+
+// Equal compares two OR expressions
+func (o *OrExpression) Equal(other *OrExpression) bool {
+	if o == nil && other == nil {
+		return true
+	}
+	if o == nil || other == nil {
+		return false
+	}
+
+	if !o.And.Equal(other.And) {
+		return false
+	}
+
+	if len(o.Rest) != len(other.Rest) {
+		return false
+	}
+
+	for i := range o.Rest {
+		if o.Rest[i].Op != other.Rest[i].Op || !o.Rest[i].And.Equal(other.Rest[i].And) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two AND expressions
+func (a *AndExpression) Equal(other *AndExpression) bool {
+	if a == nil && other == nil {
+		return true
+	}
+	if a == nil || other == nil {
+		return false
+	}
+
+	if !a.Not.Equal(other.Not) {
+		return false
+	}
+
+	if len(a.Rest) != len(other.Rest) {
+		return false
+	}
+
+	for i := range a.Rest {
+		if a.Rest[i].Op != other.Rest[i].Op || !a.Rest[i].Not.Equal(other.Rest[i].Not) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two NOT expressions
+func (n *NotExpression) Equal(other *NotExpression) bool {
+	if n == nil && other == nil {
+		return true
+	}
+	if n == nil || other == nil {
+		return false
+	}
+
+	return n.Not == other.Not && n.Comparison.Equal(other.Comparison)
+}
+
+// Equal compares two Comparison expressions
+func (c *ComparisonExpression) Equal(other *ComparisonExpression) bool {
+	if c == nil && other == nil {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+
+	if !c.Addition.Equal(other.Addition) {
+		return false
+	}
+
+	// Compare Rest
+	if (c.Rest == nil) != (other.Rest == nil) {
+		return false
+	}
+	if c.Rest != nil && !c.Rest.Equal(other.Rest) {
+		return false
+	}
+
+	// Compare IsNull
+	if (c.IsNull == nil) != (other.IsNull == nil) {
+		return false
+	}
+	if c.IsNull != nil && !c.IsNull.Equal(other.IsNull) {
+		return false
+	}
+
+	return true
+}
+
+// Equal compares two ComparisonRest expressions
+func (c *ComparisonRest) Equal(other *ComparisonRest) bool {
+	if c == nil && other == nil {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+
+	// Use pointer comparison for which operation is set
+	if (c.SimpleOp != nil) != (other.SimpleOp != nil) {
+		return false
+	}
+	if c.SimpleOp != nil && !c.SimpleOp.Equal(other.SimpleOp) {
+		return false
+	}
+
+	if (c.InOp != nil) != (other.InOp != nil) {
+		return false
+	}
+	// For now, just check if both are set - full IN comparison would require more work
+
+	if (c.BetweenOp != nil) != (other.BetweenOp != nil) {
+		return false
+	}
+	// For now, just check if both are set - full BETWEEN comparison would require more work
+
+	return true
+}
+
+// Equal compares two SimpleComparison operations
+func (s *SimpleComparison) Equal(other *SimpleComparison) bool {
+	if s == nil && other == nil {
+		return true
+	}
+	if s == nil || other == nil {
+		return false
+	}
+
+	return s.Op.Equal(other.Op) && s.Addition.Equal(other.Addition)
+}
+
+// Equal compares two SimpleComparisonOp
+func (s *SimpleComparisonOp) Equal(other *SimpleComparisonOp) bool {
+	if s == nil && other == nil {
+		return true
+	}
+	if s == nil || other == nil {
+		return false
+	}
+
+	return s.Eq == other.Eq &&
+		s.NotEq == other.NotEq &&
+		s.LtEq == other.LtEq &&
+		s.GtEq == other.GtEq &&
+		s.Lt == other.Lt &&
+		s.Gt == other.Gt &&
+		s.Like == other.Like &&
+		s.NotLike == other.NotLike
+}
+
+// Equal compares two IsNullExpr
+func (i *IsNullExpr) Equal(other *IsNullExpr) bool {
+	if i == nil && other == nil {
+		return true
+	}
+	if i == nil || other == nil {
+		return false
+	}
+
+	return i.Is == other.Is && i.Not == other.Not && i.Null == other.Null
+}
+
+// Equal compares two Addition expressions
+func (a *AdditionExpression) Equal(other *AdditionExpression) bool {
+	if a == nil && other == nil {
+		return true
+	}
+	if a == nil || other == nil {
+		return false
+	}
+
+	if !a.Multiplication.Equal(other.Multiplication) {
+		return false
+	}
+
+	if len(a.Rest) != len(other.Rest) {
+		return false
+	}
+
+	for i := range a.Rest {
+		if a.Rest[i].Op != other.Rest[i].Op || !a.Rest[i].Multiplication.Equal(other.Rest[i].Multiplication) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two Multiplication expressions
+func (m *MultiplicationExpression) Equal(other *MultiplicationExpression) bool {
+	if m == nil && other == nil {
+		return true
+	}
+	if m == nil || other == nil {
+		return false
+	}
+
+	if !m.Unary.Equal(other.Unary) {
+		return false
+	}
+
+	if len(m.Rest) != len(other.Rest) {
+		return false
+	}
+
+	for i := range m.Rest {
+		if m.Rest[i].Op != other.Rest[i].Op || !m.Rest[i].Unary.Equal(other.Rest[i].Unary) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two Unary expressions
+func (u *UnaryExpression) Equal(other *UnaryExpression) bool {
+	if u == nil && other == nil {
+		return true
+	}
+	if u == nil || other == nil {
+		return false
+	}
+
+	return u.Op == other.Op && u.Primary.Equal(other.Primary)
+}
+
+// Equal compares two Primary expressions
+func (p *PrimaryExpression) Equal(other *PrimaryExpression) bool {
+	if p == nil && other == nil {
+		return true
+	}
+	if p == nil || other == nil {
+		return false
+	}
+
+	// Check Literal
+	if (p.Literal != nil) != (other.Literal != nil) {
+		return false
+	}
+	if p.Literal != nil && !p.Literal.Equal(other.Literal) {
+		return false
+	}
+
+	// Check Identifier
+	if (p.Identifier != nil) != (other.Identifier != nil) {
+		return false
+	}
+	if p.Identifier != nil && !p.Identifier.Equal(other.Identifier) {
+		return false
+	}
+
+	// Check Function
+	if (p.Function != nil) != (other.Function != nil) {
+		return false
+	}
+	if p.Function != nil && !p.Function.Equal(other.Function) {
+		return false
+	}
+
+	// Check Parentheses
+	if (p.Parentheses != nil) != (other.Parentheses != nil) {
+		return false
+	}
+	if p.Parentheses != nil && !p.Parentheses.Expression.Equal(&other.Parentheses.Expression) {
+		return false
+	}
+
+	// For other types, do basic comparison
+	return true
+}
+
+// Equal compares two Literal values
+func (l *Literal) Equal(other *Literal) bool {
+	if l == nil && other == nil {
+		return true
+	}
+	if l == nil || other == nil {
+		return false
+	}
+
+	// Compare StringValue
+	if (l.StringValue != nil) != (other.StringValue != nil) {
+		return false
+	}
+	if l.StringValue != nil && *l.StringValue != *other.StringValue {
+		return false
+	}
+
+	// Compare Number
+	if (l.Number != nil) != (other.Number != nil) {
+		return false
+	}
+	if l.Number != nil && *l.Number != *other.Number {
+		return false
+	}
+
+	// Compare Boolean
+	if (l.Boolean != nil) != (other.Boolean != nil) {
+		return false
+	}
+	if l.Boolean != nil && *l.Boolean != *other.Boolean {
+		return false
+	}
+
+	// Compare Null
+	return l.Null == other.Null
+}
+
+// Equal compares two IdentifierExpr
+func (i *IdentifierExpr) Equal(other *IdentifierExpr) bool {
+	if i == nil && other == nil {
+		return true
+	}
+	if i == nil || other == nil {
+		return false
+	}
+
+	// Compare Database
+	if (i.Database != nil) != (other.Database != nil) {
+		return false
+	}
+	if i.Database != nil && *i.Database != *other.Database {
+		return false
+	}
+
+	// Compare Table
+	if (i.Table != nil) != (other.Table != nil) {
+		return false
+	}
+	if i.Table != nil && *i.Table != *other.Table {
+		return false
+	}
+
+	// Compare Name
+	return i.Name == other.Name
+}
+
+// Equal compares two FunctionCall
+func (f *FunctionCall) Equal(other *FunctionCall) bool {
+	if f == nil && other == nil {
+		return true
+	}
+	if f == nil || other == nil {
+		return false
+	}
+
+	if f.Name != other.Name {
+		return false
+	}
+
+	if len(f.FirstParentheses) != len(other.FirstParentheses) {
+		return false
+	}
+	for i := range f.FirstParentheses {
+		if !f.FirstParentheses[i].Equal(&other.FirstParentheses[i]) {
+			return false
+		}
+	}
+
+	if len(f.SecondParentheses) != len(other.SecondParentheses) {
+		return false
+	}
+	for i := range f.SecondParentheses {
+		if !f.SecondParentheses[i].Equal(&other.SecondParentheses[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two FunctionArg
+func (f *FunctionArg) Equal(other *FunctionArg) bool {
+	if f == nil && other == nil {
+		return true
+	}
+	if f == nil || other == nil {
+		return false
+	}
+
+	// Compare Star
+	if (f.Star != nil) != (other.Star != nil) {
+		return false
+	}
+	if f.Star != nil && *f.Star != *other.Star {
+		return false
+	}
+
+	// Compare Expression
+	if (f.Expression != nil) != (other.Expression != nil) {
+		return false
+	}
+	if f.Expression != nil && !f.Expression.Equal(other.Expression) {
+		return false
+	}
+
+	return true
 }
 
 func (i InExpression) String() string {

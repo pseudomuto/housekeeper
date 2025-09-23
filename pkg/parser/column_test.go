@@ -264,7 +264,7 @@ func TestColumnParsing(t *testing.T) {
 			name:  "backtick identifier",
 			input: "`order` UInt32",
 			validate: func(t *testing.T, col *Column) {
-				require.Equal(t, "`order`", col.Name)
+				require.Equal(t, "order", col.Name)
 				require.NotNil(t, col.DataType.Simple)
 				require.Equal(t, "UInt32", col.DataType.Simple.Name)
 			},
@@ -273,7 +273,7 @@ func TestColumnParsing(t *testing.T) {
 			name:  "backtick identifier with special chars",
 			input: "`user-name` String",
 			validate: func(t *testing.T, col *Column) {
-				require.Equal(t, "`user-name`", col.Name)
+				require.Equal(t, "user-name", col.Name)
 				require.NotNil(t, col.DataType.Simple)
 				require.Equal(t, "String", col.DataType.Simple.Name)
 			},

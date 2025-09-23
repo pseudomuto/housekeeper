@@ -29,14 +29,14 @@ tables:
       operation: DROP
     - name: table3
       operation: DROP
-    - name: '`user-data`'
+    - name: user-data
       operation: DROP
-    - name: '`select`'
-      database: '`order-db`'
+    - name: select
+      database: order-db
       operation: DROP
-    - name: '`user-events`'
-      database: '`analytics-db`'
-      cluster: '`prod-cluster`'
+    - name: user-events
+      database: analytics-db
+      cluster: prod-cluster
       operation: DROP
     - name: data_2023_archive
       operation: DROP

@@ -8,12 +8,12 @@ functions:
       operation: DROP
       cluster: production
       if_exists: true
-    - name: '`my-special-function`'
+    - name: my-special-function
       operation: DROP
       if_exists: true
     - name: truncate_string
       operation: DROP
-      cluster: '`prod-cluster`'
+      cluster: prod-cluster
     - name: is_valid_date_range
       operation: DROP
     - name: current_timestamp_utc

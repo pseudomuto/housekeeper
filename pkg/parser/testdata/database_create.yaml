@@ -15,8 +15,8 @@ databases:
       cluster: production
       engine: Atomic
       comment: Full featured database
-    - name: '`user-database`'
+    - name: user-database
       engine: Atomic
-    - name: '`order-db`'
-      cluster: '`prod-cluster`'
+    - name: order-db
+      cluster: prod-cluster
       comment: Database with special chars

@@ -144,36 +144,36 @@ tables:
           data_type: String
           codec: CODEC(LZ4HC(9))
       order_by: expression
-    - name: '`order-table`'
-      database: '`user-db`'
+    - name: order-table
+      database: user-db
       operation: CREATE
       engine: MergeTree
       columns:
-        - name: '`user-id`'
+        - name: user-id
           data_type: UInt64
-        - name: '`order-id`'
+        - name: order-id
           data_type: String
-        - name: '`order-date`'
+        - name: order-date
           data_type: Date
-        - name: '`select`'
+        - name: select
           data_type: String
-        - name: '`group`'
+        - name: group
           data_type: LowCardinality(String)
       order_by: expression
-    - name: '`user-events`'
-      database: '`analytics-db`'
-      cluster: '`prod-cluster`'
+    - name: user-events
+      database: analytics-db
+      cluster: prod-cluster
       operation: CREATE
       if_not_exists: true
       engine: ReplicatedMergeTree('/clickhouse/tables/{shard}/user-events', '{replica}')
       columns:
         - name: id
           data_type: UInt64
-        - name: '`user-name`'
+        - name: user-name
           data_type: String
         - name: event_type
           data_type: String
-        - name: '`created-at`'
+        - name: created-at
           data_type: DateTime
           default: DEFAULT expression
       order_by: expression
@@ -272,40 +272,40 @@ tables:
       operation: CREATE
       engine: Distributed('datawarehouse', 'sessions', 'web_vital_events_by_hour_local', rand())
       columns:
-        - name: '`received_at`'
+        - name: received_at
           data_type: DateTime
           codec: CODEC(DoubleDelta)
-        - name: '`pv_domain`'
+        - name: pv_domain
           data_type: LowCardinality(String)
-        - name: '`pv_browser`'
+        - name: pv_browser
           data_type: LowCardinality(String)
-        - name: '`pv_os`'
+        - name: pv_os
           data_type: LowCardinality(String)
-        - name: '`pv_device_type`'
+        - name: pv_device_type
           data_type: LowCardinality(String)
-        - name: '`pv_country_code`'
+        - name: pv_country_code
           data_type: LowCardinality(String)
-        - name: '`current_url`'
+        - name: current_url
           data_type: String
-        - name: '`current_ref_url`'
+        - name: current_ref_url
           data_type: String
-        - name: '`vital_name`'
+        - name: vital_name
           data_type: LowCardinality(String)
-        - name: '`vital_rating`'
+        - name: vital_rating
           data_type: LowCardinality(String)
-        - name: '`value_avg`'
+        - name: value_avg
           data_type: AggregateFunction(avg, Float64)
-        - name: '`value_min`'
+        - name: value_min
           data_type: AggregateFunction(min, Float64)
-        - name: '`value_max`'
+        - name: value_max
           data_type: AggregateFunction(max, Float64)
-        - name: '`value_quantiles`'
+        - name: value_quantiles
           data_type: AggregateFunction(quantiles(0.5, 0.75, 0.9, 0.95, 0.99), Float64)
-        - name: '`count`'
+        - name: count
           data_type: AggregateFunction(sum, UInt32)
-        - name: '`users`'
+        - name: users
           data_type: AggregateFunction(uniq, UUID)
-        - name: '`visits`'
+        - name: visits
           data_type: AggregateFunction(uniq, UUID)
     - name: daily_aggregates
       database: metrics

@@ -1,7 +1,7 @@
 views:
-    - name: '`events_by_hour_mv`'
-      database: '`demo`'
-      cluster: '`test`'
+    - name: events_by_hour_mv
+      database: demo
+      cluster: test
       materialized: true
       operation: CREATE
-      to: '`demo`.`events_by_hour_local`'
+      to: demo.events_by_hour_local

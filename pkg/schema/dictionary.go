@@ -725,36 +725,9 @@ func simpleDSLParamEqual(a, b *parser.SimpleDSLParam) bool {
 	return expressionEqual(a.Value, b.Value)
 }
 
-// expressionEqual compares expressions for semantic equality
-// This handles different formatting of the same logical value
+// expressionEqual compares expressions using AST-based structural equality
 func expressionEqual(a, b parser.Expression) bool {
-	// Get the string representations
-	aStr := a.String()
-	bStr := b.String()
-
-	// If they're exactly equal, we're done
-	if aStr == bStr {
-		return true
-	}
-
-	// Normalize whitespace and quotes for comparison
-	aNorm := normalizeExpressionValue(aStr)
-	bNorm := normalizeExpressionValue(bStr)
-
-	return aNorm == bNorm
-}
-
-// normalizeExpressionValue normalizes expression strings for comparison
-func normalizeExpressionValue(value string) string {
-	// Trim and normalize whitespace
-	normalized := strings.TrimSpace(value)
-	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
-
-	// Normalize quotes - remove spaces around quotes
-	normalized = regexp.MustCompile(`\s*'\s*`).ReplaceAllString(normalized, "'")
-	normalized = regexp.MustCompile(`\s*"\s*`).ReplaceAllString(normalized, "\"")
-
-	return normalized
+	return a.Equal(&b)
 }
 
 // generateCreateDictionarySQL generates CREATE DICTIONARY SQL from dictionary info

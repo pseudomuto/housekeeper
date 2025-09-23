@@ -75,6 +75,11 @@ func runContainer(ctx context.Context, w io.Writer, opts docker.DockerOptions, c
 		for _, migration := range migrationDir.Migrations {
 			fmt.Fprintf(w, "Applying migration %s...\n", migration.Version)
 			for _, stmt := range migration.Statements {
+				// Skip comment-only statements as they cannot be executed
+				if stmt.CommentStatement != nil {
+					continue
+				}
+
 				// Format and execute the statement
 				buf := new(bytes.Buffer)
 				if err := fmtr.Format(buf, stmt); err != nil {

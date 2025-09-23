@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -43,30 +42,31 @@ type (
 	// This structure contains all the properties needed for table comparison and
 	// migration generation, including columns, engine, and other table options.
 	TableInfo struct {
-		Name        string            // Table name (without database prefix)
-		Database    string            // Database name (empty if not specified)
-		Engine      string            // Engine type and parameters (e.g., "MergeTree()", "ReplicatedMergeTree('/path', 'replica')")
-		Cluster     string            // Cluster name for distributed tables
-		Comment     string            // Table comment
-		OrderBy     string            // ORDER BY expression
-		PartitionBy string            // PARTITION BY expression
-		PrimaryKey  string            // PRIMARY KEY expression
-		SampleBy    string            // SAMPLE BY expression
-		TTL         string            // Table-level TTL expression
-		Settings    map[string]string // Table settings
-		Columns     []ColumnInfo      // Column definitions
-		OrReplace   bool              // Whether CREATE OR REPLACE was used
-		IfNotExists bool              // Whether IF NOT EXISTS was used
+		Name        string              // Table name (without database prefix)
+		Database    string              // Database name (empty if not specified)
+		Engine      *parser.TableEngine // Engine AST
+		Cluster     string              // Cluster name for distributed tables
+		Comment     string              // Table comment
+		OrderBy     *parser.Expression  // ORDER BY expression AST
+		PartitionBy *parser.Expression  // PARTITION BY expression AST
+		PrimaryKey  *parser.Expression  // PRIMARY KEY expression AST
+		SampleBy    *parser.Expression  // SAMPLE BY expression AST
+		TTL         *parser.Expression  // Table-level TTL expression AST
+		Settings    map[string]string   // Table settings
+		Columns     []ColumnInfo        // Column definitions
+		OrReplace   bool                // Whether CREATE OR REPLACE was used
+		IfNotExists bool                // Whether IF NOT EXISTS was used
 	}
 
 	// ColumnInfo represents a single column definition
 	ColumnInfo struct {
-		Name     string // Column name
-		DataType string // Full data type specification (e.g., "Nullable(String)", "Array(UInt64)")
-		Default  string // Default value specification (e.g., "DEFAULT 'value'", "MATERIALIZED expr")
-		Codec    string // Compression codec (e.g., "CODEC(ZSTD)")
-		TTL      string // Column-level TTL
-		Comment  string // Column comment
+		Name        string              // Column name
+		DataType    *parser.DataType    // Data type AST
+		DefaultType string              // Default type: DEFAULT, MATERIALIZED, EPHEMERAL, ALIAS
+		Default     *parser.Expression  // Default expression AST
+		Codec       *parser.CodecClause // Codec AST
+		TTL         *parser.TTLClause   // TTL AST
+		Comment     string              // Column comment
 	}
 
 	// ColumnDiff represents a difference in column definitions
@@ -90,6 +90,92 @@ const (
 	// ColumnDiffModify indicates a column needs to be modified
 	ColumnDiffModify ColumnDiffType = "MODIFY"
 )
+
+// Equal compares two TableInfo instances for equality using AST comparison
+func (t *TableInfo) Equal(other *TableInfo) bool {
+	if t == nil && other == nil {
+		return true
+	}
+	if t == nil || other == nil {
+		return false
+	}
+
+	// Compare basic fields
+	if t.Name != other.Name || t.Database != other.Database || t.Cluster != other.Cluster ||
+		!strings.EqualFold(t.Comment, other.Comment) {
+		return false
+	}
+
+	// Compare AST fields
+	if !equalAST(t.Engine, other.Engine) ||
+		!equalAST(t.OrderBy, other.OrderBy) ||
+		!equalAST(t.PartitionBy, other.PartitionBy) ||
+		!equalAST(t.PrimaryKey, other.PrimaryKey) ||
+		!equalAST(t.SampleBy, other.SampleBy) ||
+		!equalAST(t.TTL, other.TTL) {
+		return false
+	}
+
+	// Compare settings
+	if !settingsEqual(t.Settings, other.Settings) {
+		return false
+	}
+
+	// Compare columns
+	if len(t.Columns) != len(other.Columns) {
+		return false
+	}
+	for i := range t.Columns {
+		if !t.Columns[i].Equal(other.Columns[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two ColumnInfo instances for equality using AST comparison
+func (c ColumnInfo) Equal(other ColumnInfo) bool {
+	if c.Name != other.Name || c.DefaultType != other.DefaultType ||
+		!strings.EqualFold(c.Comment, other.Comment) {
+		return false
+	}
+
+	// Compare DataType AST
+	if !equalAST(c.DataType, other.DataType) {
+		return false
+	}
+
+	// Compare Default expression AST
+	if !equalAST(c.Default, other.Default) {
+		return false
+	}
+
+	// Compare Codec AST
+	if !equalAST(c.Codec, other.Codec) {
+		return false
+	}
+
+	// Compare TTL AST
+	if !equalAST(c.TTL, other.TTL) {
+		return false
+	}
+
+	return true
+}
+
+// settingsEqual compares two settings maps for equality
+func settingsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
 
 // compareTables compares current and target parsed schemas to find table differences.
 // It identifies tables that need to be created, altered, dropped, or renamed.
@@ -182,25 +268,25 @@ func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 				tableInfo.Cluster = *table.OnCluster
 			}
 			if table.Engine != nil {
-				tableInfo.Engine = formatTableEngine(table.Engine)
+				tableInfo.Engine = table.Engine
 			}
 			if table.Comment != nil {
 				tableInfo.Comment = removeQuotes(*table.Comment)
 			}
 			if orderBy := table.GetOrderBy(); orderBy != nil {
-				tableInfo.OrderBy = orderBy.Expression.String()
+				tableInfo.OrderBy = &orderBy.Expression
 			}
 			if partitionBy := table.GetPartitionBy(); partitionBy != nil {
-				tableInfo.PartitionBy = partitionBy.Expression.String()
+				tableInfo.PartitionBy = &partitionBy.Expression
 			}
 			if primaryKey := table.GetPrimaryKey(); primaryKey != nil {
-				tableInfo.PrimaryKey = primaryKey.Expression.String()
+				tableInfo.PrimaryKey = &primaryKey.Expression
 			}
 			if sampleBy := table.GetSampleBy(); sampleBy != nil {
-				tableInfo.SampleBy = sampleBy.Expression.String()
+				tableInfo.SampleBy = &sampleBy.Expression
 			}
 			if ttl := table.GetTTL(); ttl != nil {
-				tableInfo.TTL = ttl.Expression.String()
+				tableInfo.TTL = &ttl.Expression
 			}
 			if settings := table.GetSettings(); settings != nil {
 				settingMap := make(map[string]string)
@@ -219,16 +305,17 @@ func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 				col := element.Column
 				columnInfo := ColumnInfo{
 					Name:     normalizeIdentifier(col.Name),
-					DataType: formatColumnDataType(col.DataType),
+					DataType: col.DataType,
 				}
 				if defaultClause := col.GetDefault(); defaultClause != nil {
-					columnInfo.Default = defaultClause.Type + " " + defaultClause.Expression.String()
+					columnInfo.DefaultType = defaultClause.Type
+					columnInfo.Default = &defaultClause.Expression
 				}
 				if codecClause := col.GetCodec(); codecClause != nil {
-					columnInfo.Codec = formatColumnCodec(codecClause)
+					columnInfo.Codec = codecClause
 				}
 				if ttlClause := col.GetTTL(); ttlClause != nil {
-					columnInfo.TTL = ttlClause.Expression.String()
+					columnInfo.TTL = ttlClause
 				}
 				if comment := col.GetComment(); comment != nil {
 					columnInfo.Comment = removeQuotes(*comment)
@@ -267,47 +354,19 @@ func findRenamedTable(targetTable *TableInfo, currentTables, targetTables map[st
 
 // tablesEqual compares two tables for equality
 func tablesEqual(a, b *TableInfo) bool {
-	clusterMatch := a.Cluster == b.Cluster
-
-	return a.Engine == b.Engine &&
-		clusterMatch &&
-		a.Comment == b.Comment &&
-		a.OrderBy == b.OrderBy &&
-		a.PartitionBy == b.PartitionBy &&
-		a.PrimaryKey == b.PrimaryKey &&
-		a.SampleBy == b.SampleBy &&
-		a.TTL == b.TTL &&
-		reflect.DeepEqual(a.Settings, b.Settings) &&
-		columnsEqual(a.Columns, b.Columns)
+	return a.Equal(b)
 }
 
 // tablesEqualIgnoringName compares two tables for equality ignoring name and database
 func tablesEqualIgnoringName(a, b *TableInfo) bool {
-	clusterMatch := a.Cluster == b.Cluster
-
-	return a.Engine == b.Engine &&
-		clusterMatch &&
-		a.Comment == b.Comment &&
-		a.OrderBy == b.OrderBy &&
-		a.PartitionBy == b.PartitionBy &&
-		a.PrimaryKey == b.PrimaryKey &&
-		a.SampleBy == b.SampleBy &&
-		a.TTL == b.TTL &&
-		reflect.DeepEqual(a.Settings, b.Settings) &&
-		columnsEqual(a.Columns, b.Columns)
-}
-
-// columnsEqual compares two column slices for equality using case-insensitive comment comparison
-func columnsEqual(a, b []ColumnInfo) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if !columnInfoEqual(a[i], b[i]) {
-			return false
-		}
-	}
-	return true
+	// Create copies with normalized names to use Equal()
+	aCopy := *a
+	bCopy := *b
+	aCopy.Name = ""
+	aCopy.Database = ""
+	bCopy.Name = ""
+	bCopy.Database = ""
+	return aCopy.Equal(&bCopy)
 }
 
 // compareColumns compares column definitions and returns differences
@@ -328,8 +387,8 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 	// Find columns to add or modify
 	for _, targetCol := range target {
 		if currentCol, exists := currentCols[targetCol.Name]; exists {
-			// Column exists - check for changes using case-insensitive comment comparison
-			if !columnInfoEqual(currentCol, targetCol) {
+			// Column exists - check for changes using Equal() method
+			if !currentCol.Equal(targetCol) {
 				diffs = append(diffs, ColumnDiff{
 					Type:        ColumnDiffModify,
 					ColumnName:  targetCol.Name,
@@ -441,18 +500,20 @@ func writeTableColumns(sql *strings.Builder, table *TableInfo) {
 		sql.WriteString("    ")
 		sql.WriteString(col.Name)
 		sql.WriteString(" ")
-		sql.WriteString(col.DataType)
-		if col.Default != "" {
+		sql.WriteString(formatColumnDataType(col.DataType))
+		if col.DefaultType != "" && col.Default != nil {
 			sql.WriteString(" ")
-			sql.WriteString(col.Default)
-		}
-		if col.Codec != "" {
+			sql.WriteString(col.DefaultType)
 			sql.WriteString(" ")
-			sql.WriteString(col.Codec)
+			sql.WriteString(col.Default.String())
 		}
-		if col.TTL != "" {
+		if col.Codec != nil {
+			sql.WriteString(" ")
+			sql.WriteString(formatColumnCodec(col.Codec))
+		}
+		if col.TTL != nil {
 			sql.WriteString(" TTL ")
-			sql.WriteString(col.TTL)
+			sql.WriteString(col.TTL.Expression.String())
 		}
 		if col.Comment != "" {
 			sql.WriteString(" COMMENT '")
@@ -465,31 +526,31 @@ func writeTableColumns(sql *strings.Builder, table *TableInfo) {
 
 func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 	// Engine
-	if table.Engine != "" {
+	if table.Engine != nil {
 		sql.WriteString("\nENGINE = ")
-		sql.WriteString(table.Engine)
+		sql.WriteString(formatTableEngine(table.Engine))
 	}
 
 	// Table options
-	if table.OrderBy != "" {
+	if table.OrderBy != nil {
 		sql.WriteString("\nORDER BY ")
-		sql.WriteString(table.OrderBy)
+		sql.WriteString(table.OrderBy.String())
 	}
-	if table.PartitionBy != "" {
+	if table.PartitionBy != nil {
 		sql.WriteString("\nPARTITION BY ")
-		sql.WriteString(table.PartitionBy)
+		sql.WriteString(table.PartitionBy.String())
 	}
-	if table.PrimaryKey != "" {
+	if table.PrimaryKey != nil {
 		sql.WriteString("\nPRIMARY KEY ")
-		sql.WriteString(table.PrimaryKey)
+		sql.WriteString(table.PrimaryKey.String())
 	}
-	if table.SampleBy != "" {
+	if table.SampleBy != nil {
 		sql.WriteString("\nSAMPLE BY ")
-		sql.WriteString(table.SampleBy)
+		sql.WriteString(table.SampleBy.String())
 	}
-	if table.TTL != "" {
+	if table.TTL != nil {
 		sql.WriteString("\nTTL ")
-		sql.WriteString(table.TTL)
+		sql.WriteString(table.TTL.String())
 	}
 
 	// Settings
@@ -577,18 +638,20 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 			sql.WriteString("ADD COLUMN ")
 			sql.WriteString(change.Target.Name)
 			sql.WriteString(" ")
-			sql.WriteString(change.Target.DataType)
-			if change.Target.Default != "" {
+			sql.WriteString(formatColumnDataType(change.Target.DataType))
+			if change.Target.DefaultType != "" && change.Target.Default != nil {
 				sql.WriteString(" ")
-				sql.WriteString(change.Target.Default)
-			}
-			if change.Target.Codec != "" {
+				sql.WriteString(change.Target.DefaultType)
 				sql.WriteString(" ")
-				sql.WriteString(change.Target.Codec)
+				sql.WriteString(change.Target.Default.String())
 			}
-			if change.Target.TTL != "" {
+			if change.Target.Codec != nil {
+				sql.WriteString(" ")
+				sql.WriteString(formatColumnCodec(change.Target.Codec))
+			}
+			if change.Target.TTL != nil {
 				sql.WriteString(" TTL ")
-				sql.WriteString(change.Target.TTL)
+				sql.WriteString(change.Target.TTL.Expression.String())
 			}
 			if change.Target.Comment != "" {
 				sql.WriteString(" COMMENT '")
@@ -602,18 +665,20 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 			sql.WriteString("MODIFY COLUMN ")
 			sql.WriteString(change.Target.Name)
 			sql.WriteString(" ")
-			sql.WriteString(change.Target.DataType)
-			if change.Target.Default != "" {
+			sql.WriteString(formatColumnDataType(change.Target.DataType))
+			if change.Target.DefaultType != "" && change.Target.Default != nil {
 				sql.WriteString(" ")
-				sql.WriteString(change.Target.Default)
-			}
-			if change.Target.Codec != "" {
+				sql.WriteString(change.Target.DefaultType)
 				sql.WriteString(" ")
-				sql.WriteString(change.Target.Codec)
+				sql.WriteString(change.Target.Default.String())
 			}
-			if change.Target.TTL != "" {
+			if change.Target.Codec != nil {
+				sql.WriteString(" ")
+				sql.WriteString(formatColumnCodec(change.Target.Codec))
+			}
+			if change.Target.TTL != nil {
 				sql.WriteString(" TTL ")
-				sql.WriteString(change.Target.TTL)
+				sql.WriteString(change.Target.TTL.Expression.String())
 			}
 			if change.Target.Comment != "" {
 				sql.WriteString(" COMMENT '")

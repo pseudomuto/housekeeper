@@ -51,17 +51,6 @@ func normalizeIdentifier(s string) string {
 	return s
 }
 
-// columnInfoEqual compares two ColumnInfo structs for equality with case-insensitive comment comparison.
-// This handles ClickHouse's automatic keyword normalization in comments (e.g., "from" vs "FROM").
-func columnInfoEqual(a, b ColumnInfo) bool {
-	return a.Name == b.Name &&
-		a.DataType == b.DataType &&
-		a.Default == b.Default &&
-		a.Codec == b.Codec &&
-		a.TTL == b.TTL &&
-		strings.EqualFold(a.Comment, b.Comment) // Case-insensitive comment comparison
-}
-
 // AST-based expression comparison functions
 
 // expressionsAreEqual compares expressions using AST-based structural comparison
