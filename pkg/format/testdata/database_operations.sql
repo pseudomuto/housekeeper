@@ -1,3 +1,5 @@
+-- Database operations with various features
+
 CREATE DATABASE `analytics` ENGINE = Atomic COMMENT 'Analytics database';
 
 CREATE DATABASE IF NOT EXISTS `warehouse` ON CLUSTER `production` ENGINE = MaterializedMySQL('localhost:3306', 'warehouse', 'user', 'password') COMMENT 'Data warehouse';

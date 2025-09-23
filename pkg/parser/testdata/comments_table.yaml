@@ -1,0 +1,10 @@
+tables:
+    - name: demo
+      operation: CREATE
+      engine: MergeTree
+      columns:
+        - name: id
+          data_type: UInt32
+        - name: name
+          data_type: LowCardinality(String)
+      primary_key: expression

@@ -10,95 +10,101 @@ import (
 
 // createRole formats a CREATE ROLE statement
 func (f *Formatter) createRole(w io.Writer, stmt *parser.CreateRoleStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	// CREATE [OR REPLACE] ROLE [IF NOT EXISTS]
-	if stmt.OrReplace {
-		parts = append(parts, f.keyword("CREATE OR REPLACE ROLE"))
-	} else {
-		parts = append(parts, f.keyword("CREATE ROLE"))
-		if stmt.IfNotExists {
-			parts = append(parts, f.keyword("IF NOT EXISTS"))
+		// CREATE [OR REPLACE] ROLE [IF NOT EXISTS]
+		if stmt.OrReplace {
+			parts = append(parts, f.keyword("CREATE OR REPLACE ROLE"))
+		} else {
+			parts = append(parts, f.keyword("CREATE ROLE"))
+			if stmt.IfNotExists {
+				parts = append(parts, f.keyword("IF NOT EXISTS"))
+			}
 		}
-	}
 
-	// Role name
-	parts = append(parts, f.identifier(stmt.Name))
+		// Role name
+		parts = append(parts, f.identifier(stmt.Name))
 
-	// ON CLUSTER
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		// ON CLUSTER
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	// SETTINGS
-	if stmt.Settings != nil {
-		parts = append(parts, f.formatRoleSettings(stmt.Settings))
-	}
+		// SETTINGS
+		if stmt.Settings != nil {
+			parts = append(parts, f.formatRoleSettings(stmt.Settings))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // alterRole formats an ALTER ROLE statement
 func (f *Formatter) alterRole(w io.Writer, stmt *parser.AlterRoleStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	// ALTER ROLE
-	parts = append(parts, f.keyword("ALTER ROLE"))
+		// ALTER ROLE
+		parts = append(parts, f.keyword("ALTER ROLE"))
 
-	// IF EXISTS
-	if stmt.IfExists {
-		parts = append(parts, f.keyword("IF EXISTS"))
-	}
+		// IF EXISTS
+		if stmt.IfExists {
+			parts = append(parts, f.keyword("IF EXISTS"))
+		}
 
-	// Role name
-	parts = append(parts, f.identifier(stmt.Name))
+		// Role name
+		parts = append(parts, f.identifier(stmt.Name))
 
-	// ON CLUSTER
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		// ON CLUSTER
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	// RENAME TO
-	if stmt.RenameTo != nil {
-		parts = append(parts, f.keyword("RENAME TO"), f.identifier(*stmt.RenameTo))
-	}
+		// RENAME TO
+		if stmt.RenameTo != nil {
+			parts = append(parts, f.keyword("RENAME TO"), f.identifier(*stmt.RenameTo))
+		}
 
-	// SETTINGS
-	if stmt.Settings != nil {
-		parts = append(parts, f.formatRoleSettings(stmt.Settings))
-	}
+		// SETTINGS
+		if stmt.Settings != nil {
+			parts = append(parts, f.formatRoleSettings(stmt.Settings))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // dropRole formats a DROP ROLE statement
 func (f *Formatter) dropRole(w io.Writer, stmt *parser.DropRoleStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	// DROP ROLE
-	parts = append(parts, f.keyword("DROP ROLE"))
+		// DROP ROLE
+		parts = append(parts, f.keyword("DROP ROLE"))
 
-	// IF EXISTS
-	if stmt.IfExists {
-		parts = append(parts, f.keyword("IF EXISTS"))
-	}
+		// IF EXISTS
+		if stmt.IfExists {
+			parts = append(parts, f.keyword("IF EXISTS"))
+		}
 
-	// Role names
-	names := make([]string, len(stmt.Names))
-	for i, name := range stmt.Names {
-		names[i] = f.identifier(name)
-	}
-	parts = append(parts, strings.Join(names, ", "))
+		// Role names
+		names := make([]string, len(stmt.Names))
+		for i, name := range stmt.Names {
+			names[i] = f.identifier(name)
+		}
+		parts = append(parts, strings.Join(names, ", "))
 
-	// ON CLUSTER
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		// ON CLUSTER
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // setRole formats a SET ROLE statement
@@ -159,77 +165,81 @@ func (f *Formatter) setDefaultRole(w io.Writer, stmt *parser.SetDefaultRoleStmt)
 
 // grant formats a GRANT statement
 func (f *Formatter) grant(w io.Writer, stmt *parser.GrantStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	// GRANT
-	parts = append(parts, f.keyword("GRANT"))
+		// GRANT
+		parts = append(parts, f.keyword("GRANT"))
 
-	// Privileges
-	parts = append(parts, f.formatPrivilegeList(stmt.Privileges))
+		// Privileges
+		parts = append(parts, f.formatPrivilegeList(stmt.Privileges))
 
-	// ON CLUSTER
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		// ON CLUSTER
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	// ON target
-	if stmt.On != nil {
-		parts = append(parts, f.keyword("ON"), f.formatGrantTarget(stmt.On))
-	}
+		// ON target
+		if stmt.On != nil {
+			parts = append(parts, f.keyword("ON"), f.formatGrantTarget(stmt.On))
+		}
 
-	// TO grantees
-	parts = append(parts, f.keyword("TO"))
-	parts = append(parts, f.formatGranteeList(stmt.To))
+		// TO grantees
+		parts = append(parts, f.keyword("TO"))
+		parts = append(parts, f.formatGranteeList(stmt.To))
 
-	// WITH options
-	if stmt.WithGrant {
-		parts = append(parts, f.keyword("WITH GRANT OPTION"))
-	}
-	if stmt.WithReplace {
-		parts = append(parts, f.keyword("WITH REPLACE OPTION"))
-	}
-	if stmt.WithAdmin {
-		parts = append(parts, f.keyword("WITH ADMIN OPTION"))
-	}
+		// WITH options
+		if stmt.WithGrant {
+			parts = append(parts, f.keyword("WITH GRANT OPTION"))
+		}
+		if stmt.WithReplace {
+			parts = append(parts, f.keyword("WITH REPLACE OPTION"))
+		}
+		if stmt.WithAdmin {
+			parts = append(parts, f.keyword("WITH ADMIN OPTION"))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // revoke formats a REVOKE statement
 func (f *Formatter) revoke(w io.Writer, stmt *parser.RevokeStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	// REVOKE
-	parts = append(parts, f.keyword("REVOKE"))
+		// REVOKE
+		parts = append(parts, f.keyword("REVOKE"))
 
-	// Options
-	if stmt.GrantOption {
-		parts = append(parts, f.keyword("GRANT OPTION FOR"))
-	}
-	if stmt.AdminOption {
-		parts = append(parts, f.keyword("ADMIN OPTION FOR"))
-	}
+		// Options
+		if stmt.GrantOption {
+			parts = append(parts, f.keyword("GRANT OPTION FOR"))
+		}
+		if stmt.AdminOption {
+			parts = append(parts, f.keyword("ADMIN OPTION FOR"))
+		}
 
-	// Privileges
-	parts = append(parts, f.formatPrivilegeList(stmt.Privileges))
+		// Privileges
+		parts = append(parts, f.formatPrivilegeList(stmt.Privileges))
 
-	// ON CLUSTER
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		// ON CLUSTER
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	// ON target
-	if stmt.On != nil {
-		parts = append(parts, f.keyword("ON"), f.formatGrantTarget(stmt.On))
-	}
+		// ON target
+		if stmt.On != nil {
+			parts = append(parts, f.keyword("ON"), f.formatGrantTarget(stmt.On))
+		}
 
-	// FROM grantees
-	parts = append(parts, f.keyword("FROM"))
-	parts = append(parts, f.formatGranteeList(stmt.From))
+		// FROM grantees
+		parts = append(parts, f.keyword("FROM"))
+		parts = append(parts, f.formatGranteeList(stmt.From))
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // formatRoleSettings formats role settings

@@ -21,29 +21,34 @@ type (
 	//   [SETTINGS name=value, ...]
 	//   [COMMENT 'comment']
 	CreateTableStmt struct {
-		Create      string         `parser:"'CREATE'"`
-		OrReplace   bool           `parser:"@('OR' 'REPLACE')?"`
-		Table       string         `parser:"'TABLE'"`
-		IfNotExists bool           `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database    *string        `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name        string         `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Elements    []TableElement `parser:"'(' @@ (',' @@)* ')'"`
-		Engine      *TableEngine   `parser:"@@"`
-		Clauses     []TableClause  `parser:"@@*"`
-		Comment     *string        `parser:"('COMMENT' @String)?"`
-		Semicolon   bool           `parser:"';'"`
+		LeadingComments   []string       `parser:"@(Comment | MultilineComment)*"`
+		Create            string         `parser:"'CREATE'"`
+		OrReplace         bool           `parser:"@('OR' 'REPLACE')?"`
+		Table             string         `parser:"'TABLE'"`
+		IfNotExists       bool           `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Database          *string        `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name              string         `parser:"@(Ident | BacktickIdent)"`
+		OnCluster         *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Elements          []TableElement `parser:"'(' @@ (',' @@)* ')'"`
+		PreEngineComments []string       `parser:"@(Comment | MultilineComment)*"`
+		Engine            *TableEngine   `parser:"@@"`
+		Clauses           []TableClause  `parser:"@@*"`
+		Comment           *string        `parser:"('COMMENT' @String)?"`
+		TrailingComments  []string       `parser:"@(Comment | MultilineComment)*"`
+		Semicolon         bool           `parser:"';'"`
 	}
 
 	// TableClause represents any clause that can appear after ENGINE in a CREATE TABLE statement
 	// This allows clauses to be specified in any order
 	TableClause struct {
-		OrderBy     *OrderByClause       `parser:"@@"`
-		PartitionBy *PartitionByClause   `parser:"| @@"`
-		PrimaryKey  *PrimaryKeyClause    `parser:"| @@"`
-		SampleBy    *SampleByClause      `parser:"| @@"`
-		TTL         *TableTTLClause      `parser:"| @@"`
-		Settings    *TableSettingsClause `parser:"| @@"`
+		LeadingComments  []string             `parser:"@(Comment | MultilineComment)*"`
+		OrderBy          *OrderByClause       `parser:"@@"`
+		PartitionBy      *PartitionByClause   `parser:"| @@"`
+		PrimaryKey       *PrimaryKeyClause    `parser:"| @@"`
+		SampleBy         *SampleByClause      `parser:"| @@"`
+		TTL              *TableTTLClause      `parser:"| @@"`
+		Settings         *TableSettingsClause `parser:"| @@"`
+		TrailingComments []string             `parser:"@(Comment | MultilineComment)*"`
 	}
 
 	// TableElement represents an element within table definition (column, index, constraint, or projection)
@@ -142,9 +147,10 @@ type (
 	// TableEngine represents the ENGINE clause for tables
 	// Examples: ENGINE = MergeTree(), ENGINE = ReplicatedMergeTree('/path', 'replica')
 	TableEngine struct {
-		Engine     string            `parser:"'ENGINE' '='"`
-		Name       string            `parser:"@(Ident | BacktickIdent)"`
-		Parameters []EngineParameter `parser:"('(' (@@ (',' @@)*)? ')')?"`
+		Engine           string            `parser:"'ENGINE' '='"`
+		Name             string            `parser:"@(Ident | BacktickIdent)"`
+		Parameters       []EngineParameter `parser:"('(' (@@ (',' @@)*)? ')')?"`
+		TrailingComments []string          `parser:"@(Comment | MultilineComment)*"`
 	}
 
 	// EngineParameter represents a parameter in an ENGINE clause
@@ -202,12 +208,14 @@ type (
 	// ClickHouse syntax:
 	//   ATTACH TABLE [IF NOT EXISTS] [db.]table_name [ON CLUSTER cluster]
 	AttachTableStmt struct {
-		Attach      string  `parser:"'ATTACH' 'TABLE'"`
-		IfNotExists bool    `parser:"('IF' 'NOT' 'EXISTS')?"`
-		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name        string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Semicolon   bool    `parser:"';'"`
+		LeadingComments  []string `parser:"@(Comment | MultilineComment)*"`
+		Attach           string   `parser:"'ATTACH' 'TABLE'"`
+		IfNotExists      bool     `parser:"('IF' 'NOT' 'EXISTS')?"`
+		Database         *string  `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name             string   `parser:"@(Ident | BacktickIdent)"`
+		OnCluster        *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		TrailingComments []string `parser:"@(Comment | MultilineComment)*"`
+		Semicolon        bool     `parser:"';'"`
 	}
 
 	// DetachTableStmt represents a DETACH TABLE statement.
@@ -215,14 +223,16 @@ type (
 	// ClickHouse syntax:
 	//   DETACH TABLE [IF EXISTS] [db.]table_name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]
 	DetachTableStmt struct {
-		Detach      string  `parser:"'DETACH' 'TABLE'"`
-		IfExists    bool    `parser:"('IF' 'EXISTS')?"`
-		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name        string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Permanently bool    `parser:"@'PERMANENTLY'?"`
-		Sync        bool    `parser:"@'SYNC'?"`
-		Semicolon   bool    `parser:"';'"`
+		LeadingComments  []string `parser:"@(Comment | MultilineComment)*"`
+		Detach           string   `parser:"'DETACH' 'TABLE'"`
+		IfExists         bool     `parser:"('IF' 'EXISTS')?"`
+		Database         *string  `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name             string   `parser:"@(Ident | BacktickIdent)"`
+		OnCluster        *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Permanently      bool     `parser:"@'PERMANENTLY'?"`
+		Sync             bool     `parser:"@'SYNC'?"`
+		TrailingComments []string `parser:"@(Comment | MultilineComment)*"`
+		Semicolon        bool     `parser:"';'"`
 	}
 
 	// DropTableStmt represents a DROP TABLE statement.
@@ -230,13 +240,15 @@ type (
 	// ClickHouse syntax:
 	//   DROP TABLE [IF EXISTS] [db.]table_name [ON CLUSTER cluster] [SYNC]
 	DropTableStmt struct {
-		Drop      string  `parser:"'DROP' 'TABLE'"`
-		IfExists  bool    `parser:"('IF' 'EXISTS')?"`
-		Database  *string `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name      string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Sync      bool    `parser:"@'SYNC'?"`
-		Semicolon bool    `parser:"';'"`
+		LeadingComments  []string `parser:"@(Comment | MultilineComment)*"`
+		Drop             string   `parser:"'DROP' 'TABLE'"`
+		IfExists         bool     `parser:"('IF' 'EXISTS')?"`
+		Database         *string  `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name             string   `parser:"@(Ident | BacktickIdent)"`
+		OnCluster        *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Sync             bool     `parser:"@'SYNC'?"`
+		TrailingComments []string `parser:"@(Comment | MultilineComment)*"`
+		Semicolon        bool     `parser:"';'"`
 	}
 
 	// RenameTableStmt represents a RENAME TABLE statement.
@@ -244,10 +256,12 @@ type (
 	// ClickHouse syntax:
 	//   RENAME TABLE [db.]table1 TO [db.]table2, [db.]table3 TO [db.]table4, ... [ON CLUSTER cluster]
 	RenameTableStmt struct {
-		Rename    string        `parser:"'RENAME' 'TABLE'"`
-		Renames   []TableRename `parser:"@@ (',' @@)*"`
-		OnCluster *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Semicolon bool          `parser:"';'"`
+		LeadingComments  []string      `parser:"@(Comment | MultilineComment)*"`
+		Rename           string        `parser:"'RENAME' 'TABLE'"`
+		Renames          []TableRename `parser:"@@ (',' @@)*"`
+		OnCluster        *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		TrailingComments []string      `parser:"@(Comment | MultilineComment)*"`
+		Semicolon        bool          `parser:"';'"`
 	}
 
 	// TableRename represents a single table rename operation
@@ -275,13 +289,15 @@ type (
 	// - MODIFY ORDER BY/SAMPLE BY
 	// - MODIFY SETTING
 	AlterTableStmt struct {
-		Alter      string                `parser:"'ALTER' 'TABLE'"`
-		IfExists   bool                  `parser:"@('IF' 'EXISTS')?"`
-		Database   *string               `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name       string                `parser:"@(Ident | BacktickIdent)"`
-		OnCluster  *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Operations []AlterTableOperation `parser:"@@ (',' @@)*"`
-		Semicolon  bool                  `parser:"';'"`
+		LeadingComments  []string              `parser:"@(Comment | MultilineComment)*"`
+		Alter            string                `parser:"'ALTER' 'TABLE'"`
+		IfExists         bool                  `parser:"@('IF' 'EXISTS')?"`
+		Database         *string               `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name             string                `parser:"@(Ident | BacktickIdent)"`
+		OnCluster        *string               `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Operations       []AlterTableOperation `parser:"@@ (',' @@)*"`
+		TrailingComments []string              `parser:"@(Comment | MultilineComment)*"`
+		Semicolon        bool                  `parser:"';'"`
 	}
 
 	// AlterTableOperation represents a single ALTER TABLE operation
@@ -633,4 +649,64 @@ func (p *EngineParameter) Value() string {
 		return *p.Ident
 	}
 	return ""
+}
+
+// GetLeadingComments returns the leading comments for CreateTableStmt
+func (s *CreateTableStmt) GetLeadingComments() []string {
+	return s.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for CreateTableStmt
+func (s *CreateTableStmt) GetTrailingComments() []string {
+	return s.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for AttachTableStmt
+func (s *AttachTableStmt) GetLeadingComments() []string {
+	return s.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for AttachTableStmt
+func (s *AttachTableStmt) GetTrailingComments() []string {
+	return s.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for DetachTableStmt
+func (s *DetachTableStmt) GetLeadingComments() []string {
+	return s.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for DetachTableStmt
+func (s *DetachTableStmt) GetTrailingComments() []string {
+	return s.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for DropTableStmt
+func (s *DropTableStmt) GetLeadingComments() []string {
+	return s.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for DropTableStmt
+func (s *DropTableStmt) GetTrailingComments() []string {
+	return s.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for RenameTableStmt
+func (s *RenameTableStmt) GetLeadingComments() []string {
+	return s.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for RenameTableStmt
+func (s *RenameTableStmt) GetTrailingComments() []string {
+	return s.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for AlterTableStmt
+func (s *AlterTableStmt) GetLeadingComments() []string {
+	return s.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for AlterTableStmt
+func (s *AlterTableStmt) GetTrailingComments() []string {
+	return s.TrailingComments
 }

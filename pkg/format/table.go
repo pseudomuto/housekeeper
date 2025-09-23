@@ -9,9 +9,36 @@ import (
 
 // CreateTable formats a CREATE TABLE statement with proper indentation and alignment
 func (f *Formatter) createTable(w io.Writer, stmt *parser.CreateTableStmt) error {
-	lines := make([]string, 0, 10) // Approximate capacity for typical table
+	// Format leading comments first
+	if err := f.formatLeadingComments(w, stmt.LeadingComments); err != nil {
+		return err
+	}
 
-	// Build the header line
+	lines := f.buildCreateTableHeader(stmt)
+	lines = f.appendTableElements(lines, stmt.Elements)
+	lines = append(lines, ")")
+
+	// Format pre-engine comments
+	if len(stmt.PreEngineComments) > 0 {
+		if err := f.writePreEngineComments(w, lines, stmt.PreEngineComments); err != nil {
+			return err
+		}
+		lines = lines[:0] // Clear lines since we already wrote them
+	}
+
+	lines = f.appendEngineAndClauses(lines, stmt)
+
+	// Write the main statement
+	if _, err := w.Write([]byte(strings.Join(lines, "\n") + ";")); err != nil {
+		return err
+	}
+
+	// Format trailing comments
+	return f.formatTrailingComments(w, stmt.TrailingComments)
+}
+
+// buildCreateTableHeader builds the CREATE TABLE header line
+func (f *Formatter) buildCreateTableHeader(stmt *parser.CreateTableStmt) []string {
 	var headerParts []string
 	headerParts = append(headerParts, f.keyword("CREATE"))
 
@@ -31,228 +58,352 @@ func (f *Formatter) createTable(w io.Writer, stmt *parser.CreateTableStmt) error
 		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
 	}
 
-	lines = append(lines, strings.Join(headerParts, " ")+" (")
+	return []string{strings.Join(headerParts, " ") + " ("}
+}
 
-	// Format table elements (columns, indexes, constraints)
-	if len(stmt.Elements) > 0 {
-		// Convert slice to pointer slice
-		var elements []*parser.TableElement
-		for i := range stmt.Elements {
-			elements = append(elements, &stmt.Elements[i])
-		}
-		elementLines := f.formatTableElements(elements)
-		for i, line := range elementLines {
-			prefix := f.indent(1)
-			if i < len(elementLines)-1 {
-				line += ","
-			}
-			lines = append(lines, prefix+line)
-		}
+// appendTableElements formats and appends table elements (columns, indexes, constraints)
+func (f *Formatter) appendTableElements(lines []string, elements []parser.TableElement) []string {
+	// Convert slice to pointer slice
+	elementPtrs := make([]*parser.TableElement, len(elements))
+	for i := range elements {
+		elementPtrs[i] = &elements[i]
 	}
 
-	lines = append(lines, ")")
+	maxWidth := f.calculateMaxNameWidth(elementPtrs)
 
+	// Format each element individually with proper comma handling
+	for i, element := range elementPtrs {
+		// Handle leading comments for this element
+		if element.Column != nil && len(element.Column.LeadingComments) > 0 {
+			for _, comment := range element.Column.LeadingComments {
+				lines = append(lines, f.indent(1)+comment)
+			}
+		}
+
+		// Format the actual element
+		elementLine := f.formatTableElement(element, maxWidth)
+
+		// Add comma to element (but not to the last element)
+		if i < len(elementPtrs)-1 {
+			elementLine += ","
+		}
+
+		lines = append(lines, f.indent(1)+elementLine)
+	}
+
+	return lines
+}
+
+// formatTableElement formats a single table element (column, index, or constraint)
+func (f *Formatter) formatTableElement(element *parser.TableElement, maxWidth int) string {
+	if element.Column != nil {
+		return f.formatColumnWithoutComments(element.Column, maxWidth)
+	}
+	if element.Index != nil {
+		return f.formatIndexDefinition(element.Index)
+	}
+	if element.Constraint != nil {
+		return f.formatConstraintDefinition(element.Constraint)
+	}
+	return ""
+}
+
+// writePreEngineComments writes lines and pre-engine comments to writer
+func (f *Formatter) writePreEngineComments(w io.Writer, lines []string, comments []string) error {
+	if _, err := w.Write([]byte(strings.Join(lines, "\n"))); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("\n")); err != nil {
+		return err
+	}
+	if err := f.formatCommentSequence(w, comments); err != nil {
+		return err
+	}
+	_, err := w.Write([]byte("\n"))
+	return err
+}
+
+// appendEngineAndClauses appends engine and table clauses to lines
+func (f *Formatter) appendEngineAndClauses(lines []string, stmt *parser.CreateTableStmt) []string {
 	// Format table options
 	if stmt.Engine != nil {
 		lines = append(lines, f.keyword("ENGINE")+" = "+f.formatTableEngine(stmt.Engine))
+
+		// Handle trailing comments from engine
+		if len(stmt.Engine.TrailingComments) > 0 {
+			lines = append(lines, stmt.Engine.TrailingComments...)
+		}
 	}
 
-	if orderBy := stmt.GetOrderBy(); orderBy != nil {
-		lines = append(lines, f.keyword("ORDER BY")+" "+f.formatExpression(&orderBy.Expression))
-	}
+	// Sort clauses into canonical ClickHouse order before formatting
+	sortedClauses := f.sortTableClauses(stmt.Clauses)
 
-	if partitionBy := stmt.GetPartitionBy(); partitionBy != nil {
-		lines = append(lines, f.keyword("PARTITION BY")+" "+f.formatExpression(&partitionBy.Expression))
-	}
-
-	if primaryKey := stmt.GetPrimaryKey(); primaryKey != nil {
-		lines = append(lines, f.keyword("PRIMARY KEY")+" "+f.formatExpression(&primaryKey.Expression))
-	}
-
-	if sampleBy := stmt.GetSampleBy(); sampleBy != nil {
-		lines = append(lines, f.keyword("SAMPLE BY")+" "+f.formatExpression(&sampleBy.Expression))
-	}
-
-	if ttl := stmt.GetTTL(); ttl != nil {
-		lines = append(lines, f.keyword("TTL")+" "+f.formatExpression(&ttl.Expression))
-	}
-
-	if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
-		lines = append(lines, f.formatTableSettings(settings))
+	// Format clauses with their comments
+	for _, clause := range sortedClauses {
+		lines = f.appendTableClause(lines, clause)
 	}
 
 	if stmt.Comment != nil {
 		lines = append(lines, f.keyword("COMMENT")+" "+*stmt.Comment)
 	}
 
-	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
-	return err
+	return lines
 }
 
-// AlterTable formats an ALTER TABLE statement
-func (f *Formatter) alterTable(w io.Writer, stmt *parser.AlterTableStmt) error {
-	lines := make([]string, 0, len(stmt.Operations)+1) // Header + operations
-
-	// Header
-	var headerParts []string
-	headerParts = append(headerParts, f.keyword("ALTER TABLE"))
-	headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
-
-	if stmt.OnCluster != nil {
-		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+// appendTableClause appends a single table clause with its comments
+func (f *Formatter) appendTableClause(lines []string, clause *parser.TableClause) []string {
+	// Leading comments for the clause
+	if len(clause.LeadingComments) > 0 {
+		lines = append(lines, clause.LeadingComments...)
 	}
 
-	lines = append(lines, strings.Join(headerParts, " "))
+	// Format the clause itself
+	lines = append(lines, f.formatTableClauseType(clause))
 
-	// Format operations
-	for i, op := range stmt.Operations {
-		opLine := f.indent(1) + f.formatAlterOperation(&op)
-
-		// Add comma to the end of the line if not the last operation
-		if i < len(stmt.Operations)-1 {
-			opLine += ","
-		}
-
-		lines = append(lines, opLine)
-	}
-
-	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
-	return err
-}
-
-// AttachTable formats an ATTACH TABLE statement
-func (f *Formatter) attachTable(w io.Writer, stmt *parser.AttachTableStmt) error {
-	var parts []string
-
-	parts = append(parts, f.keyword("ATTACH TABLE"))
-
-	if stmt.IfNotExists {
-		parts = append(parts, f.keyword("IF NOT EXISTS"))
-	}
-
-	parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
-
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
-}
-
-// DetachTable formats a DETACH TABLE statement
-func (f *Formatter) detachTable(w io.Writer, stmt *parser.DetachTableStmt) error {
-	var parts []string
-
-	parts = append(parts, f.keyword("DETACH TABLE"))
-
-	if stmt.IfExists {
-		parts = append(parts, f.keyword("IF EXISTS"))
-	}
-
-	parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
-
-	if stmt.Permanently {
-		parts = append(parts, f.keyword("PERMANENTLY"))
-	}
-
-	if stmt.Sync {
-		parts = append(parts, f.keyword("SYNC"))
-	}
-
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
-}
-
-// DropTable formats a DROP TABLE statement
-func (f *Formatter) dropTable(w io.Writer, stmt *parser.DropTableStmt) error {
-	var parts []string
-
-	parts = append(parts, f.keyword("DROP TABLE"))
-
-	if stmt.IfExists {
-		parts = append(parts, f.keyword("IF EXISTS"))
-	}
-
-	parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
-
-	if stmt.Sync {
-		parts = append(parts, f.keyword("SYNC"))
-	}
-
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
-}
-
-// RenameTable formats a RENAME TABLE statement
-func (f *Formatter) renameTable(w io.Writer, stmt *parser.RenameTableStmt) error {
-	var parts []string
-
-	parts = append(parts, f.keyword("RENAME TABLE"))
-
-	renameParts := make([]string, 0, len(stmt.Renames))
-	for _, rename := range stmt.Renames {
-		fromName := f.qualifiedName(rename.FromDatabase, rename.FromName)
-		toName := f.qualifiedName(rename.ToDatabase, rename.ToName)
-		renameParts = append(renameParts, fromName+" "+f.keyword("TO")+" "+toName)
-	}
-	parts = append(parts, strings.Join(renameParts, ", "))
-
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
-
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
-}
-
-// formatTableElements formats table elements with optional alignment
-func (f *Formatter) formatTableElements(elements []*parser.TableElement) []string {
-	if len(elements) == 0 {
-		return nil
-	}
-
-	lines := make([]string, 0, len(elements)) // Pre-allocate based on element count
-	var maxNameWidth int
-
-	// Calculate alignment if enabled
-	if f.options.AlignColumns {
-		for _, element := range elements {
-			if element.Column != nil {
-				// Include backticks in width calculation
-				nameLen := len(f.identifier(element.Column.Name))
-				if nameLen > maxNameWidth {
-					maxNameWidth = nameLen
-				}
-			}
-		}
-	}
-
-	// Format each element
-	for _, element := range elements {
-		if element.Column != nil {
-			lines = append(lines, f.formatColumn(element.Column, maxNameWidth))
-		} else if element.Index != nil {
-			lines = append(lines, f.formatIndexDefinition(element.Index))
-		} else if element.Constraint != nil {
-			lines = append(lines, f.formatConstraintDefinition(element.Constraint))
-		}
+	// Trailing comments for the clause
+	if len(clause.TrailingComments) > 0 {
+		lines = append(lines, clause.TrailingComments...)
 	}
 
 	return lines
 }
 
-// formatColumn formats a single column definition
+// sortTableClauses sorts table clauses into ClickHouse's canonical order.
+// This ensures consistent output regardless of parse order or ClickHouse version.
+// Order: ORDER BY, PARTITION BY, PRIMARY KEY, SAMPLE BY, TTL, SETTINGS
+func (f *Formatter) sortTableClauses(clauses []parser.TableClause) []*parser.TableClause {
+	if len(clauses) == 0 {
+		return nil
+	}
+
+	result := make([]*parser.TableClause, 0, len(clauses))
+
+	// Convert to pointers for consistent handling
+	for i := range clauses {
+		result = append(result, &clauses[i])
+	}
+
+	// Sort by clause type priority
+	clausePriority := func(clause *parser.TableClause) int {
+		switch {
+		case clause.OrderBy != nil:
+			return 1
+		case clause.PartitionBy != nil:
+			return 2
+		case clause.PrimaryKey != nil:
+			return 3
+		case clause.SampleBy != nil:
+			return 4
+		case clause.TTL != nil:
+			return 5
+		case clause.Settings != nil:
+			return 6
+		default:
+			return 99
+		}
+	}
+
+	// Simple insertion sort since we typically have very few clauses
+	for i := 1; i < len(result); i++ {
+		j := i
+		for j > 0 && clausePriority(result[j]) < clausePriority(result[j-1]) {
+			result[j], result[j-1] = result[j-1], result[j]
+			j--
+		}
+	}
+
+	return result
+}
+
+// formatTableClauseType formats a specific type of table clause
+func (f *Formatter) formatTableClauseType(clause *parser.TableClause) string {
+	if clause.OrderBy != nil {
+		return f.keyword("ORDER BY") + " " + f.formatExpression(&clause.OrderBy.Expression)
+	}
+	if clause.PartitionBy != nil {
+		return f.keyword("PARTITION BY") + " " + f.formatExpression(&clause.PartitionBy.Expression)
+	}
+	if clause.PrimaryKey != nil {
+		return f.keyword("PRIMARY KEY") + " " + f.formatExpression(&clause.PrimaryKey.Expression)
+	}
+	if clause.SampleBy != nil {
+		return f.keyword("SAMPLE BY") + " " + f.formatExpression(&clause.SampleBy.Expression)
+	}
+	if clause.TTL != nil {
+		return f.keyword("TTL") + " " + f.formatExpression(&clause.TTL.Expression)
+	}
+	if clause.Settings != nil && len(clause.Settings.Settings) > 0 {
+		return f.formatTableSettings(clause.Settings)
+	}
+	return ""
+}
+
+// formatLeadingComments formats leading comments with proper spacing
+func (f *Formatter) formatLeadingComments(w io.Writer, comments []string) error {
+	if len(comments) == 0 {
+		return nil
+	}
+	if err := f.formatCommentSequence(w, comments); err != nil {
+		return err
+	}
+	_, err := w.Write([]byte("\n\n"))
+	return err
+}
+
+// formatTrailingComments formats trailing comments with proper spacing
+func (f *Formatter) formatTrailingComments(w io.Writer, comments []string) error {
+	if len(comments) == 0 {
+		return nil
+	}
+	if _, err := w.Write([]byte("\n\n")); err != nil {
+		return err
+	}
+	return f.formatCommentSequence(w, comments)
+}
+
+// AlterTable formats an ALTER TABLE statement
+func (f *Formatter) alterTable(w io.Writer, stmt *parser.AlterTableStmt) error {
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		lines := make([]string, 0, len(stmt.Operations)+1) // Header + operations
+
+		// Header
+		var headerParts []string
+		headerParts = append(headerParts, f.keyword("ALTER TABLE"))
+		headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
+
+		if stmt.OnCluster != nil {
+			headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
+
+		lines = append(lines, strings.Join(headerParts, " "))
+
+		// Format operations
+		for i, op := range stmt.Operations {
+			opLine := f.indent(1) + f.formatAlterOperation(&op)
+
+			// Add comma to the end of the line if not the last operation
+			if i < len(stmt.Operations)-1 {
+				opLine += ","
+			}
+
+			lines = append(lines, opLine)
+		}
+
+		_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+		return err
+	})
+}
+
+// AttachTable formats an ATTACH TABLE statement
+func (f *Formatter) attachTable(w io.Writer, stmt *parser.AttachTableStmt) error {
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
+
+		parts = append(parts, f.keyword("ATTACH TABLE"))
+
+		if stmt.IfNotExists {
+			parts = append(parts, f.keyword("IF NOT EXISTS"))
+		}
+
+		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
+
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
+
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
+}
+
+// DetachTable formats a DETACH TABLE statement
+func (f *Formatter) detachTable(w io.Writer, stmt *parser.DetachTableStmt) error {
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
+
+		parts = append(parts, f.keyword("DETACH TABLE"))
+
+		if stmt.IfExists {
+			parts = append(parts, f.keyword("IF EXISTS"))
+		}
+
+		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
+
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
+
+		if stmt.Permanently {
+			parts = append(parts, f.keyword("PERMANENTLY"))
+		}
+
+		if stmt.Sync {
+			parts = append(parts, f.keyword("SYNC"))
+		}
+
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
+}
+
+// DropTable formats a DROP TABLE statement
+func (f *Formatter) dropTable(w io.Writer, stmt *parser.DropTableStmt) error {
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
+
+		parts = append(parts, f.keyword("DROP TABLE"))
+
+		if stmt.IfExists {
+			parts = append(parts, f.keyword("IF EXISTS"))
+		}
+
+		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
+
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
+
+		if stmt.Sync {
+			parts = append(parts, f.keyword("SYNC"))
+		}
+
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
+}
+
+// RenameTable formats a RENAME TABLE statement
+func (f *Formatter) renameTable(w io.Writer, stmt *parser.RenameTableStmt) error {
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
+
+		parts = append(parts, f.keyword("RENAME TABLE"))
+
+		renameParts := make([]string, 0, len(stmt.Renames))
+		for _, rename := range stmt.Renames {
+			fromName := f.qualifiedName(rename.FromDatabase, rename.FromName)
+			toName := f.qualifiedName(rename.ToDatabase, rename.ToName)
+			renameParts = append(renameParts, fromName+" "+f.keyword("TO")+" "+toName)
+		}
+		parts = append(parts, strings.Join(renameParts, ", "))
+
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
+
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
+}
+
+// formatColumn formats a single column definition with leading and trailing comments
 func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 	var parts []string
+
+	// Leading comments (inline with column)
+	if len(col.LeadingComments) > 0 {
+		parts = append(parts, col.LeadingComments...)
+	}
 
 	// Column name (with optional alignment)
 	name := f.identifier(col.Name)
@@ -266,6 +417,49 @@ func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 
 	// Note: ClickHouse columns don't have NULL/NOT NULL constraints like other databases
 	// Instead they use Nullable(T) data types
+
+	// Default value
+	if defaultClause := col.GetDefault(); defaultClause != nil {
+		parts = append(parts, f.keyword(defaultClause.Type))
+		parts = append(parts, f.formatExpression(&defaultClause.Expression))
+	}
+
+	// Codec
+	if codecClause := col.GetCodec(); codecClause != nil {
+		parts = append(parts, f.formatCodec(codecClause))
+	}
+
+	// TTL
+	if ttlClause := col.GetTTL(); ttlClause != nil {
+		parts = append(parts, f.keyword("TTL"), f.formatExpression(&ttlClause.Expression))
+	}
+
+	// Comment
+	if comment := col.GetComment(); comment != nil {
+		parts = append(parts, f.keyword("COMMENT"), *comment)
+	}
+
+	// Trailing comments (inline with column)
+	if len(col.TrailingComments) > 0 {
+		parts = append(parts, col.TrailingComments...)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatColumnWithoutComments formats a single column definition without leading/trailing comments
+func (f *Formatter) formatColumnWithoutComments(col *parser.Column, alignWidth int) string {
+	var parts []string
+
+	// Column name (with optional alignment)
+	name := f.identifier(col.Name)
+	if alignWidth > 0 && f.options.AlignColumns {
+		name = padRight(name, alignWidth)
+	}
+	parts = append(parts, name)
+
+	// Data type
+	parts = append(parts, f.formatDataType(col.DataType))
 
 	// Default value
 	if defaultClause := col.GetDefault(); defaultClause != nil {
@@ -612,6 +806,25 @@ func (f *Formatter) formatDropConstraint(op *parser.DropConstraintOperation) str
 	parts = append(parts, f.identifier(op.Name))
 
 	return strings.Join(parts, " ")
+}
+
+// calculateMaxNameWidth calculates the maximum column name width for alignment
+func (f *Formatter) calculateMaxNameWidth(elements []*parser.TableElement) int {
+	if !f.options.AlignColumns {
+		return 0
+	}
+
+	var maxNameWidth int
+	for _, element := range elements {
+		if element.Column != nil {
+			// Include backticks in width calculation
+			nameLen := len(f.identifier(element.Column.Name))
+			if nameLen > maxNameWidth {
+				maxNameWidth = nameLen
+			}
+		}
+	}
+	return maxNameWidth
 }
 
 // padRight pads a string to the specified width with spaces

@@ -1,3 +1,5 @@
+-- Dictionary operations with complex configurations
+
 CREATE DICTIONARY `analytics`.`users_dict` (
     `id`         UInt64 IS_OBJECT_ID,
     `name`       String INJECTIVE,

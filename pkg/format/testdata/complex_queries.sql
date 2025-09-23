@@ -1,3 +1,5 @@
+-- Complex SELECT statements
+
 SELECT
     `user_id`,
     toDate(`timestamp`) AS `date`,

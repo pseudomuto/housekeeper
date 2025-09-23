@@ -273,6 +273,11 @@ COMMENT 'Table used to track migrations';
 
 	// Execute bootstrap statements
 	for _, stmt := range sql.Statements {
+		// Skip comment-only statements as they cannot be executed
+		if stmt.CommentStatement != nil {
+			continue
+		}
+
 		stmtSQL, err := e.formatStatement(stmt)
 		if err != nil {
 			return errors.Wrap(err, "failed to format bootstrap statement")
@@ -325,6 +330,13 @@ func (e *Executor) executeMigration(ctx context.Context, migration *migrator.Mig
 
 	for i := startIndex; i < len(migration.Statements); i++ {
 		stmt := migration.Statements[i]
+
+		// Skip comment-only statements as they cannot be executed
+		if stmt.CommentStatement != nil {
+			statementsApplied++
+			continue
+		}
+
 		stmtSQL, err := e.formatStatement(stmt)
 		if err != nil {
 			executionError = errors.Wrapf(err, "failed to format statement %d", i+1)

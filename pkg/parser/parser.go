@@ -30,7 +30,7 @@ var (
 	// parser is the participle parser instance for ClickHouse DDL
 	parser = participle.MustBuild[SQL](
 		participle.Lexer(clickhouseLexer),
-		participle.Elide("Comment", "MultilineComment", "Whitespace"),
+		participle.Elide("Whitespace"), // Only elide whitespace, capture comments
 		participle.UseLookahead(4),
 		participle.CaseInsensitive("Ident"), // Make identifier matching case-insensitive for keywords
 	)
@@ -111,7 +111,8 @@ type (
 
 	// Statement represents any DDL or DML statement
 	Statement struct {
-		CreateDatabase        *CreateDatabaseStmt        `parser:"@@"`
+		CommentStatement      *CommentStatement          `parser:"@@"`
+		CreateDatabase        *CreateDatabaseStmt        `parser:"| @@"`
 		AlterDatabase         *AlterDatabaseStmt         `parser:"| @@"`
 		AttachDatabase        *AttachDatabaseStmt        `parser:"| @@"`
 		DetachDatabase        *DetachDatabaseStmt        `parser:"| @@"`
@@ -145,6 +146,11 @@ type (
 		RenameTable           *RenameTableStmt           `parser:"| @@"`
 		RenameDictionary      *RenameDictionaryStmt      `parser:"| @@"`
 		SelectStatement       *TopLevelSelectStatement   `parser:"| @@"`
+	}
+
+	// CommentStatement represents a standalone comment line (file-level comments, imports, etc.)
+	CommentStatement struct {
+		Comment string `parser:"@(Comment | MultilineComment)"`
 	}
 )
 

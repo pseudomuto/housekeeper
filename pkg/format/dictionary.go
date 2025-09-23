@@ -9,174 +9,184 @@ import (
 
 // CreateDictionary formats a CREATE DICTIONARY statement
 func (f *Formatter) createDictionary(w io.Writer, stmt *parser.CreateDictionaryStmt) error {
-	var lines []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var lines []string
 
-	// Build the header line
-	var headerParts []string
-	headerParts = append(headerParts, f.keyword("CREATE"))
+		// Build the header line
+		var headerParts []string
+		headerParts = append(headerParts, f.keyword("CREATE"))
 
-	if stmt.OrReplace {
-		headerParts = append(headerParts, f.keyword("OR REPLACE"))
-	}
+		if stmt.OrReplace {
+			headerParts = append(headerParts, f.keyword("OR REPLACE"))
+		}
 
-	headerParts = append(headerParts, f.keyword("DICTIONARY"))
+		headerParts = append(headerParts, f.keyword("DICTIONARY"))
 
-	if stmt.IfNotExists != nil {
-		headerParts = append(headerParts, f.keyword("IF NOT EXISTS"))
-	}
+		if stmt.IfNotExists != nil {
+			headerParts = append(headerParts, f.keyword("IF NOT EXISTS"))
+		}
 
-	headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
+		headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
 
-	if stmt.OnCluster != nil {
-		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		if stmt.OnCluster != nil {
+			headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	lines = append(lines, strings.Join(headerParts, " ")+" (")
+		lines = append(lines, strings.Join(headerParts, " ")+" (")
 
-	// Format dictionary columns
-	if len(stmt.Columns) > 0 {
-		columnLines := f.formatDictionaryColumns(stmt.Columns)
-		for i, line := range columnLines {
-			prefix := f.indent(1)
-			if i < len(columnLines)-1 {
-				line += ","
+		// Format dictionary columns
+		if len(stmt.Columns) > 0 {
+			columnLines := f.formatDictionaryColumns(stmt.Columns)
+			for i, line := range columnLines {
+				prefix := f.indent(1)
+				if i < len(columnLines)-1 {
+					line += ","
+				}
+				lines = append(lines, prefix+line)
 			}
-			lines = append(lines, prefix+line)
 		}
-	}
 
-	lines = append(lines, ")")
+		lines = append(lines, ")")
 
-	// PRIMARY KEY
-	if primaryKey := stmt.GetPrimaryKey(); primaryKey != nil {
-		var keys []string
-		for _, key := range primaryKey.Keys {
-			keys = append(keys, f.identifier(key))
+		// PRIMARY KEY
+		if primaryKey := stmt.GetPrimaryKey(); primaryKey != nil {
+			var keys []string
+			for _, key := range primaryKey.Keys {
+				keys = append(keys, f.identifier(key))
+			}
+			lines = append(lines, f.keyword("PRIMARY KEY")+" "+strings.Join(keys, ", "))
 		}
-		lines = append(lines, f.keyword("PRIMARY KEY")+" "+strings.Join(keys, ", "))
-	}
 
-	// SOURCE
-	if source := stmt.GetSource(); source != nil {
-		lines = append(lines, f.formatDictionarySource(source))
-	}
+		// SOURCE
+		if source := stmt.GetSource(); source != nil {
+			lines = append(lines, f.formatDictionarySource(source))
+		}
 
-	// LAYOUT
-	if layout := stmt.GetLayout(); layout != nil {
-		lines = append(lines, f.formatDictionaryLayout(layout))
-	}
+		// LAYOUT
+		if layout := stmt.GetLayout(); layout != nil {
+			lines = append(lines, f.formatDictionaryLayout(layout))
+		}
 
-	// LIFETIME
-	if lifetime := stmt.GetLifetime(); lifetime != nil {
-		lines = append(lines, f.formatDictionaryLifetime(lifetime))
-	}
+		// LIFETIME
+		if lifetime := stmt.GetLifetime(); lifetime != nil {
+			lines = append(lines, f.formatDictionaryLifetime(lifetime))
+		}
 
-	// SETTINGS
-	if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
-		lines = append(lines, f.formatDictionarySettings(settings))
-	}
+		// SETTINGS
+		if settings := stmt.GetSettings(); settings != nil && len(settings.Settings) > 0 {
+			lines = append(lines, f.formatDictionarySettings(settings))
+		}
 
-	// COMMENT
-	if stmt.Comment != nil {
-		lines = append(lines, f.keyword("COMMENT")+" "+*stmt.Comment)
-	}
+		// COMMENT
+		if stmt.Comment != nil {
+			lines = append(lines, f.keyword("COMMENT")+" "+*stmt.Comment)
+		}
 
-	_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(lines, "\n") + ";"))
+		return err
+	})
 }
 
 // AttachDictionary formats an ATTACH DICTIONARY statement
 func (f *Formatter) attachDictionary(w io.Writer, stmt *parser.AttachDictionaryStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	parts = append(parts, f.keyword("ATTACH DICTIONARY"))
+		parts = append(parts, f.keyword("ATTACH DICTIONARY"))
 
-	if stmt.IfNotExists != nil {
-		parts = append(parts, f.keyword("IF NOT EXISTS"))
-	}
+		if stmt.IfNotExists != nil {
+			parts = append(parts, f.keyword("IF NOT EXISTS"))
+		}
 
-	parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
 
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // DetachDictionary formats a DETACH DICTIONARY statement
 func (f *Formatter) detachDictionary(w io.Writer, stmt *parser.DetachDictionaryStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	parts = append(parts, f.keyword("DETACH DICTIONARY"))
+		parts = append(parts, f.keyword("DETACH DICTIONARY"))
 
-	if stmt.IfExists != nil {
-		parts = append(parts, f.keyword("IF EXISTS"))
-	}
+		if stmt.IfExists != nil {
+			parts = append(parts, f.keyword("IF EXISTS"))
+		}
 
-	parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
 
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	if stmt.Permanently != nil {
-		parts = append(parts, f.keyword("PERMANENTLY"))
-	}
+		if stmt.Permanently != nil {
+			parts = append(parts, f.keyword("PERMANENTLY"))
+		}
 
-	if stmt.Sync != nil {
-		parts = append(parts, f.keyword("SYNC"))
-	}
+		if stmt.Sync != nil {
+			parts = append(parts, f.keyword("SYNC"))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // DropDictionary formats a DROP DICTIONARY statement
 func (f *Formatter) dropDictionary(w io.Writer, stmt *parser.DropDictionaryStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	parts = append(parts, f.keyword("DROP DICTIONARY"))
+		parts = append(parts, f.keyword("DROP DICTIONARY"))
 
-	if stmt.IfExists != nil {
-		parts = append(parts, f.keyword("IF EXISTS"))
-	}
+		if stmt.IfExists != nil {
+			parts = append(parts, f.keyword("IF EXISTS"))
+		}
 
-	parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
 
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	if stmt.Sync != nil {
-		parts = append(parts, f.keyword("SYNC"))
-	}
+		if stmt.Sync != nil {
+			parts = append(parts, f.keyword("SYNC"))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // RenameDictionary formats a RENAME DICTIONARY statement
 func (f *Formatter) renameDictionary(w io.Writer, stmt *parser.RenameDictionaryStmt) error {
-	var parts []string
+	return f.formatWithComments(w, stmt, func(w io.Writer) error {
+		var parts []string
 
-	parts = append(parts, f.keyword("RENAME DICTIONARY"))
+		parts = append(parts, f.keyword("RENAME DICTIONARY"))
 
-	renameParts := make([]string, 0, len(stmt.Renames))
-	for _, rename := range stmt.Renames {
-		fromName := f.qualifiedName(rename.FromDatabase, rename.FromName)
-		toName := f.qualifiedName(rename.ToDatabase, rename.ToName)
-		renameParts = append(renameParts, fromName+" "+f.keyword("TO")+" "+toName)
-	}
-	parts = append(parts, strings.Join(renameParts, ", "))
+		renameParts := make([]string, 0, len(stmt.Renames))
+		for _, rename := range stmt.Renames {
+			fromName := f.qualifiedName(rename.FromDatabase, rename.FromName)
+			toName := f.qualifiedName(rename.ToDatabase, rename.ToName)
+			renameParts = append(renameParts, fromName+" "+f.keyword("TO")+" "+toName)
+		}
+		parts = append(parts, strings.Join(renameParts, ", "))
 
-	if stmt.OnCluster != nil {
-		parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-	}
+		if stmt.OnCluster != nil {
+			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		}
 
-	_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-	return err
+		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
+		return err
+	})
 }
 
 // formatDictionaryColumns formats dictionary column definitions

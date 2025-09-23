@@ -1,3 +1,5 @@
+-- View operations with SELECT statements
+
 CREATE VIEW `analytics`.`daily_summary`
 AS SELECT
     toDate(`timestamp`) AS `date`,

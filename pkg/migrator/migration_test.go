@@ -49,16 +49,16 @@ func TestLoadMigration(t *testing.T) {
 			name:    "complex_migration",
 			version: "003_complex_schema",
 			sql: `CREATE DATABASE analytics ENGINE = Atomic;
-				  
+
 				  CREATE TABLE analytics.users (
 					  id UInt64,
 					  email String,
 					  created_at DateTime DEFAULT now(),
 					  metadata Map(String, String) DEFAULT map()
-				  ) ENGINE = MergeTree() 
+				  ) ENGINE = MergeTree()
 				  ORDER BY (id, created_at)
 				  PARTITION BY toYYYYMM(created_at);
-				  
+
 				  CREATE DICTIONARY analytics.user_dict (
 					  id UInt64 IS_OBJECT_ID,
 					  email String INJECTIVE
@@ -66,7 +66,7 @@ func TestLoadMigration(t *testing.T) {
 				  SOURCE(HTTP(url 'http://api.example.com/users'))
 				  LAYOUT(HASHED())
 				  LIFETIME(3600);
-				  
+
 				  CREATE MATERIALIZED VIEW analytics.daily_stats
 				  ENGINE = MergeTree() ORDER BY date
 				  AS SELECT toDate(created_at), count()
@@ -88,7 +88,7 @@ func TestLoadMigration(t *testing.T) {
 			version:     "005_comments",
 			sql:         "-- This is a comment\n/* Multi-line comment */",
 			wantErr:     false,
-			stmtCount:   0,
+			stmtCount:   2,
 			description: "Migration with only comments should parse successfully",
 		},
 		{
@@ -791,8 +791,8 @@ func TestMigrationDir_Validate_ComplexMigrations(t *testing.T) {
 			timestamp DateTime DEFAULT now(),
 			data Map(String, String) DEFAULT map(),
 			metadata Nullable(String)
-		) ENGINE = MergeTree() 
-		ORDER BY (id, timestamp) 
+		) ENGINE = MergeTree()
+		ORDER BY (id, timestamp)
 		PARTITION BY toYYYYMM(timestamp);`,
 		"20240101120200.sql": `CREATE MATERIALIZED VIEW analytics.daily_stats
 		ENGINE = MergeTree() ORDER BY date

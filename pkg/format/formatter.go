@@ -192,7 +192,8 @@ func FormatSQL(w io.Writer, opts FormatterOptions, sql *parser.SQL) error {
 // Format writes formatted SQL statements to the provided writer.
 //
 // Each statement is formatted according to the formatter's configuration and
-// written to the writer. Multiple statements are separated by double newlines.
+// written to the writer. Sequential comments have no blank lines between them,
+// while comments and SQL statements are separated by blank lines.
 // Any write errors are returned immediately.
 //
 // Parameters:
@@ -206,21 +207,36 @@ func (f *Formatter) Format(w io.Writer, statements ...*parser.Statement) error {
 	}
 
 	first := true
+	var prevWasComment bool
+
 	for _, stmt := range statements {
 		if stmt == nil {
 			continue
 		}
 
-		if !first {
-			if _, err := w.Write([]byte("\n\n")); err != nil {
-				return err
+		currentIsComment := stmt.CommentStatement != nil
+
+		if !first { // nolint: nestif
+			// Sequential comments: single newline
+			// Comment to SQL or SQL to comment: double newline
+			// SQL to SQL: double newline
+			if prevWasComment && currentIsComment {
+				if _, err := w.Write([]byte("\n")); err != nil {
+					return err
+				}
+			} else {
+				if _, err := w.Write([]byte("\n\n")); err != nil {
+					return err
+				}
 			}
 		}
 
 		if err := f.statement(w, stmt); err != nil {
 			return err
 		}
+
 		first = false
+		prevWasComment = currentIsComment
 	}
 	return nil
 }
@@ -373,6 +389,8 @@ func (f *Formatter) formatFunctionStatements(w io.Writer, stmt *parser.Statement
 // formatOtherStatements handles other statements
 func (f *Formatter) formatOtherStatements(w io.Writer, stmt *parser.Statement) error {
 	switch {
+	case stmt.CommentStatement != nil:
+		return f.formatCommentStatement(w, stmt.CommentStatement)
 	case stmt.SelectStatement != nil:
 		return f.selectStatement(w, stmt.SelectStatement)
 	}
@@ -400,4 +418,66 @@ func (f *Formatter) qualifiedName(database *string, name string) string {
 // identifier formats a single identifier with backticks
 func (f *Formatter) identifier(name string) string {
 	return utils.BacktickIdentifier(name)
+}
+
+// commentable represents any statement that can have leading and trailing comments
+type commentable interface {
+	GetLeadingComments() []string
+	GetTrailingComments() []string
+}
+
+// formatWithComments wraps statement formatting with automatic comment handling.
+// It formats leading comments, calls the provided format function for the core statement,
+// then formats trailing comments. This provides a DRY approach to comment handling
+// across all statement types.
+func (f *Formatter) formatWithComments(w io.Writer, stmt commentable, formatCore func(io.Writer) error) error {
+	// Format leading comments
+	if comments := stmt.GetLeadingComments(); len(comments) > 0 {
+		if err := f.formatCommentSequence(w, comments); err != nil {
+			return err
+		}
+		if _, err := w.Write([]byte("\n\n")); err != nil {
+			return err
+		}
+	}
+
+	// Format the core statement
+	if err := formatCore(w); err != nil {
+		return err
+	}
+
+	// Format trailing comments
+	if comments := stmt.GetTrailingComments(); len(comments) > 0 {
+		if _, err := w.Write([]byte("\n\n")); err != nil {
+			return err
+		}
+		if err := f.formatCommentSequence(w, comments); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// formatCommentStatement formats a standalone comment statement
+func (f *Formatter) formatCommentStatement(w io.Writer, stmt *parser.CommentStatement) error {
+	// Preserve comments exactly as they are
+	_, err := w.Write([]byte(stmt.Comment))
+	return err
+}
+
+// formatCommentSequence formats a sequence of comments with proper line breaks
+func (f *Formatter) formatCommentSequence(w io.Writer, comments []string) error {
+	for i, comment := range comments {
+		if i > 0 {
+			// Sequential comments: single newline only
+			if _, err := w.Write([]byte("\n")); err != nil {
+				return err
+			}
+		}
+		if _, err := w.Write([]byte(comment)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
