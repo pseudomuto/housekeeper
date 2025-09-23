@@ -348,3 +348,105 @@ func TestComplexNestedTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestDecimalTypeNormalization(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected struct {
+			typeName  string
+			precision string
+			scale     string
+		}
+	}{
+		{
+			name:  "Decimal32 with scale",
+			input: "amount Decimal32(3)",
+			expected: struct {
+				typeName  string
+				precision string
+				scale     string
+			}{"Decimal", "9", "3"},
+		},
+		{
+			name:  "Decimal64 with scale",
+			input: "price Decimal64(5)",
+			expected: struct {
+				typeName  string
+				precision string
+				scale     string
+			}{"Decimal", "18", "5"},
+		},
+		{
+			name:  "Decimal128 with scale",
+			input: "total Decimal128(10)",
+			expected: struct {
+				typeName  string
+				precision string
+				scale     string
+			}{"Decimal", "38", "10"},
+		},
+		{
+			name:  "Decimal256 with scale",
+			input: "large_value Decimal256(20)",
+			expected: struct {
+				typeName  string
+				precision string
+				scale     string
+			}{"Decimal", "76", "20"},
+		},
+		{
+			name:  "Nullable Decimal32",
+			input: "nullable_amount Nullable(Decimal32(2))",
+			expected: struct {
+				typeName  string
+				precision string
+				scale     string
+			}{"Decimal", "9", "2"},
+		},
+		{
+			name:  "Array of Decimal64",
+			input: "prices Array(Decimal64(4))",
+			expected: struct {
+				typeName  string
+				precision string
+				scale     string
+			}{"Decimal", "18", "4"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse the column
+			sql := fmt.Sprintf("CREATE TABLE test (%s) ENGINE = Memory();", tt.input)
+			sqlResult, err := ParseString(sql)
+			require.NoError(t, err)
+			require.NotNil(t, sqlResult)
+
+			// Extract column
+			require.Len(t, sqlResult.Statements, 1)
+			require.NotNil(t, sqlResult.Statements[0].CreateTable)
+			require.NotEmpty(t, sqlResult.Statements[0].CreateTable.Elements)
+			col := sqlResult.Statements[0].CreateTable.Elements[0].Column
+			require.NotNil(t, col)
+
+			// Verify normalization
+			var dataType *DataType
+			if col.DataType.Nullable != nil {
+				dataType = col.DataType.Nullable.Type
+			} else if col.DataType.Array != nil {
+				dataType = col.DataType.Array.Type
+			} else {
+				dataType = col.DataType
+			}
+
+			require.NotNil(t, dataType.Simple)
+			require.Equal(t, tt.expected.typeName, dataType.Simple.Name)
+			require.Len(t, dataType.Simple.Parameters, 2)
+			require.NotNil(t, dataType.Simple.Parameters[0].Number)
+			require.Equal(t, tt.expected.precision, *dataType.Simple.Parameters[0].Number)
+			require.NotNil(t, dataType.Simple.Parameters[1].Number)
+			require.Equal(t, tt.expected.scale, *dataType.Simple.Parameters[1].Number)
+		})
+	}
+}
