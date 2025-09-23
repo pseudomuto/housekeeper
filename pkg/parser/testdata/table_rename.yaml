@@ -54,15 +54,15 @@ tables:
       operation: RENAME
     - name: data_v1
       operation: RENAME
-    - name: '`old-table`'
-      cluster: '`prod-cluster`'
+    - name: old-table
+      cluster: prod-cluster
       operation: RENAME
-    - name: '`old-users`'
-      database: '`user-db`'
+    - name: old-users
+      database: user-db
       operation: RENAME
-    - name: '`select`'
-      database: '`order-db`'
+    - name: select
+      database: order-db
       operation: RENAME
-    - name: '`user-profiles`'
-      database: '`staging-db`'
+    - name: user-profiles
+      database: staging-db
       operation: RENAME

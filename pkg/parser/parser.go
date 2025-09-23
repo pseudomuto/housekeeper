@@ -33,8 +33,20 @@ var (
 		participle.Elide("Whitespace"), // Only elide whitespace, capture comments
 		participle.UseLookahead(4),
 		participle.CaseInsensitive("Ident"), // Make identifier matching case-insensitive for keywords
+		participle.Map(stripBackticksFromTokens, "BacktickIdent"),
 	)
 )
+
+// stripBackticksFromTokens strips backticks from BacktickIdent tokens during parsing
+// This ensures canonical representation: identifiers are stored WITHOUT backticks internally
+func stripBackticksFromTokens(token lexer.Token) (lexer.Token, error) {
+	// Strip leading and trailing backticks
+	value := token.Value
+	if len(value) >= 2 && value[0] == '`' && value[len(value)-1] == '`' {
+		token.Value = value[1 : len(value)-1]
+	}
+	return token, nil
+}
 
 // normalizeCase is no longer needed with case-insensitive parser
 func normalizeCase(sql string) string {

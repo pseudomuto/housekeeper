@@ -8,5 +8,5 @@ databases:
       cluster: production
     - name: db3
       cluster: production
-    - name: '`old-name`'
-      cluster: '`prod-cluster`'
+    - name: old-name
+      cluster: prod-cluster

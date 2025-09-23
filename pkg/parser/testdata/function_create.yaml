@@ -34,14 +34,14 @@ functions:
     - name: current_timestamp_utc
       operation: CREATE
       expression: expression
-    - name: '`my-special-function`'
+    - name: my-special-function
       operation: CREATE
       parameters:
         - value
       expression: expression
     - name: calc_percentage
       operation: CREATE
-      cluster: '`prod-cluster`'
+      cluster: prod-cluster
       parameters:
         - part
         - total

@@ -13,8 +13,8 @@ dictionaries:
       if_not_exists: true
     - name: simple_dict
       operation: CREATE
-    - name: '`order-lookup`'
-      database: '`user-dict`'
+    - name: order-lookup
+      database: user-dict
       operation: CREATE
     - name: reordered_dict
       comment: Dictionary with flexible clause ordering

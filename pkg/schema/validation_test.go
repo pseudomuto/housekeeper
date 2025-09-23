@@ -4,38 +4,57 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
+
+// Helper function to create a TableEngine from a name
+func makeEngine(name string) *parser.TableEngine {
+	if name == "" {
+		return nil
+	}
+	return &parser.TableEngine{Name: name}
+}
+
+// Helper function to create a simple DataType from a name
+func makeDataType(name string) *parser.DataType {
+	if name == "" {
+		return nil
+	}
+	return &parser.DataType{
+		Simple: &parser.SimpleType{Name: name},
+	}
+}
 
 func TestIsIntegrationEngine(t *testing.T) {
 	tests := []struct {
 		name     string
-		engine   string
+		engine   *parser.TableEngine
 		expected bool
 	}{
-		{"Kafka engine", "Kafka", true},
-		{"Kafka with params", "Kafka('topic', 'group')", true},
-		{"MySQL engine", "MySQL", true},
-		{"MySQL with params", "MySQL('host:3306', 'db', 'user', 'pass')", true},
-		{"PostgreSQL engine", "PostgreSQL", true},
-		{"RabbitMQ engine", "RabbitMQ", true},
-		{"MongoDB engine", "MongoDB", true},
-		{"S3 engine", "S3", true},
-		{"HDFS engine", "HDFS", true},
-		{"URL engine", "URL", true},
-		{"File engine", "File", true},
-		{"MergeTree engine", "MergeTree", false},
-		{"MergeTree with params", "MergeTree()", false},
-		{"ReplicatedMergeTree", "ReplicatedMergeTree('/path', 'replica')", false},
-		{"Memory engine", "Memory", false},
-		{"Distributed engine", "Distributed('cluster', 'db', 'table')", false},
-		{"Empty engine", "", false},
+		{"Kafka engine", makeEngine("Kafka"), true},
+		{"Kafka with params", makeEngine("Kafka"), true},
+		{"MySQL engine", makeEngine("MySQL"), true},
+		{"MySQL with params", makeEngine("MySQL"), true},
+		{"PostgreSQL engine", makeEngine("PostgreSQL"), true},
+		{"RabbitMQ engine", makeEngine("RabbitMQ"), true},
+		{"MongoDB engine", makeEngine("MongoDB"), true},
+		{"S3 engine", makeEngine("S3"), true},
+		{"HDFS engine", makeEngine("HDFS"), true},
+		{"URL engine", makeEngine("URL"), true},
+		{"File engine", makeEngine("File"), true},
+		{"MergeTree engine", makeEngine("MergeTree"), false},
+		{"MergeTree with params", makeEngine("MergeTree"), false},
+		{"ReplicatedMergeTree", makeEngine("ReplicatedMergeTree"), false},
+		{"Memory engine", makeEngine("Memory"), false},
+		{"Distributed engine", makeEngine("Distributed"), false},
+		{"Empty engine", nil, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isIntegrationEngine(tt.engine)
-			require.Equal(t, tt.expected, result, "Expected %v for engine %s", tt.expected, tt.engine)
+			require.Equal(t, tt.expected, result, "Expected %v for engine %v", tt.expected, tt.engine)
 		})
 	}
 }
@@ -76,7 +95,7 @@ func TestValidateTableOperation(t *testing.T) {
 			target: &TableInfo{
 				Name:     "events",
 				Database: "analytics",
-				Engine:   "MergeTree()",
+				Engine:   makeEngine("MergeTree"),
 			},
 			expectError: false,
 		},
@@ -85,14 +104,14 @@ func TestValidateTableOperation(t *testing.T) {
 			current: &TableInfo{
 				Name:     "kafka_events",
 				Database: "analytics",
-				Engine:   "Kafka('topic', 'group')",
+				Engine:   makeEngine("Kafka"),
 			},
 			target: &TableInfo{
 				Name:     "kafka_events",
 				Database: "analytics",
-				Engine:   "Kafka('topic', 'group')",
+				Engine:   makeEngine("Kafka"),
 				Columns: []ColumnInfo{
-					{Name: "new_col", DataType: "String"},
+					{Name: "new_col", DataType: makeDataType("String")},
 				},
 			},
 			expectError: false,
@@ -103,7 +122,7 @@ func TestValidateTableOperation(t *testing.T) {
 			target: &TableInfo{
 				Name:     "mysql_users",
 				Database: "analytics",
-				Engine:   "MySQL('host:3306', 'db', 'user', 'pass')",
+				Engine:   makeEngine("MySQL"),
 			},
 			expectError: false,
 		},
@@ -112,13 +131,13 @@ func TestValidateTableOperation(t *testing.T) {
 			current: &TableInfo{
 				Name:     "events",
 				Database: "analytics",
-				Engine:   "MergeTree()",
+				Engine:   makeEngine("MergeTree"),
 				Cluster:  "staging",
 			},
 			target: &TableInfo{
 				Name:     "events",
 				Database: "analytics",
-				Engine:   "MergeTree()",
+				Engine:   makeEngine("MergeTree"),
 				Cluster:  "production",
 			},
 			expectError: true,
@@ -129,12 +148,12 @@ func TestValidateTableOperation(t *testing.T) {
 			current: &TableInfo{
 				Name:     "events",
 				Database: "analytics",
-				Engine:   "MergeTree()",
+				Engine:   makeEngine("MergeTree"),
 			},
 			target: &TableInfo{
 				Name:     "events",
 				Database: "analytics",
-				Engine:   "ReplacingMergeTree()",
+				Engine:   makeEngine("ReplacingMergeTree"),
 			},
 			expectError: true,
 			errorType:   ErrUnsupported,
@@ -144,12 +163,12 @@ func TestValidateTableOperation(t *testing.T) {
 			current: &TableInfo{
 				Name:     "databases",
 				Database: "system",
-				Engine:   "SystemDatabases",
+				Engine:   makeEngine("SystemDatabases"),
 			},
 			target: &TableInfo{
 				Name:     "databases",
 				Database: "system",
-				Engine:   "SystemDatabases",
+				Engine:   makeEngine("SystemDatabases"),
 				Comment:  "Modified comment",
 			},
 			expectError: true,
@@ -161,7 +180,7 @@ func TestValidateTableOperation(t *testing.T) {
 			target: &TableInfo{
 				Name:     "custom_table",
 				Database: "system",
-				Engine:   "MergeTree()",
+				Engine:   makeEngine("MergeTree"),
 			},
 			expectError: true,
 			errorType:   ErrUnsupported,

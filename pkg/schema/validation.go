@@ -1,9 +1,10 @@
 package schema
 
 import (
-	"strings"
+	"reflect"
 
 	"github.com/pkg/errors"
+	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
 // Engine classifications for validation
@@ -29,13 +30,31 @@ var systemDatabases = map[string]bool{
 	"information_schema": true,
 }
 
-// isIntegrationEngine checks if an engine name represents an integration engine
-func isIntegrationEngine(engineName string) bool {
-	// Extract engine name without parameters
-	// e.g., "MySQL('host:3306', 'db', 'user', 'pass')" -> "MySQL"
-	parts := strings.Split(engineName, "(")
-	baseName := strings.TrimSpace(parts[0])
-	return integrationEngines[baseName]
+// equalAST is a generic helper for comparing AST types with Equal() methods
+func equalAST[T interface{ Equal(T) bool }](a, b T) bool {
+	// Use reflection to check if pointers are nil
+	aVal := reflect.ValueOf(a)
+	bVal := reflect.ValueOf(b)
+
+	aIsNil := !aVal.IsValid() || (aVal.Kind() == reflect.Ptr && aVal.IsNil())
+	bIsNil := !bVal.IsValid() || (bVal.Kind() == reflect.Ptr && bVal.IsNil())
+
+	if aIsNil && bIsNil {
+		return true
+	}
+	if aIsNil || bIsNil {
+		return false
+	}
+
+	return a.Equal(b)
+}
+
+// isIntegrationEngine checks if an engine represents an integration engine
+func isIntegrationEngine(engine *parser.TableEngine) bool {
+	if engine == nil {
+		return false
+	}
+	return integrationEngines[engine.Name]
 }
 
 // isSystemDatabase checks if a database name is a system database
@@ -58,11 +77,17 @@ func validateTableOperation(current, target *TableInfo) error {
 	}
 
 	// Category 4: Engine Type Changes
-	if current != nil && target != nil {
-		if current.Engine != target.Engine {
-			return errors.Wrapf(ErrUnsupported,
-				"cannot change engine from %s to %s: %v", current.Engine, target.Engine, ErrEngineChange)
+	if current != nil && target != nil && !equalAST(current.Engine, target.Engine) {
+		currentEngineName := ""
+		targetEngineName := ""
+		if current.Engine != nil {
+			currentEngineName = current.Engine.Name
 		}
+		if target.Engine != nil {
+			targetEngineName = target.Engine.Name
+		}
+		return errors.Wrapf(ErrUnsupported,
+			"cannot change engine from %s to %s: %v", currentEngineName, targetEngineName, ErrEngineChange)
 	}
 
 	// Category 7: System Object Protection

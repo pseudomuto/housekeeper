@@ -47,14 +47,14 @@ views:
       materialized: true
       operation: CREATE
       engine: MergeTree()ORDERBY(date,category)
-    - name: '`daily-summary`'
-      database: '`analytics-db`'
+    - name: daily-summary
+      database: analytics-db
       operation: CREATE
-    - name: '`hourly-stats`'
-      database: '`metrics`'
+    - name: hourly-stats
+      database: metrics
       materialized: true
       operation: CREATE
-      engine: MergeTree()ORDERBY`timestamp`
+      engine: MergeTree()ORDERBYtimestamp
     - name: user_rankings
       database: analytics
       operation: CREATE

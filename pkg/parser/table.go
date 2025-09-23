@@ -710,3 +710,128 @@ func (s *AlterTableStmt) GetLeadingComments() []string {
 func (s *AlterTableStmt) GetTrailingComments() []string {
 	return s.TrailingComments
 }
+
+// Equal compares two OrderByClause instances for equality
+func (o *OrderByClause) Equal(other *OrderByClause) bool {
+	if o == nil && other == nil {
+		return true
+	}
+	if o == nil || other == nil {
+		return false
+	}
+	return o.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two PartitionByClause instances for equality
+func (p *PartitionByClause) Equal(other *PartitionByClause) bool {
+	if p == nil && other == nil {
+		return true
+	}
+	if p == nil || other == nil {
+		return false
+	}
+	return p.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two PrimaryKeyClause instances for equality
+func (p *PrimaryKeyClause) Equal(other *PrimaryKeyClause) bool {
+	if p == nil && other == nil {
+		return true
+	}
+	if p == nil || other == nil {
+		return false
+	}
+	return p.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two SampleByClause instances for equality
+func (s *SampleByClause) Equal(other *SampleByClause) bool {
+	if s == nil && other == nil {
+		return true
+	}
+	if s == nil || other == nil {
+		return false
+	}
+	return s.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two TableTTLClause instances for equality
+func (t *TableTTLClause) Equal(other *TableTTLClause) bool {
+	if t == nil && other == nil {
+		return true
+	}
+	if t == nil || other == nil {
+		return false
+	}
+	return t.Expression.Equal(&other.Expression)
+}
+
+// Equal compares two TableEngine instances for equality
+func (t *TableEngine) Equal(other *TableEngine) bool {
+	if t == nil && other == nil {
+		return true
+	}
+	if t == nil || other == nil {
+		return false
+	}
+
+	if t.Name != other.Name {
+		return false
+	}
+
+	if len(t.Parameters) != len(other.Parameters) {
+		return false
+	}
+
+	for i := range t.Parameters {
+		if !t.Parameters[i].Equal(&other.Parameters[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equal compares two EngineParameter instances for equality
+func (e *EngineParameter) Equal(other *EngineParameter) bool {
+	if e == nil && other == nil {
+		return true
+	}
+	if e == nil || other == nil {
+		return false
+	}
+
+	// Compare Expression
+	if (e.Expression != nil) != (other.Expression != nil) {
+		return false
+	}
+	if e.Expression != nil {
+		return e.Expression.Equal(other.Expression)
+	}
+
+	// Compare String
+	if (e.String != nil) != (other.String != nil) {
+		return false
+	}
+	if e.String != nil && *e.String != *other.String {
+		return false
+	}
+
+	// Compare Number
+	if (e.Number != nil) != (other.Number != nil) {
+		return false
+	}
+	if e.Number != nil && *e.Number != *other.Number {
+		return false
+	}
+
+	// Compare Ident
+	if (e.Ident != nil) != (other.Ident != nil) {
+		return false
+	}
+	if e.Ident != nil && *e.Ident != *other.Ident {
+		return false
+	}
+
+	return true
+}
