@@ -191,50 +191,27 @@ func NormalizeDataType(dt *DataType) {
 	if dt.Simple != nil {
 		switch dt.Simple.Name {
 		case "Decimal32":
-			dt.Simple.Name = "Decimal"
-			precision := "9"
-			scale := "0"
-			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
-				scale = *dt.Simple.Parameters[0].Number
-			}
-			dt.Simple.Parameters = []TypeParameter{
-				{Number: &precision},
-				{Number: &scale},
-			}
+			normalizeDecimalType(dt, "9")
 		case "Decimal64":
-			dt.Simple.Name = "Decimal"
-			precision := "18"
-			scale := "0"
-			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
-				scale = *dt.Simple.Parameters[0].Number
-			}
-			dt.Simple.Parameters = []TypeParameter{
-				{Number: &precision},
-				{Number: &scale},
-			}
+			normalizeDecimalType(dt, "18")
 		case "Decimal128":
-			dt.Simple.Name = "Decimal"
-			precision := "38"
-			scale := "0"
-			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
-				scale = *dt.Simple.Parameters[0].Number
-			}
-			dt.Simple.Parameters = []TypeParameter{
-				{Number: &precision},
-				{Number: &scale},
-			}
+			normalizeDecimalType(dt, "38")
 		case "Decimal256":
-			dt.Simple.Name = "Decimal"
-			precision := "76"
-			scale := "0"
-			if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
-				scale = *dt.Simple.Parameters[0].Number
-			}
-			dt.Simple.Parameters = []TypeParameter{
-				{Number: &precision},
-				{Number: &scale},
-			}
+			normalizeDecimalType(dt, "76")
 		}
+	}
+}
+
+// normalizeDecimalType normalizes Decimal types to their canonical form.
+func normalizeDecimalType(dt *DataType, precision string) {
+	dt.Simple.Name = "Decimal"
+	scale := "0"
+	if len(dt.Simple.Parameters) > 0 && dt.Simple.Parameters[0].Number != nil {
+		scale = *dt.Simple.Parameters[0].Number
+	}
+	dt.Simple.Parameters = []TypeParameter{
+		{Number: &precision},
+		{Number: &scale},
 	}
 }
 
