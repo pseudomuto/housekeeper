@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,14 +161,14 @@ zoXaxemNp3beJOgrWxT3lWeeBubYnSS3M6Gi074wswKwt4ag1r8T7jsL
 			cfg, err := GetTLSConfig(tt.opts)
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Nil(t, cfg)
+				require.Nil(t, cfg)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.NotNil(t, cfg)
-			assert.Len(t, cfg.Certificates, 1)
-			assert.NotNil(t, cfg.RootCAs)
+			require.NotNil(t, cfg)
+			require.Len(t, cfg.Certificates, 1)
+			require.NotNil(t, cfg.RootCAs)
 		})
 	}
 }
