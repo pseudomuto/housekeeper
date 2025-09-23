@@ -19,7 +19,7 @@ import (
 // openssl req -new -key tls.key -out tls.csr \
 //  -subj "/C=AB/ST=CD/L=TheMoon/O=TestOrg/CN=foobar"
 //
-// openssl x509 -req -in tls.csr -CA ca.crt -CAkey ca.key -CAcreateserial \                                                                                                                ✘ INT
+// openssl x509 -req -in tls.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
 // -out tls.crt -days 365 -sha256
 
 func TestGetTLSConfig(t *testing.T) {
