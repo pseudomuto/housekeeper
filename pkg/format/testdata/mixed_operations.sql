@@ -1,3 +1,5 @@
+-- Mixed DDL operations
+
 CREATE DATABASE `analytics` ENGINE = Atomic;
 
 CREATE TABLE `analytics`.`raw_events` (

@@ -6,9 +6,11 @@ type (
 	// such as DEFAULT values, MATERIALIZED expressions, ALIAS definitions,
 	// compression CODECs, TTL settings, and comments.
 	Column struct {
-		Name       string            `parser:"@(Ident | BacktickIdent)"`
-		DataType   *DataType         `parser:"@@"`
-		Attributes []ColumnAttribute `parser:"@@*"`
+		LeadingComments  []string          `parser:"@(Comment | MultilineComment)*"`
+		Name             string            `parser:"@(Ident | BacktickIdent)"`
+		DataType         *DataType         `parser:"@@"`
+		Attributes       []ColumnAttribute `parser:"@@*"`
+		TrailingComments []string          `parser:"@(Comment | MultilineComment)*"`
 	}
 
 	// ColumnAttribute represents any attribute that can appear after the data type

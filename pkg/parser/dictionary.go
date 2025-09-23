@@ -18,16 +18,18 @@ type (
 	//   [SETTINGS(setting1 = value1 [, setting2 = value2, ...])]
 	//   [COMMENT 'comment']
 	CreateDictionaryStmt struct {
-		Create      string              `parser:"'CREATE'"`
-		OrReplace   bool                `parser:"@('OR' 'REPLACE')?"`
-		Dictionary  string              `parser:"'DICTIONARY'"`
-		IfNotExists *string             `parser:"(@'IF' 'NOT' 'EXISTS')?"`
-		Database    *string             `parser:"((@(Ident | BacktickIdent) '.')?"`
-		Name        string              `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Columns     []*DictionaryColumn `parser:"'(' @@* ')'"`
-		Clauses     []DictionaryClause  `parser:"@@*"`
-		Comment     *string             `parser:"('COMMENT' @String)? ';'"`
+		LeadingComments  []string            `parser:"@(Comment | MultilineComment)*"`
+		Create           string              `parser:"'CREATE'"`
+		OrReplace        bool                `parser:"@('OR' 'REPLACE')?"`
+		Dictionary       string              `parser:"'DICTIONARY'"`
+		IfNotExists      *string             `parser:"(@'IF' 'NOT' 'EXISTS')?"`
+		Database         *string             `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name             string              `parser:"@(Ident | BacktickIdent))"`
+		OnCluster        *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Columns          []*DictionaryColumn `parser:"'(' @@* ')'"`
+		Clauses          []DictionaryClause  `parser:"@@*"`
+		Comment          *string             `parser:"('COMMENT' @String)?"`
+		TrailingComments []string            `parser:"@(Comment | MultilineComment)* ';'"`
 	}
 
 	// DictionaryClause represents any clause that can appear after columns in a CREATE DICTIONARY statement
@@ -150,40 +152,48 @@ type (
 	// ClickHouse syntax:
 	//   ATTACH DICTIONARY [IF NOT EXISTS] [db.]dict_name [ON CLUSTER cluster]
 	AttachDictionaryStmt struct {
-		IfNotExists *string `parser:"'ATTACH' 'DICTIONARY' (@'IF' 'NOT' 'EXISTS')?"`
-		Database    *string `parser:"((@(Ident | BacktickIdent) '.')?"`
-		Name        string  `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))? ';'"`
+		LeadingComments  []string `parser:"@(Comment | MultilineComment)*"`
+		IfNotExists      *string  `parser:"'ATTACH' 'DICTIONARY' (@'IF' 'NOT' 'EXISTS')?"`
+		Database         *string  `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name             string   `parser:"@(Ident | BacktickIdent))"`
+		OnCluster        *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		TrailingComments []string `parser:"@(Comment | MultilineComment)* ';'"`
 	}
 
 	// DetachDictionaryStmt represents DETACH DICTIONARY statements.
 	// ClickHouse syntax:
 	//   DETACH DICTIONARY [IF EXISTS] [db.]dict_name [ON CLUSTER cluster] [PERMANENTLY] [SYNC]
 	DetachDictionaryStmt struct {
-		IfExists    *string `parser:"'DETACH' 'DICTIONARY' (@'IF' 'EXISTS')?"`
-		Database    *string `parser:"((@(Ident | BacktickIdent) '.')?"`
-		Name        string  `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Permanently *string `parser:"(@'PERMANENTLY')?"`
-		Sync        *string `parser:"(@'SYNC')? ';'"`
+		LeadingComments  []string `parser:"@(Comment | MultilineComment)*"`
+		IfExists         *string  `parser:"'DETACH' 'DICTIONARY' (@'IF' 'EXISTS')?"`
+		Database         *string  `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name             string   `parser:"@(Ident | BacktickIdent))"`
+		OnCluster        *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Permanently      *string  `parser:"(@'PERMANENTLY')?"`
+		Sync             *string  `parser:"(@'SYNC')?"`
+		TrailingComments []string `parser:"@(Comment | MultilineComment)* ';'"`
 	}
 
 	// DropDictionaryStmt represents DROP DICTIONARY statements.
 	// ClickHouse syntax:
 	//   DROP DICTIONARY [IF EXISTS] [db.]dict_name [ON CLUSTER cluster] [SYNC]
 	DropDictionaryStmt struct {
-		IfExists  *string `parser:"'DROP' 'DICTIONARY' (@'IF' 'EXISTS')?"`
-		Database  *string `parser:"((@(Ident | BacktickIdent) '.')?"`
-		Name      string  `parser:"@(Ident | BacktickIdent))"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Sync      *string `parser:"(@'SYNC')? ';'"`
+		LeadingComments  []string `parser:"@(Comment | MultilineComment)*"`
+		IfExists         *string  `parser:"'DROP' 'DICTIONARY' (@'IF' 'EXISTS')?"`
+		Database         *string  `parser:"((@(Ident | BacktickIdent) '.')?"`
+		Name             string   `parser:"@(Ident | BacktickIdent))"`
+		OnCluster        *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Sync             *string  `parser:"(@'SYNC')?"`
+		TrailingComments []string `parser:"@(Comment | MultilineComment)* ';'"`
 	}
 
 	// RenameDictionaryStmt represents RENAME DICTIONARY statements
 	// Syntax: RENAME DICTIONARY [db.]name1 TO [db.]new_name1 [, [db.]name2 TO [db.]new_name2, ...] [ON CLUSTER cluster];
 	RenameDictionaryStmt struct {
-		Renames   []*DictionaryRename `parser:"'RENAME' 'DICTIONARY' @@ (',' @@)*"`
-		OnCluster *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))? ';'"`
+		LeadingComments  []string            `parser:"@(Comment | MultilineComment)*"`
+		Renames          []*DictionaryRename `parser:"'RENAME' 'DICTIONARY' @@ (',' @@)*"`
+		OnCluster        *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		TrailingComments []string            `parser:"@(Comment | MultilineComment)* ';'"`
 	}
 
 	// DictionaryRename represents a single dictionary rename operation
@@ -290,4 +300,54 @@ func (c *CreateDictionaryStmt) GetSettings() *DictionarySettings {
 		}
 	}
 	return nil
+}
+
+// GetLeadingComments returns the leading comments for CreateDictionaryStmt
+func (c *CreateDictionaryStmt) GetLeadingComments() []string {
+	return c.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for CreateDictionaryStmt
+func (c *CreateDictionaryStmt) GetTrailingComments() []string {
+	return c.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for AttachDictionaryStmt
+func (a *AttachDictionaryStmt) GetLeadingComments() []string {
+	return a.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for AttachDictionaryStmt
+func (a *AttachDictionaryStmt) GetTrailingComments() []string {
+	return a.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for DetachDictionaryStmt
+func (d *DetachDictionaryStmt) GetLeadingComments() []string {
+	return d.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for DetachDictionaryStmt
+func (d *DetachDictionaryStmt) GetTrailingComments() []string {
+	return d.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for DropDictionaryStmt
+func (d *DropDictionaryStmt) GetLeadingComments() []string {
+	return d.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for DropDictionaryStmt
+func (d *DropDictionaryStmt) GetTrailingComments() []string {
+	return d.TrailingComments
+}
+
+// GetLeadingComments returns the leading comments for RenameDictionaryStmt
+func (r *RenameDictionaryStmt) GetLeadingComments() []string {
+	return r.LeadingComments
+}
+
+// GetTrailingComments returns the trailing comments for RenameDictionaryStmt
+func (r *RenameDictionaryStmt) GetTrailingComments() []string {
+	return r.TrailingComments
 }

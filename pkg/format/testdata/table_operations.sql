@@ -1,3 +1,5 @@
+-- Table operations with complex features
+
 CREATE TABLE `analytics`.`events` (
     `id`         UInt64,
     `user_id`    UInt64,
