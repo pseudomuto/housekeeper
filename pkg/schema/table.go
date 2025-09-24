@@ -42,20 +42,22 @@ type (
 	// This structure contains all the properties needed for table comparison and
 	// migration generation, including columns, engine, and other table options.
 	TableInfo struct {
-		Name        string              // Table name (without database prefix)
-		Database    string              // Database name (empty if not specified)
-		Engine      *parser.TableEngine // Engine AST
-		Cluster     string              // Cluster name for distributed tables
-		Comment     string              // Table comment
-		OrderBy     *parser.Expression  // ORDER BY expression AST
-		PartitionBy *parser.Expression  // PARTITION BY expression AST
-		PrimaryKey  *parser.Expression  // PRIMARY KEY expression AST
-		SampleBy    *parser.Expression  // SAMPLE BY expression AST
-		TTL         *parser.Expression  // Table-level TTL expression AST
-		Settings    map[string]string   // Table settings
-		Columns     []ColumnInfo        // Column definitions
-		OrReplace   bool                // Whether CREATE OR REPLACE was used
-		IfNotExists bool                // Whether IF NOT EXISTS was used
+		Name          string              // Table name (without database prefix)
+		Database      string              // Database name (empty if not specified)
+		Engine        *parser.TableEngine // Engine AST
+		Cluster       string              // Cluster name for distributed tables
+		Comment       string              // Table comment
+		OrderBy       *parser.Expression  // ORDER BY expression AST
+		PartitionBy   *parser.Expression  // PARTITION BY expression AST
+		PrimaryKey    *parser.Expression  // PRIMARY KEY expression AST
+		SampleBy      *parser.Expression  // SAMPLE BY expression AST
+		TTL           *parser.Expression  // Table-level TTL expression AST
+		Settings      map[string]string   // Table settings
+		Columns       []ColumnInfo        // Column definitions
+		OrReplace     bool                // Whether CREATE OR REPLACE was used
+		IfNotExists   bool                // Whether IF NOT EXISTS was used
+		AsSourceTable *string             // If this table uses AS, the source table name (qualified)
+		AsDependents  map[string]bool     // Tables that use AS to reference this table
 	}
 
 	// ColumnInfo represents a single column definition
@@ -186,8 +188,15 @@ func settingsEqual(a, b map[string]string) bool {
 // - Rename detection based on content similarity
 // - Proper ordering for migration generation
 func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
-	currentTables := extractTablesFromSQL(current)
-	targetTables := extractTablesFromSQL(target)
+	currentTables, err := extractTablesFromSQL(current)
+	if err != nil {
+		return nil, err
+	}
+
+	targetTables, err := extractTablesFromSQL(target)
+	if err != nil {
+		return nil, err
+	}
 
 	// Pre-allocate diffs slice with estimated capacity
 	diffs := make([]*TableDiff, 0, len(currentTables)+len(targetTables))
@@ -211,6 +220,17 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 			// Remove from currentTables if this was a rename to avoid processing as a drop
 			if diff.Type == TableDiffRename {
 				delete(currentTables, diff.TableName)
+			}
+
+			// Propagate column changes to AS dependents (only for ALTER operations)
+			if diff.Type == TableDiffAlter && targetTable.AsDependents != nil && len(diff.ColumnChanges) > 0 {
+				propagatedDiffs := propagateColumnChangesToDependents(
+					diff,
+					targetTable.AsDependents,
+					currentTables,
+					targetTables,
+				)
+				diffs = append(diffs, propagatedDiffs...)
 			}
 		}
 	}
@@ -240,10 +260,134 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	return diffs, nil
 }
 
+// propagateColumnChangesToDependents creates ALTER or DROP+CREATE diffs for tables
+// that use AS to reference a source table when that source table has column changes
+func propagateColumnChangesToDependents(
+	sourceDiff *TableDiff,
+	dependents map[string]bool,
+	currentTables, targetTables map[string]*TableInfo,
+) []*TableDiff {
+	// Only process if there are column changes to propagate
+	if len(sourceDiff.ColumnChanges) == 0 {
+		return nil
+	}
+
+	propagatedDiffs := make([]*TableDiff, 0, len(dependents))
+
+	for dependentName := range dependents {
+		targetDep := targetTables[dependentName]
+		currentDep := currentTables[dependentName]
+
+		// Skip if dependent doesn't exist in both current and target
+		if currentDep == nil || targetDep == nil {
+			continue
+		}
+
+		// Create a propagated diff with column changes
+		propDiff := &TableDiff{
+			Type:          TableDiffAlter,
+			TableName:     dependentName,
+			Description:   fmt.Sprintf("Propagated column changes from %s (AS dependency)", sourceDiff.TableName),
+			Current:       currentDep,
+			Target:        targetDep,
+			ColumnChanges: sourceDiff.ColumnChanges, // Same column changes
+		}
+
+		// Generate SQL based on engine type
+		if isViewLikeEngine(targetDep.Engine) {
+			// For Distributed, Memory, etc.: DROP + CREATE is safe and necessary
+			propDiff.UpSQL = fmt.Sprintf("-- Recreate to match schema changes from %s\n", sourceDiff.TableName) +
+				generateDropTableSQL(currentDep) + ";\n" +
+				generateCreateTableSQL(targetDep)
+			propDiff.DownSQL = generateDropTableSQL(targetDep) + ";\n" +
+				generateCreateTableSQL(currentDep)
+		} else {
+			// For MergeTree, etc.: Use ALTER to preserve data
+			propDiff.UpSQL = fmt.Sprintf("-- Propagated from %s (AS dependency)\n", sourceDiff.TableName) +
+				generateAlterTableSQL(targetDep, sourceDiff.ColumnChanges)
+			propDiff.DownSQL = generateAlterTableSQL(currentDep, reverseColumnChanges(sourceDiff.ColumnChanges))
+		}
+
+		propagatedDiffs = append(propagatedDiffs, propDiff)
+	}
+
+	return propagatedDiffs
+}
+
+// isViewLikeEngine determines if an engine is view-like (doesn't store data locally)
+// and can be safely recreated with DROP+CREATE without data loss
+func isViewLikeEngine(engine *parser.TableEngine) bool {
+	if engine == nil {
+		return false
+	}
+
+	viewLikeEngines := map[string]bool{
+		"Distributed": true,
+		"Merge":       true,
+		"Buffer":      true,
+		"Dictionary":  true,
+		"View":        true,
+		"LiveView":    true,
+		"Memory":      true, // Temporary data, safe to recreate
+	}
+
+	return viewLikeEngines[engine.Name]
+}
+
+// resolveASReferences resolves AS table references to copy schema from source tables
+// It also tracks dependency relationships for migration propagation
+func resolveASReferences(tables map[string]*TableInfo) error {
+	for tableName, table := range tables {
+		if table.AsSourceTable == nil {
+			continue
+		}
+
+		// Find the source table
+		sourceTable, exists := tables[*table.AsSourceTable]
+		if !exists {
+			return fmt.Errorf("table %s references non-existent table %s via AS clause",
+				tableName, *table.AsSourceTable)
+		}
+
+		// Copy schema from source table (but keep explicitly specified properties)
+		// Only copy columns if no columns were explicitly defined
+		if len(table.Columns) == 0 {
+			table.Columns = make([]ColumnInfo, len(sourceTable.Columns))
+			copy(table.Columns, sourceTable.Columns)
+		}
+
+		// Copy clauses only if not explicitly specified
+		if table.OrderBy == nil && sourceTable.OrderBy != nil {
+			orderByCopy := *sourceTable.OrderBy
+			table.OrderBy = &orderByCopy
+		}
+		if table.PartitionBy == nil && sourceTable.PartitionBy != nil {
+			partitionByCopy := *sourceTable.PartitionBy
+			table.PartitionBy = &partitionByCopy
+		}
+		if table.PrimaryKey == nil && sourceTable.PrimaryKey != nil {
+			primaryKeyCopy := *sourceTable.PrimaryKey
+			table.PrimaryKey = &primaryKeyCopy
+		}
+		if table.SampleBy == nil && sourceTable.SampleBy != nil {
+			sampleByCopy := *sourceTable.SampleBy
+			table.SampleBy = &sampleByCopy
+		}
+
+		// Track dependency in source table
+		if sourceTable.AsDependents == nil {
+			sourceTable.AsDependents = make(map[string]bool)
+		}
+		sourceTable.AsDependents[tableName] = true
+	}
+
+	return nil
+}
+
 // extractTablesFromSQL extracts table information from parsed SQL statements
 //
 //nolint:gocognit,funlen // Complex function needed for comprehensive table parsing
-func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
+func extractTablesFromSQL(sql *parser.SQL) (map[string]*TableInfo, error) {
 	tables := make(map[string]*TableInfo)
 
 	for _, stmt := range sql.Statements {
@@ -259,6 +403,15 @@ func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 				Name:        normalizeIdentifier(table.Name),
 				OrReplace:   table.OrReplace,
 				IfNotExists: table.IfNotExists,
+			}
+
+			// Track AS source table if present
+			if table.AsTable != nil {
+				asTableName := normalizeIdentifier(table.AsTable.Table)
+				if table.AsTable.Database != nil {
+					asTableName = normalizeIdentifier(*table.AsTable.Database) + "." + asTableName
+				}
+				tableInfo.AsSourceTable = &asTableName
 			}
 
 			if table.Database != nil {
@@ -328,7 +481,12 @@ func extractTablesFromSQL(sql *parser.SQL) map[string]*TableInfo {
 		}
 	}
 
-	return tables
+	// Resolve AS references after all tables are extracted
+	if err := resolveASReferences(tables); err != nil {
+		return tables, err
+	}
+
+	return tables, nil
 }
 
 // findRenamedTable attempts to find if a target table is actually a renamed version of a current table

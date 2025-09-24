@@ -1,0 +1,86 @@
+tables:
+    - name: copy
+      operation: CREATE
+      engine: MergeTree
+      order_by: expression
+    - name: table_copy
+      database: db1
+      operation: CREATE
+      engine: Memory
+    - name: events_distributed
+      cluster: production
+      operation: CREATE
+      engine: Distributed(production, currentDatabase(), events_local, rand())
+    - name: backup_users
+      operation: CREATE
+      if_not_exists: true
+      engine: MergeTree
+      order_by: expression
+    - name: temp_copy
+      operation: CREATE
+      or_replace: true
+      engine: Memory
+    - name: events_all
+      database: analytics
+      cluster: analytics_cluster
+      operation: CREATE
+      or_replace: true
+      if_not_exists: true
+      engine: Distributed(analytics_cluster, analytics, events_local, cityHash64(user_id))
+      comment: Distributed view of events_local
+      settings:
+        index_granularity: "8192"
+    - name: backup-table
+      operation: CREATE
+      engine: MergeTree
+      order_by: expression
+    - name: table-copy
+      database: backup-db
+      operation: CREATE
+      engine: MergeTree
+      order_by: expression
+    - name: base
+      operation: CREATE
+      engine: MergeTree
+      columns:
+        - name: id
+          data_type: UInt64
+        - name: name
+          data_type: String
+        - name: email
+          data_type: String
+          default: DEFAULT expression
+        - name: created_at
+          data_type: DateTime
+          default: DEFAULT expression
+      order_by: expression
+    - name: base_backup
+      operation: CREATE
+      engine: MergeTree
+      order_by: expression
+    - name: base_distributed
+      cluster: cluster
+      operation: CREATE
+      engine: Distributed(cluster, currentDatabase(), base, rand())
+    - name: local_metrics
+      operation: CREATE
+      engine: MergeTree
+      columns:
+        - name: timestamp
+          data_type: DateTime
+        - name: metric_name
+          data_type: LowCardinality(String)
+        - name: value
+          data_type: Float64
+        - name: tags
+          data_type: Map(String, String)
+      order_by: expression
+      partition_by: expression
+      ttl: expression
+    - name: metrics_all
+      cluster: monitoring
+      operation: CREATE
+      engine: Distributed(monitoring, currentDatabase(), local_metrics, xxHash64(metric_name, timestamp))
+      settings:
+        distributed_product_mode: '''global'''
+        skip_unavailable_shards: "1"

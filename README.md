@@ -17,7 +17,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Key Features
 
-- **Complete ClickHouse DDL Support** - Full support for databases, tables, dictionaries, views, materialized views, named collections, functions, and roles
+- **Complete ClickHouse DDL Support** - Full support for databases, tables (including `CREATE TABLE AS`), dictionaries, views, materialized views, named collections, functions, and roles
 - **Cluster-Aware Operations** - Native `ON CLUSTER` support for distributed ClickHouse deployments
 - **Intelligent Migration Generation** - Smart schema comparison with proper operation ordering and dependency management
 - **Modern Parser Architecture** - Built with participle for robust, maintainable SQL parsing
@@ -31,7 +31,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 | **Database** | ✅ | ✅¹ | ✅ | ✅ | ✅ | ✅ | N/A | ¹Comment changes only |
 | **Named Collection** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅ | N/A | ²Uses CREATE OR REPLACE |
 | **Function** | ✅ | ❌³ | ❌ | ❌ | ✅ | ✅⁴ | N/A | ³Uses DROP+CREATE strategy |
-| **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A | Full ALTER support |
+| **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A | Full ALTER support, CREATE AS syntax |
 | **Dictionary** | ✅ | ❌⁵ | ✅ | ✅ | ✅ | ✅ | N/A | ⁵Uses CREATE OR REPLACE |
 | **View** | ✅ | ❌⁶ | ✅ | ✅ | ✅ | ✅⁷ | N/A | ⁶Uses CREATE OR REPLACE |
 | **Materialized View** | ✅ | ❌⁸ | ✅⁹ | ✅⁹ | ✅⁹ | ✅⁹ | N/A | ⁸Query changes use DROP+CREATE |
@@ -62,6 +62,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 - **Engine Changes**: Not supported for any object type (requires manual migration)
 - **Role Management**: Full support for CREATE/ALTER/DROP ROLE plus GRANT/REVOKE operations
 - **Smart Rename Detection**: Avoids unnecessary DROP+CREATE when only names change
+- **CREATE TABLE AS**: Supports schema copying with automatic column propagation to dependent tables
 
 ## Documentation
 

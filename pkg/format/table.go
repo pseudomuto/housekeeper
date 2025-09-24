@@ -15,8 +15,12 @@ func (f *Formatter) createTable(w io.Writer, stmt *parser.CreateTableStmt) error
 	}
 
 	lines := f.buildCreateTableHeader(stmt)
-	lines = f.appendTableElements(lines, stmt.Elements)
-	lines = append(lines, ")")
+
+	// Only append elements and closing paren if not using AS syntax
+	if stmt.AsTable == nil {
+		lines = f.appendTableElements(lines, stmt.Elements)
+		lines = append(lines, ")")
+	}
 
 	// Format pre-engine comments
 	if len(stmt.PreEngineComments) > 0 {
@@ -56,6 +60,15 @@ func (f *Formatter) buildCreateTableHeader(stmt *parser.CreateTableStmt) []strin
 
 	if stmt.OnCluster != nil {
 		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+	}
+
+	// Handle AS clause
+	if stmt.AsTable != nil {
+		headerParts = append(headerParts, f.keyword("AS"))
+		asTableName := f.qualifiedName(stmt.AsTable.Database, stmt.AsTable.Table)
+		headerParts = append(headerParts, asTableName)
+		// No opening parenthesis when using AS syntax
+		return []string{strings.Join(headerParts, " ")}
 	}
 
 	return []string{strings.Join(headerParts, " ") + " ("}

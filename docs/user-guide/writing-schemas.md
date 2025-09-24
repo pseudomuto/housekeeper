@@ -485,6 +485,116 @@ ORDER BY timestamp
 TTL timestamp + INTERVAL 2 YEAR;        -- Keep analytics longer
 ```
 
+### CREATE TABLE AS - Schema Copying
+
+The `CREATE TABLE AS` syntax allows you to create a new table by copying the schema from an existing table. This is particularly useful for:
+- Creating distributed tables that mirror local tables
+- Creating backup tables with identical structure
+- Quickly duplicating table schemas with different engines
+
+#### Basic Syntax
+
+```sql
+-- Copy schema from existing table
+CREATE TABLE copy AS source ENGINE = MergeTree() ORDER BY id;
+
+-- With database qualifiers
+CREATE TABLE db1.table_copy AS db2.source_table ENGINE = Memory;
+
+-- With all options
+CREATE OR REPLACE TABLE IF NOT EXISTS backup_users AS users 
+ENGINE = MergeTree() 
+ORDER BY user_id;
+```
+
+#### Distributed Table Pattern
+
+The most common use case is creating distributed tables that mirror local table schemas:
+
+```sql
+-- Define local table
+CREATE TABLE events_local (
+    id UInt64,
+    timestamp DateTime,
+    event_type LowCardinality(String),
+    user_id UInt64,
+    data Map(String, String)
+) ENGINE = MergeTree()
+ORDER BY (timestamp, user_id)
+PARTITION BY toYYYYMM(timestamp);
+
+-- Create distributed table with same schema
+CREATE TABLE events_all ON CLUSTER production AS events_local
+ENGINE = Distributed(production, currentDatabase(), events_local, rand());
+
+-- Create distributed table with specific sharding
+CREATE TABLE events_distributed ON CLUSTER analytics AS events_local  
+ENGINE = Distributed(analytics, currentDatabase(), events_local, cityHash64(user_id));
+```
+
+#### Backup Table Pattern
+
+Create backup tables with identical structure but different engines or settings:
+
+```sql
+-- Original table
+CREATE TABLE users (
+    id UInt64,
+    name String,
+    email String,
+    created_at DateTime DEFAULT now()
+) ENGINE = MergeTree() ORDER BY id;
+
+-- Create backup with same schema
+CREATE TABLE users_backup AS users 
+ENGINE = MergeTree() 
+ORDER BY id
+SETTINGS index_granularity = 1024;  -- Different settings
+
+-- Create memory-based staging table
+CREATE TABLE users_staging AS users ENGINE = Memory;
+```
+
+#### Migration Behavior
+
+When using `CREATE TABLE AS` with Housekeeper, understand these key behaviors:
+
+1. **Schema Resolution**: The AS reference is resolved at schema processing time, copying all column definitions from the source table.
+
+2. **Independence**: Once created, AS tables are independent entities. They can be dropped, renamed, or modified without affecting the source.
+
+3. **Column Propagation**: When the source table gets column changes (ADD/DROP/MODIFY), Housekeeper automatically propagates these to AS dependents:
+   - **MergeTree family**: Uses ALTER TABLE to preserve data
+   - **Distributed/Memory engines**: Uses DROP+CREATE (safe, as they don't store local data)
+
+4. **Structural Operations Don't Propagate**: DROP, DETACH, ATTACH, or RENAME of the source table has NO effect on AS dependents.
+
+Example migration scenario:
+
+```sql
+-- Current schema
+CREATE TABLE metrics_local (
+    timestamp DateTime,
+    value Float64
+) ENGINE = MergeTree() ORDER BY timestamp;
+
+CREATE TABLE metrics_all AS metrics_local 
+ENGINE = Distributed(cluster, currentDatabase(), metrics_local, rand());
+
+-- When metrics_local gets new column, migration generates:
+-- 1. ALTER TABLE metrics_local ADD COLUMN metric_name String;
+-- 2. DROP TABLE metrics_all; 
+-- 3. CREATE TABLE metrics_all (...with new column...) ENGINE = Distributed(...);
+```
+
+#### Best Practices
+
+- Use `CREATE TABLE AS` for distributed tables that should mirror local table schemas
+- Use it for creating backup or staging tables with same structure
+- Remember that AS tables are independent after creation - the source can be dropped
+- Place AS table definitions after their source tables in schema files
+- Consider using AS for tables that should maintain schema consistency with a source
+
 ## Dictionary Design
 
 ### Basic Dictionaries
