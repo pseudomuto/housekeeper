@@ -66,3 +66,21 @@ CREATE USER name21 HOST LIKE '%';
 
 -- HOST LIKE with domain filter
 CREATE USER name22 HOST LIKE '%.mysite.com';
+
+-- VALID UNTIL standalone with date only
+CREATE USER name23 VALID UNTIL '2025-01-01';
+
+-- VALID UNTIL standalone with date and time
+CREATE USER name24 VALID UNTIL '2025-01-01 12:00:00 UTC';
+
+-- VALID UNTIL standalone with infinity
+CREATE USER name25 VALID UNTIL 'infinity';
+
+-- VALID UNTIL standalone with backtick timezone
+CREATE USER name26 VALID UNTIL '2025-01-01 12:00:00 `Asia/Tokyo`';
+
+-- VALID UNTIL with identification method
+CREATE USER name27 IDENTIFIED BY 'password' VALID UNTIL '2025-01-01';
+
+-- VALID UNTIL at identification method level
+CREATE USER name28 IDENTIFIED BY 'hash_value' VALID UNTIL '2025-12-31 23:59:59 UTC';

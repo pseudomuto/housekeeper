@@ -12,6 +12,7 @@ type (
 		OnCluster      *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
 		Identification *UserIdentification `parser:"@@?"`
 		Host           *UserHost           `parser:"@@?"`
+		ValidUntil     *string             `parser:"('VALID' 'UNTIL' @String)?"`
 		Semicolon      bool                `parser:"';'"`
 	}
 
@@ -29,9 +30,10 @@ type (
 	}
 
 	UserIdentificationOtherMethod struct {
-		With *string `parser:"('WITH' @Ident)?"`
-		By   string  `parser:"'BY' @String"`
-		Salt *string `parser:"('SALT' @String)?"`
+		With       *string `parser:"('WITH' @Ident)?"`
+		By         string  `parser:"'BY' @String"`
+		Salt       *string `parser:"('SALT' @String)?"`
+		ValidUntil *string `parser:"('VALID' 'UNTIL' @String)?"`
 	}
 
 	UserHost struct {

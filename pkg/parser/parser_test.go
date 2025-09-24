@@ -134,6 +134,7 @@ type ExpectedUser struct {
 	Cluster        string         `yaml:"cluster,omitempty"`
 	Identification Identification `yaml:"identification,omitempty"`
 	Host           *Host          `yaml:"host,omitempty"`
+	ValidUntil     string         `yaml:"valid_until,omitempty"`
 }
 
 type Identification struct {
@@ -149,6 +150,7 @@ type Identification struct {
 	LdapServer    string `yaml:"ldap_server,omitempty"`
 	KerberosRealm string `yaml:"kerberos_realm,omitempty"`
 	SslCn         string `yaml:"ssl_cn,omitempty"`
+	ValidUntil    string `yaml:"valid_until,omitempty"`
 }
 
 type Host struct {
@@ -902,9 +904,17 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 					if user.Identification.IdentifiedWithOther.Salt != nil {
 						identification.Salt = *user.Identification.IdentifiedWithOther.Salt
 					}
+
+					if user.Identification.IdentifiedWithOther.ValidUntil != nil {
+						identification.ValidUntil = *user.Identification.IdentifiedWithOther.ValidUntil
+					}
 				}
 
 				expectedUser.Identification = identification
+			}
+
+			if user.ValidUntil != nil {
+				expectedUser.ValidUntil = *user.ValidUntil
 			}
 
 			if user.Host != nil {
@@ -1175,6 +1185,12 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 
 		require.Equal(t, expectedUser.Identification.SslCn, actualUser.Identification.SslCn,
 			"Wrong user IdentifiedSslCn at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.Identification.ValidUntil, actualUser.Identification.ValidUntil,
+			"Wrong user identification ValidUntil at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.ValidUntil, actualUser.ValidUntil,
+			"Wrong user ValidUntil at index %d in %s", i, sqlFile)
 
 		if expectedUser.Host != nil {
 			require.NotNil(t, actualUser.Host, "Expected user host but got nil at index %d in %s", i, sqlFile)

@@ -94,3 +94,25 @@ users:
       type: like
       value: "'%.mysite.com'"
 
+  - name: name23
+    valid_until: "'2025-01-01'"
+
+  - name: name24
+    valid_until: "'2025-01-01 12:00:00 UTC'"
+
+  - name: name25
+    valid_until: "'infinity'"
+
+  - name: name26
+    valid_until: "'2025-01-01 12:00:00 `Asia/Tokyo`'"
+
+  - name: name27
+    identification:
+      by: "'password'"
+      valid_until: "'2025-01-01'"
+
+  - name: name28
+    identification:
+      by: "'hash_value'"
+      valid_until: "'2025-12-31 23:59:59 UTC'"
+
