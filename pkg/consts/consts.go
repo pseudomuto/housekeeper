@@ -17,4 +17,8 @@ const (
 
 	// DefaultClickHouseCluster is the default cluster name used when none is specified
 	DefaultClickHouseCluster = "cluster"
+
+	// TableFunctionPrefix is the prefix used to mark AsSourceTable entries that represent table functions
+	// rather than actual table references. Used in CREATE TABLE AS function_name(...) syntax.
+	TableFunctionPrefix = "FUNCTION:"
 )

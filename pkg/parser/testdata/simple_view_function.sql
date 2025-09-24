@@ -1,0 +1,1 @@
+CREATE MATERIALIZED VIEW test TO numbers(100) AS SELECT * FROM source;

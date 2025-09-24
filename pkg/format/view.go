@@ -40,13 +40,14 @@ func (f *Formatter) createView(w io.Writer, stmt *parser.CreateViewStmt) error {
 
 		// TO table (for materialized views)
 		if stmt.To != nil {
-			// Parse the TO table name to handle database.table format
-			parts := strings.Split(*stmt.To, ".")
-			if len(parts) == 2 {
-				lines = append(lines, f.keyword("TO")+" "+f.qualifiedName(&parts[0], parts[1]))
-			} else {
-				lines = append(lines, f.keyword("TO")+" "+f.identifier(*stmt.To))
+			toClause := f.keyword("TO") + " "
+			// Format either table reference or table function
+			if stmt.To.Table != nil {
+				toClause += f.qualifiedName(stmt.To.Database, *stmt.To.Table)
+			} else if stmt.To.Function != nil {
+				toClause += f.formatViewTableFunction(stmt.To.Function)
 			}
+			lines = append(lines, toClause)
 		}
 
 		// ENGINE (for materialized views)
@@ -198,4 +199,23 @@ func (f *Formatter) formatViewEngine(engine *parser.ViewEngine) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// formatViewTableFunction formats a table function call in view's TO clause
+func (f *Formatter) formatViewTableFunction(fn *parser.TableFunction) string {
+	if fn == nil {
+		return ""
+	}
+
+	result := f.identifier(fn.Name)
+	if len(fn.Arguments) > 0 {
+		var params []string
+		for _, arg := range fn.Arguments {
+			params = append(params, f.formatFunctionArg(&arg))
+		}
+		result += "(" + strings.Join(params, ", ") + ")"
+	} else {
+		result += "()"
+	}
+	return result
 }

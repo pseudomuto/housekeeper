@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -342,6 +343,11 @@ func resolveASReferences(tables map[string]*TableInfo) error {
 			continue
 		}
 
+		// Skip table function markers - these don't reference actual tables in the schema
+		if strings.HasPrefix(*table.AsSourceTable, consts.TableFunctionPrefix) {
+			continue
+		}
+
 		// Find the source table
 		sourceTable, exists := tables[*table.AsSourceTable]
 		if !exists {
@@ -407,11 +413,19 @@ func extractTablesFromSQL(sql *parser.SQL) (map[string]*TableInfo, error) {
 
 			// Track AS source table if present
 			if table.AsTable != nil {
-				asTableName := normalizeIdentifier(table.AsTable.Table)
-				if table.AsTable.Database != nil {
-					asTableName = normalizeIdentifier(*table.AsTable.Database) + "." + asTableName
+				// Handle both table functions and table references
+				if table.AsTable.Function != nil {
+					// For table functions, store the function name as a marker
+					// This helps identify that the table was created from a table function
+					functionMarker := consts.TableFunctionPrefix + table.AsTable.Function.Name
+					tableInfo.AsSourceTable = &functionMarker
+				} else if table.AsTable.TableRef != nil {
+					asTableName := normalizeIdentifier(table.AsTable.TableRef.Table)
+					if table.AsTable.TableRef.Database != nil {
+						asTableName = normalizeIdentifier(*table.AsTable.TableRef.Database) + "." + asTableName
+					}
+					tableInfo.AsSourceTable = &asTableName
 				}
-				tableInfo.AsSourceTable = &asTableName
 			}
 
 			if table.Database != nil {

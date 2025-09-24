@@ -42,6 +42,35 @@ func getStringValue(s *string) string {
 	return *s
 }
 
+// getViewTableTargetValue converts ViewTableTarget to string representation
+func getViewTableTargetValue(target *parser.ViewTableTarget) string {
+	if target == nil {
+		return ""
+	}
+
+	if target.Function != nil {
+		// Format table function as string
+		result := target.Function.Name + "("
+		var args []string
+		for _, arg := range target.Function.Arguments {
+			if arg.Star != nil {
+				args = append(args, "*")
+			} else if arg.Expression != nil {
+				args = append(args, arg.Expression.String())
+			}
+		}
+		result += strings.Join(args, ", ") + ")"
+		return result
+	} else if target.Table != nil {
+		if target.Database != nil {
+			return *target.Database + "." + *target.Table
+		}
+		return *target.Table
+	}
+
+	return ""
+}
+
 // normalizeIdentifier removes surrounding backticks from ClickHouse identifiers
 // for consistent comparison between parsed DDL and ClickHouse system table output
 func normalizeIdentifier(s string) string {

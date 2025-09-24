@@ -80,6 +80,7 @@ type ExpectedTable struct {
 	IfExists        bool              `yaml:"if_exists,omitempty"`
 	Permanently     bool              `yaml:"permanently,omitempty"`
 	Sync            bool              `yaml:"sync,omitempty"`
+	AsTable         string            `yaml:"as_table,omitempty"`
 	Engine          string            `yaml:"engine,omitempty"`
 	Comment         string            `yaml:"comment,omitempty"`
 	Columns         []ExpectedColumn  `yaml:"columns,omitempty"`
@@ -482,7 +483,28 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				expectedView.Cluster = *view.OnCluster
 			}
 			if view.To != nil {
-				expectedView.To = *view.To
+				// Convert ViewTableTarget to string representation
+				if view.To.Table != nil {
+					if view.To.Database != nil {
+						expectedView.To = *view.To.Database + "." + *view.To.Table
+					} else {
+						expectedView.To = *view.To.Table
+					}
+				} else if view.To.Function != nil {
+					// Format table function as string
+					fn := view.To.Function
+					toStr := fn.Name + "("
+					var args []string
+					for _, arg := range fn.Arguments {
+						if arg.Star != nil {
+							args = append(args, "*")
+						} else if arg.Expression != nil {
+							args = append(args, arg.Expression.String())
+						}
+					}
+					toStr += strings.Join(args, ", ") + ")"
+					expectedView.To = toStr
+				}
 			}
 			if view.Engine != nil {
 				// Build engine string from new ViewEngine structure
@@ -596,6 +618,30 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 			if table.Comment != nil {
 				expectedTable.Comment = removeQuotes(*table.Comment)
+			}
+			if table.AsTable != nil {
+				// Handle both table functions and table references
+				if table.AsTable.Function != nil {
+					// Format table function as string
+					fn := table.AsTable.Function
+					asTableStr := fn.Name + "("
+					var args []string
+					for _, arg := range fn.Arguments {
+						if arg.Star != nil {
+							args = append(args, "*")
+						} else if arg.Expression != nil {
+							args = append(args, arg.Expression.String())
+						}
+					}
+					asTableStr += strings.Join(args, ", ") + ")"
+					expectedTable.AsTable = asTableStr
+				} else if table.AsTable.TableRef != nil {
+					if table.AsTable.TableRef.Database != nil {
+						expectedTable.AsTable = *table.AsTable.TableRef.Database + "." + table.AsTable.TableRef.Table
+					} else {
+						expectedTable.AsTable = table.AsTable.TableRef.Table
+					}
+				}
 			}
 			if orderBy := table.GetOrderBy(); orderBy != nil {
 				expectedTable.OrderBy = "expression"

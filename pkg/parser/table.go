@@ -8,6 +8,23 @@ type (
 		Table    string  `parser:"@(Ident | BacktickIdent)"`
 	}
 
+	// TableSource represents either a table reference or a table function in AS clause
+	// Can be either:
+	//   - Simple table reference: [db.]table_name
+	//   - Table function: functionName(args...)
+	// Examples:
+	//   - AS users
+	//   - AS analytics.events
+	//   - AS remote('host:9000', 'db', 'table')
+	//   - AS s3Table('https://bucket.s3.amazonaws.com/file.csv', 'CSV')
+	//   - AS numbers(1000000)
+	TableSource struct {
+		// Try table function first (has parentheses to distinguish it)
+		Function *TableFunction `parser:"@@"`
+		// Fall back to table reference if no function call syntax found
+		TableRef *TableReference `parser:"| @@"`
+	}
+
 	// CreateTableStmt represents a CREATE TABLE statement with full ClickHouse syntax support.
 	// ClickHouse syntax:
 	//   CREATE [OR REPLACE] TABLE [IF NOT EXISTS] [db.]table_name [ON CLUSTER cluster]
@@ -29,22 +46,22 @@ type (
 	//   [SETTINGS name=value, ...]
 	//   [COMMENT 'comment']
 	CreateTableStmt struct {
-		LeadingComments   []string        `parser:"@(Comment | MultilineComment)*"`
-		Create            string          `parser:"'CREATE'"`
-		OrReplace         bool            `parser:"@('OR' 'REPLACE')?"`
-		Table             string          `parser:"'TABLE'"`
-		IfNotExists       bool            `parser:"@('IF' 'NOT' 'EXISTS')?"`
-		Database          *string         `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name              string          `parser:"@(Ident | BacktickIdent)"`
-		OnCluster         *string         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		AsTable           *TableReference `parser:"('AS' @@)?"`
-		Elements          []TableElement  `parser:"('(' @@ (',' @@)* ')')?"`
-		PreEngineComments []string        `parser:"@(Comment | MultilineComment)*"`
-		Engine            *TableEngine    `parser:"@@"`
-		Clauses           []TableClause   `parser:"@@*"`
-		Comment           *string         `parser:"('COMMENT' @String)?"`
-		TrailingComments  []string        `parser:"@(Comment | MultilineComment)*"`
-		Semicolon         bool            `parser:"';'"`
+		LeadingComments   []string       `parser:"@(Comment | MultilineComment)*"`
+		Create            string         `parser:"'CREATE'"`
+		OrReplace         bool           `parser:"@('OR' 'REPLACE')?"`
+		Table             string         `parser:"'TABLE'"`
+		IfNotExists       bool           `parser:"@('IF' 'NOT' 'EXISTS')?"`
+		Database          *string        `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name              string         `parser:"@(Ident | BacktickIdent)"`
+		OnCluster         *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		AsTable           *TableSource   `parser:"('AS' @@)?"`
+		Elements          []TableElement `parser:"('(' @@ (',' @@)* ')')?"`
+		PreEngineComments []string       `parser:"@(Comment | MultilineComment)*"`
+		Engine            *TableEngine   `parser:"@@"`
+		Clauses           []TableClause  `parser:"@@*"`
+		Comment           *string        `parser:"('COMMENT' @String)?"`
+		TrailingComments  []string       `parser:"@(Comment | MultilineComment)*"`
+		Semicolon         bool           `parser:"';'"`
 	}
 
 	// TableClause represents any clause that can appear after ENGINE in a CREATE TABLE statement
