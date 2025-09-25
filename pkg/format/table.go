@@ -65,8 +65,13 @@ func (f *Formatter) buildCreateTableHeader(stmt *parser.CreateTableStmt) []strin
 	// Handle AS clause
 	if stmt.AsTable != nil {
 		headerParts = append(headerParts, f.keyword("AS"))
-		asTableName := f.qualifiedName(stmt.AsTable.Database, stmt.AsTable.Table)
-		headerParts = append(headerParts, asTableName)
+		// Format either table function or table reference
+		if stmt.AsTable.Function != nil {
+			headerParts = append(headerParts, f.formatTableFunction(stmt.AsTable.Function))
+		} else if stmt.AsTable.TableRef != nil {
+			asTableName := f.qualifiedName(stmt.AsTable.TableRef.Database, stmt.AsTable.TableRef.Table)
+			headerParts = append(headerParts, asTableName)
+		}
 		// No opening parenthesis when using AS syntax
 		return []string{strings.Join(headerParts, " ")}
 	}
@@ -846,4 +851,23 @@ func padRight(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-len(s))
+}
+
+// formatTableFunction formats a table function call (e.g., remote(...), s3Table(...), numbers(...))
+func (f *Formatter) formatTableFunction(fn *parser.TableFunction) string {
+	if fn == nil {
+		return ""
+	}
+
+	result := f.identifier(fn.Name)
+	if len(fn.Arguments) > 0 {
+		var params []string
+		for _, arg := range fn.Arguments {
+			params = append(params, f.formatFunctionArg(&arg))
+		}
+		result += "(" + strings.Join(params, ", ") + ")"
+	} else {
+		result += "()"
+	}
+	return result
 }

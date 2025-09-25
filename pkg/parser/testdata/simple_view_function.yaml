@@ -1,0 +1,5 @@
+views:
+    - name: test
+      materialized: true
+      operation: CREATE
+      to: numbers(100)

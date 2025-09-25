@@ -1,6 +1,18 @@
 package parser
 
 type (
+	// ViewTableTarget represents a table target in TO clause of materialized view
+	// Can be either:
+	//   - Simple table reference: [db.]table_name
+	//   - Table function: functionName(args...)
+	ViewTableTarget struct {
+		// Try table function first (has parentheses to distinguish it)
+		Function *TableFunction `parser:"@@"`
+		// Fall back to table reference if no function call syntax found
+		Database *string `parser:"| ((@(Ident | BacktickIdent) '.')?"`
+		Table    *string `parser:"@(Ident | BacktickIdent))"`
+	}
+
 	// CreateViewStmt represents a CREATE VIEW statement.
 	// Supports both regular views and materialized views.
 	// ClickHouse syntax:
@@ -17,7 +29,7 @@ type (
 		Database         *string          `parser:"(@(Ident | BacktickIdent) '.')?"`
 		Name             string           `parser:"@(Ident | BacktickIdent)"`
 		OnCluster        *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		To               *string          `parser:"('TO' @((Ident | BacktickIdent) ('.' (Ident | BacktickIdent))?))?"`
+		To               *ViewTableTarget `parser:"('TO' @@)?"`
 		Engine           *ViewEngine      `parser:"@@?"`
 		Populate         bool             `parser:"@'POPULATE'?"`
 		AsSelect         *SelectStatement `parser:"'AS' @@"`

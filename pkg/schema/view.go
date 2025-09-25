@@ -409,7 +409,7 @@ func viewStatementsAreEqual(stmt1, stmt2 *parser.CreateViewStmt) bool {
 	// that's not preserved in ClickHouse's stored object definitions
 
 	// Compare TO clauses (materialized views only)
-	if getStringValue(stmt1.To) != getStringValue(stmt2.To) {
+	if getViewTableTargetValue(stmt1.To) != getViewTableTargetValue(stmt2.To) {
 		return false
 	}
 
@@ -1146,8 +1146,9 @@ func generateCreateViewSQL(view *ViewInfo) string {
 		sql += " ON CLUSTER " + view.Cluster
 	}
 
-	if view.Statement.To != nil && *view.Statement.To != "" {
-		sql += " TO " + *view.Statement.To
+	toValue := getViewTableTargetValue(view.Statement.To)
+	if toValue != "" {
+		sql += " TO " + toValue
 	}
 
 	if view.Statement.Engine != nil {
