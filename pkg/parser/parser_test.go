@@ -139,6 +139,8 @@ type ExpectedUser struct {
 	Grantees          *ExpectedGrantees `yaml:"grantees,omitempty"`
 	Roles             []string          `yaml:"roles,omitempty"`
 	RolesExcept       []string          `yaml:"roles_except,omitempty"`
+	DefaultDatabase   string            `yaml:"default_database,omitempty"`
+	DefaultDbNone     bool              `yaml:"default_database_none,omitempty"`
 }
 
 type Identification struct {
@@ -992,12 +994,27 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 
 			if user.Roles != nil {
 				if user.Roles.Roles != nil {
-					expectedUser.Roles = user.Roles.Roles
+					var cleanedRoles []string
+					for _, role := range user.Roles.Roles {
+						cleanedRoles = append(cleanedRoles, removeQuotes(role))
+					}
+					expectedUser.Roles = cleanedRoles
 				}
 
 				if user.Roles.Except != nil {
-					expectedUser.RolesExcept = user.Roles.Except
+					var cleanedExcept []string
+					for _, role := range user.Roles.Except {
+						cleanedExcept = append(cleanedExcept, removeQuotes(role))
+					}
+					expectedUser.RolesExcept = cleanedExcept
 				}
+			}
+
+			if user.DefaultDatabase != nil {
+				if user.DefaultDatabase.Database != nil {
+					expectedUser.DefaultDatabase = removeQuotes(*user.DefaultDatabase.Database)
+				}
+				expectedUser.DefaultDbNone = user.DefaultDatabase.None
 			}
 
 			if expectedUser.Name != "" {

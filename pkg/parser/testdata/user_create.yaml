@@ -129,7 +129,7 @@ users:
         - reader
     - name: name38
       roles:
-        - "'special-role'"
+        - special-role
         - guest
     - name: name39
       roles:
@@ -141,5 +141,11 @@ users:
       roles:
         - ALL
       roles_except:
-        - "'admin-role'"
-        - "guest"
+        - admin-role
+        - guest
+    - name: name41
+      default_database: analytics
+    - name: name42
+      default_database: special-db
+    - name: name43
+      default_database_none: true

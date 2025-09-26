@@ -120,3 +120,12 @@ CREATE USER name39 DEFAULT ROLE ALL EXCEPT role1, role2;
 
 -- User with default all roles except quoted roles
 CREATE USER name40 DEFAULT ROLE ALL EXCEPT 'admin-role', guest;
+
+-- User with default database
+CREATE USER name41 DEFAULT DATABASE analytics;
+
+-- User with default database using quotes
+CREATE USER name42 DEFAULT DATABASE 'special-db';
+
+-- User with default database set to NONE
+CREATE USER name43 DEFAULT DATABASE NONE;

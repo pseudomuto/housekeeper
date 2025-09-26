@@ -15,6 +15,7 @@ type (
 		ValidUntil        *string             `parser:"('VALID' 'UNTIL' @String)?"`
 		AccessStorageType *string             `parser:"('IN' @Ident)?"`
 		Roles             *Roles              `parser:"@@?"`
+		DefaultDatabase   *DefaultDatabase    `parser:"@@?"`
 		Grantees          *UserGrantees       `parser:"@@?"`
 		Semicolon         bool                `parser:"';'"`
 	}
@@ -68,5 +69,10 @@ type (
 	Roles struct {
 		Roles  []string `parser:"'DEFAULT' 'ROLE' @(Ident | BacktickIdent | String) (',' @(Ident | BacktickIdent | String))*"`
 		Except []string `parser:"('EXCEPT' @(Ident | BacktickIdent | String) (',' @(Ident | BacktickIdent | String))*)?"`
+	}
+
+	DefaultDatabase struct {
+		Database *string `parser:"'DEFAULT' 'DATABASE' @(Ident | BacktickIdent | String)"`
+		None     bool    `parser:"| 'DEFAULT' 'DATABASE' @'NONE'"`
 	}
 )
