@@ -128,13 +128,17 @@ type ExpectedNamedCollection struct {
 }
 
 type ExpectedUser struct {
-	Name           string         `yaml:"name"`
-	IfNotExists    bool           `yaml:"if_not_exists,omitempty"`
-	OrReplace      bool           `yaml:"or_replace,omitempty"`
-	Cluster        string         `yaml:"cluster,omitempty"`
-	Identification Identification `yaml:"identification,omitempty"`
-	Host           *Host          `yaml:"host,omitempty"`
-	ValidUntil     string         `yaml:"valid_until,omitempty"`
+	Name              string            `yaml:"name"`
+	IfNotExists       bool              `yaml:"if_not_exists,omitempty"`
+	OrReplace         bool              `yaml:"or_replace,omitempty"`
+	Cluster           string            `yaml:"cluster,omitempty"`
+	Identification    Identification    `yaml:"identification,omitempty"`
+	Host              *Host             `yaml:"host,omitempty"`
+	ValidUntil        string            `yaml:"valid_until,omitempty"`
+	AccessStorageType string            `yaml:"access_storage_type,omitempty"`
+	Grantees          *ExpectedGrantees `yaml:"grantees,omitempty"`
+	Roles             []string          `yaml:"roles,omitempty"`
+	RolesExcept       []string          `yaml:"roles_except,omitempty"`
 }
 
 type Identification struct {
@@ -156,6 +160,17 @@ type Identification struct {
 type Host struct {
 	Type  string `yaml:"type"`
 	Value string `yaml:"value,omitempty"`
+}
+
+type ExpectedGrantees struct {
+	Items  []ExpectedGranteeItem `yaml:"items,omitempty"`
+	Except []ExpectedGranteeItem `yaml:"except,omitempty"`
+}
+
+type ExpectedGranteeItem struct {
+	UserOrRole *string `yaml:"user_or_role,omitempty"`
+	Any        bool    `yaml:"any,omitempty"`
+	None       bool    `yaml:"none,omitempty"`
 }
 
 var updateFlag = flag.Bool("update", false, "update YAML test files")
@@ -873,25 +888,25 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 
 				if user.Identification.IdentifiedWithHttp != nil {
 					identification.With = "http"
-					identification.HttpServer = *user.Identification.IdentifiedWithHttp
+					identification.HttpServer = removeQuotes(*user.Identification.IdentifiedWithHttp)
 				}
 
 				if user.Identification.IdentifiedWithLdap != nil {
 					identification.With = "ldap"
-					identification.LdapServer = *user.Identification.IdentifiedWithLdap
+					identification.LdapServer = removeQuotes(*user.Identification.IdentifiedWithLdap)
 				}
 
 				if user.Identification.IdentifiedWithKerberos != nil {
 					identification.With = "kerberos"
 
 					if user.Identification.IdentifiedWithKerberos.Realm != nil {
-						identification.KerberosRealm = *user.Identification.IdentifiedWithKerberos.Realm
+						identification.KerberosRealm = removeQuotes(*user.Identification.IdentifiedWithKerberos.Realm)
 					}
 				}
 
 				if user.Identification.IdentifiedWithSslCertificate != nil {
 					identification.With = "ssl_certificate"
-					identification.SslCn = *user.Identification.IdentifiedWithSslCertificate
+					identification.SslCn = removeQuotes(*user.Identification.IdentifiedWithSslCertificate)
 				}
 
 				if user.Identification.IdentifiedWithOther != nil {
@@ -899,14 +914,14 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 						identification.With = *user.Identification.IdentifiedWithOther.With
 					}
 
-					identification.By = user.Identification.IdentifiedWithOther.By
+					identification.By = removeQuotes(user.Identification.IdentifiedWithOther.By)
 
 					if user.Identification.IdentifiedWithOther.Salt != nil {
-						identification.Salt = *user.Identification.IdentifiedWithOther.Salt
+						identification.Salt = removeQuotes(*user.Identification.IdentifiedWithOther.Salt)
 					}
 
 					if user.Identification.IdentifiedWithOther.ValidUntil != nil {
-						identification.ValidUntil = *user.Identification.IdentifiedWithOther.ValidUntil
+						identification.ValidUntil = removeQuotes(*user.Identification.IdentifiedWithOther.ValidUntil)
 					}
 				}
 
@@ -914,29 +929,75 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 
 			if user.ValidUntil != nil {
-				expectedUser.ValidUntil = *user.ValidUntil
+				expectedUser.ValidUntil = removeQuotes(*user.ValidUntil)
+			}
+
+			if user.AccessStorageType != nil {
+				expectedUser.AccessStorageType = *user.AccessStorageType
 			}
 
 			if user.Host != nil {
 				host := &Host{}
 				if user.Host.IP != nil {
 					host.Type = "ip"
-					host.Value = *user.Host.IP
+					host.Value = removeQuotes(*user.Host.IP)
 				} else if user.Host.Any {
 					host.Type = "any"
 				} else if user.Host.Local {
 					host.Type = "local"
 				} else if user.Host.Name != nil {
 					host.Type = "name"
-					host.Value = *user.Host.Name
+					host.Value = removeQuotes(*user.Host.Name)
 				} else if user.Host.Regexp != nil {
 					host.Type = "regexp"
-					host.Value = *user.Host.Regexp
+					host.Value = removeQuotes(*user.Host.Regexp)
 				} else if user.Host.Like != nil {
 					host.Type = "like"
-					host.Value = *user.Host.Like
+					host.Value = removeQuotes(*user.Host.Like)
 				}
 				expectedUser.Host = host
+			}
+
+			if user.Grantees != nil {
+				grantees := &ExpectedGrantees{}
+
+				// Process main grantee items
+				for _, item := range user.Grantees.Items {
+					granteeItem := ExpectedGranteeItem{}
+					if item.UserOrRole != nil {
+						cleanedValue := removeQuotes(*item.UserOrRole)
+						granteeItem.UserOrRole = &cleanedValue
+					}
+					granteeItem.Any = item.Any
+					granteeItem.None = item.None
+					grantees.Items = append(grantees.Items, granteeItem)
+				}
+
+				// Process EXCEPT items if present
+				if user.Grantees.Except != nil {
+					for _, item := range user.Grantees.Except.Items {
+						granteeItem := ExpectedGranteeItem{}
+						if item.UserOrRole != nil {
+							cleanedValue := removeQuotes(*item.UserOrRole)
+							granteeItem.UserOrRole = &cleanedValue
+						}
+						granteeItem.Any = item.Any
+						granteeItem.None = item.None
+						grantees.Except = append(grantees.Except, granteeItem)
+					}
+				}
+
+				expectedUser.Grantees = grantees
+			}
+
+			if user.Roles != nil {
+				if user.Roles.Roles != nil {
+					expectedUser.Roles = user.Roles.Roles
+				}
+
+				if user.Roles.Except != nil {
+					expectedUser.RolesExcept = user.Roles.Except
+				}
 			}
 
 			if expectedUser.Name != "" {
@@ -1192,6 +1253,9 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 		require.Equal(t, expectedUser.ValidUntil, actualUser.ValidUntil,
 			"Wrong user ValidUntil at index %d in %s", i, sqlFile)
 
+		require.Equal(t, expectedUser.AccessStorageType, actualUser.AccessStorageType,
+			"Wrong user AccessStorageType at index %d in %s", i, sqlFile)
+
 		if expectedUser.Host != nil {
 			require.NotNil(t, actualUser.Host, "Expected user host but got nil at index %d in %s", i, sqlFile)
 			require.Equal(t, expectedUser.Host.Type, actualUser.Host.Type,
@@ -1201,6 +1265,44 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 		} else {
 			require.Nil(t, actualUser.Host, "Expected no user host but got one at index %d in %s", i, sqlFile)
 		}
+
+		if expectedUser.Grantees != nil {
+			require.NotNil(t, actualUser.Grantees, "Expected user grantees but got nil at index %d in %s", i, sqlFile)
+			require.Len(t, actualUser.Grantees.Items, len(expectedUser.Grantees.Items),
+				"Wrong number of grantee items for user %s at index %d in %s", expectedUser.Name, i, sqlFile)
+			require.Len(t, actualUser.Grantees.Except, len(expectedUser.Grantees.Except),
+				"Wrong number of grantee except items for user %s at index %d in %s", expectedUser.Name, i, sqlFile)
+
+			// Check main grantee items
+			for j, expectedItem := range expectedUser.Grantees.Items {
+				actualItem := actualUser.Grantees.Items[j]
+				require.Equal(t, expectedItem.UserOrRole, actualItem.UserOrRole,
+					"Wrong user or role in grantee item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.Any, actualItem.Any,
+					"Wrong ANY flag in grantee item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.None, actualItem.None,
+					"Wrong NONE flag in grantee item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+			}
+
+			// Check except grantee items
+			for j, expectedItem := range expectedUser.Grantees.Except {
+				actualItem := actualUser.Grantees.Except[j]
+				require.Equal(t, expectedItem.UserOrRole, actualItem.UserOrRole,
+					"Wrong user or role in except item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.Any, actualItem.Any,
+					"Wrong ANY flag in except item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+				require.Equal(t, expectedItem.None, actualItem.None,
+					"Wrong NONE flag in except item %d for user %s at index %d in %s", j, expectedUser.Name, i, sqlFile)
+			}
+		} else {
+			require.Nil(t, actualUser.Grantees, "Expected no user grantees but got one at index %d in %s", i, sqlFile)
+		}
+
+		require.Equal(t, expectedUser.Roles, actualUser.Roles,
+			"Wrong user DefaultRoles at index %d in %s", i, sqlFile)
+
+		require.Equal(t, expectedUser.RolesExcept, actualUser.RolesExcept,
+			"Wrong user DefaultRoles at index %d in %s", i, sqlFile)
 
 	}
 }

@@ -84,3 +84,39 @@ CREATE USER name27 IDENTIFIED BY 'password' VALID UNTIL '2025-01-01';
 
 -- VALID UNTIL at identification method level
 CREATE USER name28 IDENTIFIED BY 'hash_value' VALID UNTIL '2025-12-31 23:59:59 UTC';
+
+-- GRANTEES with user list
+CREATE USER name29 GRANTEES user1, user2, 'special-user';
+
+-- GRANTEES with ANY
+CREATE USER name31 GRANTEES ANY;
+
+-- GRANTEES with NONE
+CREATE USER name32 GRANTEES NONE;
+
+-- Simple test with user name
+CREATE USER name30 GRANTEES simple_user;
+
+-- User with access storage type
+CREATE USER name33 IN local_directory;
+
+-- User with valid until and access storage type
+CREATE USER name34 VALID UNTIL '2025-12-31 23:59:59 UTC' IN ldap_directory;
+
+-- User with identification, valid until, and access storage type
+CREATE USER name35 IDENTIFIED BY 'password123' VALID UNTIL '2025-06-01' IN memory;
+
+-- User with default single role
+CREATE USER name36 DEFAULT ROLE admin;
+
+-- User with default multiple roles
+CREATE USER name37 DEFAULT ROLE admin, user, reader;
+
+-- User with default roles using quotes
+CREATE USER name38 DEFAULT ROLE 'special-role', guest;
+
+-- User with default all roles except some
+CREATE USER name39 DEFAULT ROLE ALL EXCEPT role1, role2;
+
+-- User with default all roles except quoted roles
+CREATE USER name40 DEFAULT ROLE ALL EXCEPT 'admin-role', guest;

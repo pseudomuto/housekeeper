@@ -8,12 +8,15 @@ type (
 			IfNotExists bool `parser:"  @('IF' 'NOT' 'EXISTS')"`
 			OrReplace   bool `parser:"| @('OR' 'REPLACE')"`
 		} `parser:"@@?"`
-		Name           string              `parser:"@(Ident | BacktickIdent)"`
-		OnCluster      *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Identification *UserIdentification `parser:"@@?"`
-		Host           *UserHost           `parser:"@@?"`
-		ValidUntil     *string             `parser:"('VALID' 'UNTIL' @String)?"`
-		Semicolon      bool                `parser:"';'"`
+		Name              string              `parser:"@(Ident | BacktickIdent)"`
+		OnCluster         *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Identification    *UserIdentification `parser:"@@?"`
+		Host              *UserHost           `parser:"@@?"`
+		ValidUntil        *string             `parser:"('VALID' 'UNTIL' @String)?"`
+		AccessStorageType *string             `parser:"('IN' @Ident)?"`
+		Roles             *Roles              `parser:"@@?"`
+		Grantees          *UserGrantees       `parser:"@@?"`
+		Semicolon         bool                `parser:"';'"`
 	}
 
 	UserIdentification struct {
@@ -43,5 +46,27 @@ type (
 		Name   *string `parser:"| 'HOST' 'NAME' @String"`
 		Regexp *string `parser:"| 'HOST' 'REGEXP' @String"`
 		Like   *string `parser:"| 'HOST' 'LIKE' @String"`
+	}
+
+	UserGrantees struct {
+		Grantees string        `parser:"'GRANTEES'"`
+		Items    []GranteeItem `parser:"@@ (',' @@)*"`
+		Except   *UserExcept   `parser:"@@?"`
+	}
+
+	GranteeItem struct {
+		UserOrRole *string `parser:"@(Ident | BacktickIdent | String)"`
+		Any        bool    `parser:"| @'ANY'"`
+		None       bool    `parser:"| @'NONE'"`
+	}
+
+	UserExcept struct {
+		Except string        `parser:"'EXCEPT'"`
+		Items  []GranteeItem `parser:"@@ (',' @@)*"`
+	}
+
+	Roles struct {
+		Roles  []string `parser:"'DEFAULT' 'ROLE' @(Ident | BacktickIdent | String) (',' @(Ident | BacktickIdent | String))*"`
+		Except []string `parser:"('EXCEPT' @(Ident | BacktickIdent | String) (',' @(Ident | BacktickIdent | String))*)?"`
 	}
 )
