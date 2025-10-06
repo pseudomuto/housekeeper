@@ -23,18 +23,16 @@ type databaseObjects struct {
 
 // globalObjects holds the organized global statements (not tied to a specific database)
 type globalObjects struct {
-	roles       []*parser.CreateRoleStmt
-	grants      []*parser.GrantStmt
-	collections []*parser.CreateNamedCollectionStmt
+	roles  []*parser.CreateRoleStmt
+	grants []*parser.GrantStmt
 }
 
 // organizeStatementsByDatabase groups SQL statements by database and separates global objects
 func organizeStatementsByDatabase(sql *parser.SQL) (map[string]*databaseObjects, *globalObjects) {
 	dbObjects := make(map[string]*databaseObjects)
 	global := &globalObjects{
-		roles:       []*parser.CreateRoleStmt{},
-		grants:      []*parser.GrantStmt{},
-		collections: []*parser.CreateNamedCollectionStmt{},
+		roles:  []*parser.CreateRoleStmt{},
+		grants: []*parser.GrantStmt{},
 	}
 
 	ensureDB := func(name string) {
@@ -65,9 +63,6 @@ func organizeStatementsByDatabase(sql *parser.SQL) (map[string]*databaseObjects,
 			dbName := getDatabase(stmt.CreateView.Database)
 			ensureDB(dbName)
 			dbObjects[dbName].views = append(dbObjects[dbName].views, stmt.CreateView)
-		} else if stmt.CreateNamedCollection != nil {
-			// Named collections are global objects
-			global.collections = append(global.collections, stmt.CreateNamedCollection)
 		} else if stmt.CreateRole != nil {
 			// Roles are global objects
 			global.roles = append(global.roles, stmt.CreateRole)
@@ -160,7 +155,7 @@ func findOrphanGrants(grants []*parser.GrantStmt, roles []*parser.CreateRoleStmt
 
 // hasGlobalObjects checks if there are any global objects to generate
 func hasGlobalObjects(global *globalObjects) bool {
-	return len(global.roles) > 0 || len(global.grants) > 0 || len(global.collections) > 0
+	return len(global.roles) > 0 || len(global.grants) > 0
 }
 
 // getDatabase extracts the database name from a pointer, defaulting to "default"
@@ -363,22 +358,6 @@ func (p *Project) addTableFiles(fsMap fstest.MapFS, dbName string, tables []*par
 	return nil
 }
 
-// addCollectionFiles adds collection files to the global directory
-func (p *Project) addCollectionFiles(fsMap fstest.MapFS, collections []*parser.CreateNamedCollectionStmt) error {
-	for _, collection := range collections {
-		stmt, err := p.formatStatement(collection)
-		if err != nil {
-			return err
-		}
-
-		path := filepath.Join("db", "schemas", "_global", "collections", collection.Name+".sql")
-		fsMap[path] = &fstest.MapFile{
-			Data: []byte(stmt),
-		}
-	}
-	return nil
-}
-
 // addSingleRoleFile creates a file for a single role with its associated grants
 func (p *Project) addSingleRoleFile(
 	fsMap fstest.MapFS,
@@ -508,13 +487,6 @@ func (p *Project) generateGlobalFiles(fsMap fstest.MapFS, global *globalObjects)
 		}
 	}
 
-	// Create collection files
-	if len(global.collections) > 0 {
-		if err := p.addCollectionFiles(fsMap, global.collections); err != nil {
-			return errors.Wrap(err, "failed to add collection files")
-		}
-	}
-
 	return nil
 }
 
@@ -523,7 +495,7 @@ func (p *Project) generateGlobalSchemaContent(global *globalObjects) string {
 	var content strings.Builder
 	var imports []string
 
-	content.WriteString("-- Global objects (roles, grants, named collections)\n")
+	content.WriteString("-- Global objects (roles, grants)\n")
 	content.WriteString("-- These objects exist at the cluster level and are not tied to specific databases\n\n")
 
 	// Add imports for roles
@@ -538,15 +510,6 @@ func (p *Project) generateGlobalSchemaContent(global *globalObjects) string {
 	// Check for orphan grants
 	if hasOrphanGrants(global.grants, global.roles) {
 		imports = append(imports, "roles/grants.sql")
-	}
-
-	// Add imports for named collections
-	if len(global.collections) > 0 {
-		content.WriteString("-- Named Collections\n")
-		for _, collection := range global.collections {
-			importPath := fmt.Sprintf("collections/%s.sql", collection.Name)
-			imports = append(imports, importPath)
-		}
 	}
 
 	// Add import directives

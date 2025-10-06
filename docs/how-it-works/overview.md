@@ -119,10 +119,9 @@ schema, err := client.GetSchema(ctx)
 The extraction process:
 1. **Connection Management**: Handles various DSN formats and connection options
 2. **System Object Filtering**: Excludes system databases and tables
-3. **Complete Object Support**: Extracts databases, tables, named collections, dictionaries, views
-4. **Configuration Filtering**: Excludes `builtin_` prefixed named collections (config-managed)
-5. **Cluster Awareness**: Injects ON CLUSTER clauses when configured
-6. **DDL Generation**: Produces valid ClickHouse DDL statements
+3. **Complete Object Support**: Extracts databases, tables, dictionaries, views
+4. **Cluster Awareness**: Injects ON CLUSTER clauses when configured
+5. **DDL Generation**: Produces valid ClickHouse DDL statements
 
 #### Supported Connection Types
 ```bash

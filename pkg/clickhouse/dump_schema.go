@@ -7,7 +7,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
-// DumpSchema retrieves all schema objects (databases, tables, named collections, dictionaries, views, roles, functions)
+// DumpSchema retrieves all schema objects (databases, tables, dictionaries, views, roles, functions)
 // and returns them as a parsed SQL structure ready for use with migration generation.
 //
 // This function combines all individual extraction functions to provide a complete view of the
@@ -17,11 +17,10 @@ import (
 // The extraction follows this order:
 //  1. Databases - extracted first as they define the namespace
 //  2. Tables - extracted with full DDL statements
-//  3. Named Collections - connection configurations that dictionaries might reference
-//  4. Dictionaries - dictionary definitions with source/layout/lifetime
-//  5. Views - both regular and materialized views (extracted last since they may depend on dictionaries)
-//  6. Roles - global role definitions and privilege grants
-//  7. Functions - user-defined function definitions (global objects)
+//  3. Dictionaries - dictionary definitions with source/layout/lifetime
+//  4. Views - both regular and materialized views (extracted last since they may depend on dictionaries)
+//  5. Roles - global role definitions and privilege grants
+//  6. Functions - user-defined function definitions (global objects)
 //
 // All system objects are automatically excluded and all DDL statements are validated.
 //
@@ -54,13 +53,6 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 		return nil, errors.Wrap(err, "failed to extract databases")
 	}
 	allStatements = append(allStatements, databases.Statements...)
-
-	// Extract named collections (before tables since integration engine tables might use them)
-	namedCollections, err := extractNamedCollections(ctx, client)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to extract named collections")
-	}
-	allStatements = append(allStatements, namedCollections.Statements...)
 
 	// Extract tables
 	tables, err := extractTables(ctx, client)
