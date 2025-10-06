@@ -88,16 +88,9 @@ func (c *Client) addOnClusterToFunction(createQuery string) string {
 		return createQuery // Already has ON CLUSTER
 	}
 
-	// Find the function name end position to insert ON CLUSTER
-	// Look for the space before "AS"
-	beforeAs := strings.LastIndex(createQuery[:asPos], " ")
-	if beforeAs == -1 {
-		return createQuery // Can't find insertion point
-	}
-
-	// Insert ON CLUSTER clause
+	// Insert ON CLUSTER clause right before " AS "
 	clusterClause := fmt.Sprintf(" ON CLUSTER `%s`", c.options.Cluster)
-	result := createQuery[:beforeAs] + clusterClause + createQuery[beforeAs:]
+	result := createQuery[:asPos] + clusterClause + createQuery[asPos:]
 
 	return result
 }
