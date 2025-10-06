@@ -47,10 +47,6 @@ For larger projects, split schemas into logical modules:
 -- Database definitions
 -- housekeeper:import schemas/databases/ecommerce.sql
 
--- Named collections (connection configs)
--- housekeeper:import schemas/_global/collections/api_configs.sql
--- housekeeper:import schemas/_global/collections/kafka_configs.sql
-
 -- Core tables
 -- housekeeper:import schemas/tables/users.sql
 -- housekeeper:import schemas/tables/products.sql
@@ -71,10 +67,9 @@ The order of imports matters for proper migration generation. Housekeeper proces
 
 1. **Global Objects** (roles, users, settings profiles) - Available cluster-wide
 2. **Databases** - Container for other objects
-3. **Named Collections** - Global connection configurations
-4. **Tables** - Data storage structures
-5. **Dictionaries** - External data lookups
-6. **Views** - Query abstractions that may depend on tables/dictionaries
+3. **Tables** - Data storage structures
+4. **Dictionaries** - External data lookups
+5. **Views** - Query abstractions that may depend on tables/dictionaries
 
 ```sql
 -- File: db/main.sql - Proper import ordering
@@ -86,16 +81,13 @@ The order of imports matters for proper migration generation. Housekeeper proces
 -- 2. Database definitions  
 -- housekeeper:import schemas/databases/main.sql
 
--- 3. Named collections (if needed by tables)
--- housekeeper:import schemas/_global/collections/main.sql
-
--- 4. Tables and core data structures
+-- 3. Tables and core data structures
 -- housekeeper:import schemas/tables/main.sql
 
--- 5. Dictionaries that may reference tables
+-- 4. Dictionaries that may reference tables
 -- housekeeper:import schemas/dictionaries/main.sql
 
--- 6. Views that query tables and dictionaries
+-- 5. Views that query tables and dictionaries
 -- housekeeper:import schemas/views/main.sql
 ```
 
@@ -151,105 +143,6 @@ ENGINE = MySQL('mysql-host:3306', 'database', 'user', 'password');
 -- PostgreSQL integration  
 CREATE DATABASE postgres_data
 ENGINE = PostgreSQL('postgres-host:5432', 'database', 'user', 'password');
-```
-
-## Named Collections
-
-Named collections provide a centralized way to store connection parameters and configuration that can be reused across multiple tables, especially useful for integration engines.
-
-### Basic Named Collections
-
-```sql
--- API configuration
-CREATE NAMED COLLECTION api_config AS
-    host = 'api.example.com',
-    port = 443,
-    ssl = TRUE,
-    timeout = 30;
-
--- Database connection
-CREATE NAMED COLLECTION postgres_config AS
-    host = 'postgres-host',
-    port = 5432,
-    user = 'clickhouse_user',
-    password = 'secure_password',
-    database = 'production_db';
-
--- Kafka configuration  
-CREATE NAMED COLLECTION kafka_cluster AS
-    kafka_broker_list = 'kafka1:9092,kafka2:9092,kafka3:9092',
-    kafka_security_protocol = 'SASL_SSL',
-    kafka_sasl_mechanism = 'PLAIN',
-    kafka_sasl_username = 'clickhouse',
-    kafka_sasl_password = 'secret';
-```
-
-### Using Named Collections with Tables
-
-Named collections are particularly powerful with integration engine tables:
-
-```sql
--- Kafka table using named collection
-CREATE TABLE events (
-    id UInt64,
-    event_type String,
-    timestamp DateTime,
-    data String
-) ENGINE = Kafka(
-    kafka_cluster,  -- Reference to named collection
-    'events_topic',
-    'analytics_group',
-    'JSONEachRow'
-);
-
--- PostgreSQL table using named collection
-CREATE TABLE users_staging (
-    id UInt64,
-    email String,
-    name String
-) ENGINE = PostgreSQL(
-    postgres_config,  -- Reference to named collection
-    'users'
-);
-```
-
-### Named Collection Features
-
-- **Centralized Configuration**: Define connection parameters once, use everywhere
-- **Security**: Keeps credentials out of individual table definitions
-- **Cluster Support**: Full `ON CLUSTER` support for distributed deployments
-- **Global Scope**: Named collections are available across all databases
-- **Immutable**: Use `CREATE OR REPLACE` for modifications (no `ALTER` support)
-
-### Configuration vs DDL-Managed Collections
-
-Housekeeper distinguishes between two types of named collections:
-
-1. **DDL-Managed Collections**: Created via `CREATE NAMED COLLECTION` statements
-   - Stored in system.named_collections table
-   - Managed through Housekeeper migrations
-   - Can be created, replaced, and dropped via DDL
-
-2. **Configuration-Managed Collections**: Defined in ClickHouse XML/YAML config files
-   - Also appear in system.named_collections table
-   - Typically prefixed with `builtin_` by convention
-   - Require configuration file changes and server restarts
-   - **Automatically excluded from schema extraction**
-
-> **Note**: Collections with names starting with `builtin_` are filtered out during schema extraction to prevent conflicts between DDL and configuration management approaches. This ensures that configuration-defined collections remain under config management control.
-
-### Cluster-Aware Named Collections
-
-```sql
--- Named collection for cluster deployment
-CREATE NAMED COLLECTION kafka_cluster 
-ON CLUSTER production
-AS
-    kafka_broker_list = 'kafka1:9092,kafka2:9092',
-    kafka_security_protocol = 'SASL_SSL',
-    kafka_sasl_mechanism = 'PLAIN',
-    kafka_sasl_username = 'clickhouse',
-    kafka_sasl_password = 'secret';
 ```
 
 ## Table Design

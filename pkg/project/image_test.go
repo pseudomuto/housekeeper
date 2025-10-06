@@ -41,10 +41,10 @@ func TestGenerateImage(t *testing.T) {
 			sql: `
 				CREATE DATABASE analytics ENGINE = Atomic;
 				CREATE DATABASE users ENGINE = Atomic;
-				
+
 				CREATE TABLE analytics.events (id UInt64) ENGINE = MergeTree() ORDER BY id;
 				CREATE TABLE users.profiles (id UInt64) ENGINE = MergeTree() ORDER BY id;
-				
+
 				CREATE DICTIONARY analytics.lookup (
 					id UInt64 IS_OBJECT_ID,
 					name String
@@ -52,7 +52,7 @@ func TestGenerateImage(t *testing.T) {
 				SOURCE(HTTP(url 'http://example.com'))
 				LAYOUT(HASHED())
 				LIFETIME(3600);
-				
+
 				CREATE VIEW users.active AS SELECT * FROM profiles WHERE active = 1;
 			`,
 			fileTests: []fileTest{
@@ -72,47 +72,17 @@ func TestGenerateImage(t *testing.T) {
 			},
 		},
 		{
-			name: "named collections are organized properly",
-			sql: `
-				CREATE DATABASE analytics ENGINE = Atomic;
-				
-				CREATE NAMED COLLECTION kafka_config AS
-					host = 'localhost',
-					port = 9092;
-					
-				CREATE TABLE analytics.events (
-					id UInt64,
-					message String
-				) ENGINE = MergeTree() ORDER BY id;
-			`,
-			fileTests: []fileTest{
-				{"db/main.sql", "-- housekeeper:import schemas/_global/schema.sql"},
-				{"db/main.sql", "-- housekeeper:import schemas/analytics/schema.sql"},
-				{"db/schemas/analytics/schema.sql", "CREATE DATABASE `analytics` ENGINE = Atomic"},
-				{"db/schemas/analytics/schema.sql", "-- housekeeper:import tables/events.sql"},
-				{"db/schemas/_global/schema.sql", "-- Global objects"},
-				{"db/schemas/_global/schema.sql", "-- Named Collections"},
-				{"db/schemas/_global/schema.sql", "-- housekeeper:import collections/kafka_config.sql"},
-				{"db/schemas/analytics/tables/events.sql", "CREATE TABLE `analytics`.`events`"},
-				{"db/schemas/analytics/tables/events.sql", "`id`      UInt64"},
-				{"db/schemas/analytics/tables/events.sql", "`message` String"},
-				{"db/schemas/_global/collections/kafka_config.sql", "CREATE NAMED COLLECTION `kafka_config`"},
-				{"db/schemas/_global/collections/kafka_config.sql", "`host` = 'localhost'"},
-				{"db/schemas/_global/collections/kafka_config.sql", "`port` = 9092"},
-			},
-		},
-		{
 			name: "roles and grants are organized in _global",
 			sql: `
 				CREATE DATABASE analytics ENGINE = Atomic;
-				
+
 				CREATE ROLE admin_role;
 				CREATE ROLE readonly_role;
-				
+
 				GRANT SELECT ON *.* TO readonly_role;
 				GRANT ALL ON analytics.* TO admin_role;
 				GRANT readonly_role TO admin_role;
-				
+
 				CREATE TABLE analytics.users (id UInt64) ENGINE = MergeTree() ORDER BY id;
 			`,
 			fileTests: []fileTest{
@@ -219,8 +189,6 @@ func TestGenerateImage_FileStructure(t *testing.T) {
 	// Expected file structure
 	expectedFiles := []string{
 		"db/main.sql",
-		"db/schemas/_global/schema.sql",
-		"db/schemas/_global/collections/api_config.sql",
 		"db/schemas/analytics/schema.sql",
 		"db/schemas/analytics/tables/events.sql",
 		"db/schemas/analytics/dictionaries/lookup.sql",

@@ -17,7 +17,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Key Features
 
-- **Complete ClickHouse DDL Support** - Full support for databases, tables (including `CREATE TABLE AS`), dictionaries, views, materialized views, named collections, functions, and roles
+- **Complete ClickHouse DDL Support** - Full support for databases, tables (including `CREATE TABLE AS`), dictionaries, views, materialized views, functions, and roles
 - **Cluster-Aware Operations** - Native `ON CLUSTER` support for distributed ClickHouse deployments
 - **Intelligent Migration Generation** - Smart schema comparison with proper operation ordering and dependency management
 - **Modern Parser Architecture** - Built with participle for robust, maintainable SQL parsing
@@ -29,8 +29,7 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 | Object Type | CREATE | ALTER | ATTACH | DETACH | DROP | RENAME | GRANT/REVOKE | Notes |
 |------------|--------|-------|---------|---------|------|--------|--------------|-------|
 | **Database** | ✅ | ✅¹ | ✅ | ✅ | ✅ | ✅ | N/A | ¹Comment changes only |
-| **Named Collection** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅ | N/A | ²Uses CREATE OR REPLACE |
-| **Function** | ✅ | ❌³ | ❌ | ❌ | ✅ | ✅⁴ | N/A | ³Uses DROP+CREATE strategy |
+| **Function** | ✅ | ❌² | ❌ | ❌ | ✅ | ✅³ | N/A | ²Uses DROP+CREATE strategy |
 | **Table** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A | Full ALTER support, CREATE AS syntax |
 | **Dictionary** | ✅ | ❌⁵ | ✅ | ✅ | ✅ | ✅ | N/A | ⁵Uses CREATE OR REPLACE |
 | **View** | ✅ | ❌⁶ | ✅ | ✅ | ✅ | ✅⁷ | N/A | ⁶Uses CREATE OR REPLACE |
@@ -42,16 +41,15 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 - ❌ Not supported (alternative strategy used)
 - N/A Not applicable  
 - ¹ ALTER DATABASE only supports comment modifications
-- ² Named collections use CREATE OR REPLACE for all modifications
-- ³ Functions use DROP+CREATE for all modifications (no ALTER FUNCTION in ClickHouse)
-- ⁴ Functions use DROP+CREATE for renames (no RENAME FUNCTION in ClickHouse)
-- ⁵ Dictionaries use CREATE OR REPLACE for all modifications (ClickHouse limitation)
-- ⁶ Views use CREATE OR REPLACE for modifications
-- ⁷ Views use RENAME TABLE for renames
-- ⁸ Materialized view query changes use DROP+CREATE strategy for reliability
-- ⁹ Materialized views use table operations (ATTACH/DETACH/DROP/RENAME TABLE)
-- ¹⁰ ALTER ROLE supports RENAME TO and SETTINGS modifications
-- ¹¹ Roles use ALTER ROLE...RENAME TO for rename operations
+- ² Functions use DROP+CREATE for all modifications (no ALTER FUNCTION in ClickHouse)
+- ³ Functions use DROP+CREATE for renames (no RENAME FUNCTION in ClickHouse)
+- ⁴ Dictionaries use CREATE OR REPLACE for all modifications (ClickHouse limitation)
+- ⁵ Views use CREATE OR REPLACE for modifications
+- ⁶ Views use RENAME TABLE for renames
+- ⁷ Materialized view query changes use DROP+CREATE strategy for reliability
+- ⁸ Materialized views use table operations (ATTACH/DETACH/DROP/RENAME TABLE)
+- ⁹ ALTER ROLE supports RENAME TO and SETTINGS modifications
+- ¹⁰ Roles use ALTER ROLE...RENAME TO for rename operations
 
 ### Migration Strategy Notes
 

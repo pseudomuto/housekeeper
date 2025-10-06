@@ -354,25 +354,8 @@ func buildDependencyGraph(schema *Schema) *DependencyGraph {
     for _, db := range schema.Databases {
         graph.Nodes = append(graph.Nodes, db)
         
-        // Named collections are global but tracked per database for organization
-        for _, collection := range db.NamedCollections {
-            graph.Nodes = append(graph.Nodes, collection)
-        }
-        
         for _, table := range db.Tables {
             graph.Nodes = append(graph.Nodes, table)
-            
-            // Table may depend on named collection (integration engines)
-            if table.Engine.UsesNamedCollection() {
-                namedCollection := findNamedCollection(schema, table.Engine.NamedCollection)
-                if namedCollection != nil {
-                    graph.Edges = append(graph.Edges, Dependency{
-                        From: table,
-                        To:   namedCollection,
-                        Type: "named_collection_reference",
-                    })
-                }
-            }
         }
         
         for _, dict := range db.Dictionaries {
@@ -417,19 +400,16 @@ func orderMigrations(changes []Change) []Change {
     // UP migration order (creation order with dependencies)
     order := []string{
         "create_database",
-        "create_named_collection",  // Before tables (integration engines may use them)
         "create_table", 
         "create_dictionary",        // After tables (may reference tables)
         "create_view",             // Last (may reference tables and dictionaries)
         "alter_database",
         "alter_table",
-        "rename_named_collection",
         "rename_table",
         "rename_dictionary",
         "drop_view",               // First to drop (depends on tables/dictionaries)
         "drop_dictionary",         // Before tables (references them)
-        "drop_table",              // Before named collections (may use them)
-        "drop_named_collection",   // After tables that use them
+        "drop_table",
         "drop_database",           // Last (contains everything)
     }
     

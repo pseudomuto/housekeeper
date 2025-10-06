@@ -249,8 +249,6 @@ db/schemas/_global/
 │   ├── main.sql           # Role imports and basic definitions
 │   ├── team_roles.sql     # Department/team specific roles
 │   └── service_roles.sql  # Application service accounts
-└── collections/           # Future: named collections
-    └── main.sql           # Global named collections
 ```
 
 ### Import Order Matters

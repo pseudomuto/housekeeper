@@ -125,10 +125,9 @@ Functions are applied in the correct dependency order:
 1. Roles           (user management)
 2. Functions       (reusable logic)      ← Functions applied here
 3. Databases       (schema containers)  
-4. Collections     (named collections)
-5. Tables          (data structures)
-6. Dictionaries    (external data)
-7. Views           (computed results)
+4. Tables          (data structures)
+5. Dictionaries    (external data)
+6. Views           (computed results)
 ```
 
 This ensures functions are available when referenced by views, materialized views, or table defaults.
