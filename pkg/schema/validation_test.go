@@ -26,6 +26,31 @@ func makeDataType(name string) *parser.DataType {
 	}
 }
 
+// Helper function to create a simple expression for tests
+func makeExpression(value string) *parser.Expression {
+	return &parser.Expression{
+		Or: &parser.OrExpression{
+			And: &parser.AndExpression{
+				Not: &parser.NotExpression{
+					Comparison: &parser.ComparisonExpression{
+						Addition: &parser.AdditionExpression{
+							Multiplication: &parser.MultiplicationExpression{
+								Unary: &parser.UnaryExpression{
+									Primary: &parser.PrimaryExpression{
+										Identifier: &parser.IdentifierExpr{
+											Name: value,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestIsIntegrationEngine(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -184,6 +209,41 @@ func TestValidateTableOperation(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   ErrUnsupported,
+		},
+		{
+			name:    "invalid - Distributed table with PRIMARY KEY clause",
+			current: nil,
+			target: &TableInfo{
+				Name:       "events_distributed",
+				Database:   "analytics",
+				Engine:     makeEngine("Distributed"),
+				PrimaryKey: makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+		},
+		{
+			name:    "invalid - Buffer table with multiple invalid clauses",
+			current: nil,
+			target: &TableInfo{
+				Name:        "buffer_table",
+				Database:    "analytics",
+				Engine:      makeEngine("Buffer"),
+				PrimaryKey:  makeExpression("id"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+		},
+		{
+			name:    "valid - Distributed table with no restricted clauses",
+			current: nil,
+			target: &TableInfo{
+				Name:     "events_distributed",
+				Database: "analytics",
+				Engine:   makeEngine("Distributed"),
+			},
+			expectError: false,
 		},
 	}
 
@@ -472,6 +532,385 @@ func TestValidateViewOperation(t *testing.T) {
 			} else {
 				require.NoError(t, err, "Expected no error for test case: %s", tt.name)
 			}
+		})
+	}
+}
+
+func TestValidateTableClauses(t *testing.T) {
+	tests := []struct {
+		name        string
+		table       *TableInfo
+		expectError bool
+		errorType   error
+		errorMsg    string
+	}{
+		{
+			name: "valid - MergeTree with all clauses",
+			table: &TableInfo{
+				Name:        "events",
+				Database:    "analytics",
+				Engine:      makeEngine("MergeTree"),
+				PrimaryKey:  makeExpression("id"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+				OrderBy:     makeExpression("id"),
+				SampleBy:    makeExpression("id"),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid - ReplicatedMergeTree with all clauses",
+			table: &TableInfo{
+				Name:        "events",
+				Database:    "analytics",
+				Engine:      makeEngine("ReplicatedMergeTree"),
+				PrimaryKey:  makeExpression("id"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+				OrderBy:     makeExpression("id"),
+				SampleBy:    makeExpression("id"),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid - Memory with ORDER BY and PRIMARY KEY",
+			table: &TableInfo{
+				Name:       "temp_data",
+				Database:   "analytics",
+				Engine:     makeEngine("Memory"),
+				PrimaryKey: makeExpression("id"),
+				OrderBy:    makeExpression("id"),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid - Distributed with only ENGINE",
+			table: &TableInfo{
+				Name:     "events_distributed",
+				Database: "analytics",
+				Engine:   makeEngine("Distributed"),
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid - Distributed with PRIMARY KEY",
+			table: &TableInfo{
+				Name:       "events_distributed",
+				Database:   "analytics",
+				Engine:     makeEngine("Distributed"),
+				PrimaryKey: makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "PRIMARY KEY clause(s) not supported for Distributed tables",
+		},
+		{
+			name: "invalid - Distributed with PARTITION BY",
+			table: &TableInfo{
+				Name:        "events_distributed",
+				Database:    "analytics",
+				Engine:      makeEngine("Distributed"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "PARTITION BY clause(s) not supported for Distributed tables",
+		},
+		{
+			name: "invalid - Distributed with ORDER BY",
+			table: &TableInfo{
+				Name:     "events_distributed",
+				Database: "analytics",
+				Engine:   makeEngine("Distributed"),
+				OrderBy:  makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "ORDER BY clause(s) not supported for Distributed tables",
+		},
+		{
+			name: "invalid - Distributed with SAMPLE BY",
+			table: &TableInfo{
+				Name:     "events_distributed",
+				Database: "analytics",
+				Engine:   makeEngine("Distributed"),
+				SampleBy: makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "SAMPLE BY clause(s) not supported for Distributed tables",
+		},
+		{
+			name: "invalid - Distributed with multiple invalid clauses",
+			table: &TableInfo{
+				Name:        "events_distributed",
+				Database:    "analytics",
+				Engine:      makeEngine("Distributed"),
+				PrimaryKey:  makeExpression("id"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+				OrderBy:     makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "PRIMARY KEY, PARTITION BY, ORDER BY clause(s) not supported for Distributed tables",
+		},
+		{
+			name: "invalid - Buffer with PRIMARY KEY",
+			table: &TableInfo{
+				Name:       "buffer_table",
+				Database:   "analytics",
+				Engine:     makeEngine("Buffer"),
+				PrimaryKey: makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "PRIMARY KEY clause(s) not supported for Buffer tables",
+		},
+		{
+			name: "invalid - Dictionary engine with ORDER BY",
+			table: &TableInfo{
+				Name:     "dict_table",
+				Database: "analytics",
+				Engine:   makeEngine("Dictionary"),
+				OrderBy:  makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "ORDER BY clause(s) not supported for Dictionary tables",
+		},
+		{
+			name: "invalid - View engine with PARTITION BY",
+			table: &TableInfo{
+				Name:        "view_table",
+				Database:    "analytics",
+				Engine:      makeEngine("View"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "PARTITION BY clause(s) not supported for View tables",
+		},
+		{
+			name: "invalid - LiveView with SAMPLE BY",
+			table: &TableInfo{
+				Name:     "live_view",
+				Database: "analytics",
+				Engine:   makeEngine("LiveView"),
+				SampleBy: makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "SAMPLE BY clause(s) not supported for LiveView tables",
+		},
+		{
+			name: "invalid - Memory with PARTITION BY",
+			table: &TableInfo{
+				Name:        "memory_table",
+				Database:    "analytics",
+				Engine:      makeEngine("Memory"),
+				PartitionBy: makeExpression("toYYYYMM(date)"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "PARTITION BY clause(s) not supported for Memory tables",
+		},
+		{
+			name: "invalid - Memory with SAMPLE BY",
+			table: &TableInfo{
+				Name:     "memory_table",
+				Database: "analytics",
+				Engine:   makeEngine("Memory"),
+				SampleBy: makeExpression("id"),
+			},
+			expectError: true,
+			errorType:   ErrUnsupported,
+			errorMsg:    "SAMPLE BY clause(s) not supported for Memory tables",
+		},
+		{
+			name: "valid - nil engine",
+			table: &TableInfo{
+				Name:       "no_engine",
+				Database:   "analytics",
+				Engine:     nil,
+				PrimaryKey: makeExpression("id"),
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTableClauses(tt.table)
+
+			if tt.expectError {
+				require.Error(t, err, "Expected error for test case: %s", tt.name)
+				require.True(t, errors.Is(err, tt.errorType), "Expected error type %v, got %v", tt.errorType, err)
+				if tt.errorMsg != "" {
+					require.Contains(t, err.Error(), tt.errorMsg, "Expected error message to contain: %s", tt.errorMsg)
+				}
+			} else {
+				require.NoError(t, err, "Expected no error for test case: %s", tt.name)
+			}
+		})
+	}
+}
+
+func TestShouldCopyClause(t *testing.T) {
+	tests := []struct {
+		name       string
+		engine     *parser.TableEngine
+		clauseType string
+		shouldCopy bool
+	}{
+		// MergeTree - supports all clauses
+		{
+			name:       "MergeTree supports PRIMARY KEY",
+			engine:     makeEngine("MergeTree"),
+			clauseType: "PRIMARY KEY",
+			shouldCopy: true,
+		},
+		{
+			name:       "MergeTree supports PARTITION BY",
+			engine:     makeEngine("MergeTree"),
+			clauseType: "PARTITION BY",
+			shouldCopy: true,
+		},
+		{
+			name:       "MergeTree supports ORDER BY",
+			engine:     makeEngine("MergeTree"),
+			clauseType: "ORDER BY",
+			shouldCopy: true,
+		},
+		{
+			name:       "MergeTree supports SAMPLE BY",
+			engine:     makeEngine("MergeTree"),
+			clauseType: "SAMPLE BY",
+			shouldCopy: true,
+		},
+
+		// Distributed - restricts all main clauses
+		{
+			name:       "Distributed blocks PRIMARY KEY",
+			engine:     makeEngine("Distributed"),
+			clauseType: "PRIMARY KEY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Distributed blocks PARTITION BY",
+			engine:     makeEngine("Distributed"),
+			clauseType: "PARTITION BY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Distributed blocks ORDER BY",
+			engine:     makeEngine("Distributed"),
+			clauseType: "ORDER BY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Distributed blocks SAMPLE BY",
+			engine:     makeEngine("Distributed"),
+			clauseType: "SAMPLE BY",
+			shouldCopy: false,
+		},
+
+		// Buffer - restricts all main clauses
+		{
+			name:       "Buffer blocks PRIMARY KEY",
+			engine:     makeEngine("Buffer"),
+			clauseType: "PRIMARY KEY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Buffer blocks PARTITION BY",
+			engine:     makeEngine("Buffer"),
+			clauseType: "PARTITION BY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Buffer blocks ORDER BY",
+			engine:     makeEngine("Buffer"),
+			clauseType: "ORDER BY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Buffer blocks SAMPLE BY",
+			engine:     makeEngine("Buffer"),
+			clauseType: "SAMPLE BY",
+			shouldCopy: false,
+		},
+
+		// Memory - restricts PARTITION BY and SAMPLE BY only
+		{
+			name:       "Memory allows PRIMARY KEY",
+			engine:     makeEngine("Memory"),
+			clauseType: "PRIMARY KEY",
+			shouldCopy: true,
+		},
+		{
+			name:       "Memory allows ORDER BY",
+			engine:     makeEngine("Memory"),
+			clauseType: "ORDER BY",
+			shouldCopy: true,
+		},
+		{
+			name:       "Memory blocks PARTITION BY",
+			engine:     makeEngine("Memory"),
+			clauseType: "PARTITION BY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Memory blocks SAMPLE BY",
+			engine:     makeEngine("Memory"),
+			clauseType: "SAMPLE BY",
+			shouldCopy: false,
+		},
+
+		// View engines
+		{
+			name:       "View blocks PRIMARY KEY",
+			engine:     makeEngine("View"),
+			clauseType: "PRIMARY KEY",
+			shouldCopy: false,
+		},
+		{
+			name:       "LiveView blocks ORDER BY",
+			engine:     makeEngine("LiveView"),
+			clauseType: "ORDER BY",
+			shouldCopy: false,
+		},
+		{
+			name:       "Dictionary blocks PARTITION BY",
+			engine:     makeEngine("Dictionary"),
+			clauseType: "PARTITION BY",
+			shouldCopy: false,
+		},
+
+		// Unknown engines
+		{
+			name:       "Unknown engine allows all clauses",
+			engine:     makeEngine("UnknownEngine"),
+			clauseType: "PRIMARY KEY",
+			shouldCopy: true,
+		},
+
+		// Nil engine
+		{
+			name:       "Nil engine allows all clauses",
+			engine:     nil,
+			clauseType: "PRIMARY KEY",
+			shouldCopy: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldCopyClause(tt.engine, tt.clauseType)
+			require.Equal(t, tt.shouldCopy, result, "Expected %v for %s engine with %s clause", tt.shouldCopy,
+				func() string {
+					if tt.engine == nil {
+						return "nil"
+					}
+					return tt.engine.Name
+				}(), tt.clauseType)
 		})
 	}
 }

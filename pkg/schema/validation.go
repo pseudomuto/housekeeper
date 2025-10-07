@@ -2,6 +2,7 @@ package schema
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -28,6 +29,16 @@ var systemDatabases = map[string]bool{
 	"system":             true,
 	"INFORMATION_SCHEMA": true,
 	"information_schema": true,
+}
+
+// engineClauseRestrictions defines which clauses are restricted for specific engine types
+var engineClauseRestrictions = map[string][]string{
+	"Distributed": {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+	"Buffer":      {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+	"Dictionary":  {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+	"View":        {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+	"LiveView":    {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+	"Memory":      {"PARTITION BY", "SAMPLE BY"}, // Memory supports ORDER BY and PRIMARY KEY
 }
 
 // equalAST is a generic helper for comparing AST types with Equal() methods
@@ -98,6 +109,13 @@ func validateTableOperation(current, target *TableInfo) error {
 	if target != nil && isSystemDatabase(target.Database) {
 		return errors.Wrapf(ErrUnsupported,
 			"cannot create system table %s.%s: %v", target.Database, target.Name, ErrSystemObject)
+	}
+
+	// Category 8: Clause Restrictions for Engine Types
+	if target != nil {
+		if err := validateTableClauses(target); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -183,6 +201,66 @@ func validateViewOperation(current, target *ViewInfo) error {
 	if target != nil && isSystemDatabase(target.Database) {
 		return errors.Wrapf(ErrUnsupported,
 			"cannot create system view %s.%s: %v", target.Database, target.Name, ErrSystemObject)
+	}
+
+	return nil
+}
+
+// validateTableClauses validates that table clauses are appropriate for the engine type
+func validateTableClauses(table *TableInfo) error {
+	if table.Engine == nil {
+		return nil // No engine specified, can't validate
+	}
+
+	restrictedClauses, hasRestrictions := engineClauseRestrictions[table.Engine.Name]
+	if !hasRestrictions {
+		return nil // Engine has no clause restrictions
+	}
+
+	// Check if table has any restricted clauses
+	var foundInvalidClauses []string
+
+	if table.PrimaryKey != nil {
+		for _, restricted := range restrictedClauses {
+			if restricted == "PRIMARY KEY" {
+				foundInvalidClauses = append(foundInvalidClauses, "PRIMARY KEY")
+				break
+			}
+		}
+	}
+
+	if table.PartitionBy != nil {
+		for _, restricted := range restrictedClauses {
+			if restricted == "PARTITION BY" {
+				foundInvalidClauses = append(foundInvalidClauses, "PARTITION BY")
+				break
+			}
+		}
+	}
+
+	if table.SampleBy != nil {
+		for _, restricted := range restrictedClauses {
+			if restricted == "SAMPLE BY" {
+				foundInvalidClauses = append(foundInvalidClauses, "SAMPLE BY")
+				break
+			}
+		}
+	}
+
+	if table.OrderBy != nil {
+		for _, restricted := range restrictedClauses {
+			if restricted == "ORDER BY" {
+				foundInvalidClauses = append(foundInvalidClauses, "ORDER BY")
+				break
+			}
+		}
+	}
+
+	if len(foundInvalidClauses) > 0 {
+		clauseList := strings.Join(foundInvalidClauses, ", ")
+		return errors.Wrapf(ErrUnsupported,
+			"%s clause(s) not supported for %s tables: %v",
+			clauseList, table.Engine.Name, ErrInvalidClause)
 	}
 
 	return nil

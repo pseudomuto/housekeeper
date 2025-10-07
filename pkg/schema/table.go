@@ -335,6 +335,28 @@ func isViewLikeEngine(engine *parser.TableEngine) bool {
 	return viewLikeEngines[engine.Name]
 }
 
+// shouldCopyClause determines if a specific clause type should be copied from source to target table
+// based on the target table's engine restrictions
+func shouldCopyClause(targetEngine *parser.TableEngine, clauseType string) bool {
+	if targetEngine == nil {
+		return true // If no engine specified, allow all clauses
+	}
+
+	restrictedClauses, hasRestrictions := engineClauseRestrictions[targetEngine.Name]
+	if !hasRestrictions {
+		return true // Engine has no clause restrictions
+	}
+
+	// Check if this clause type is restricted for this engine
+	for _, restricted := range restrictedClauses {
+		if restricted == clauseType {
+			return false // This clause is not allowed for this engine
+		}
+	}
+
+	return true // Clause is allowed
+}
+
 // resolveASReferences resolves AS table references to copy schema from source tables
 // It also tracks dependency relationships for migration propagation
 func resolveASReferences(tables map[string]*TableInfo) error {
@@ -362,20 +384,20 @@ func resolveASReferences(tables map[string]*TableInfo) error {
 			copy(table.Columns, sourceTable.Columns)
 		}
 
-		// Copy clauses only if not explicitly specified
-		if table.OrderBy == nil && sourceTable.OrderBy != nil {
+		// Copy clauses only if not explicitly specified AND supported by target engine
+		if table.OrderBy == nil && sourceTable.OrderBy != nil && shouldCopyClause(table.Engine, "ORDER BY") {
 			orderByCopy := *sourceTable.OrderBy
 			table.OrderBy = &orderByCopy
 		}
-		if table.PartitionBy == nil && sourceTable.PartitionBy != nil {
+		if table.PartitionBy == nil && sourceTable.PartitionBy != nil && shouldCopyClause(table.Engine, "PARTITION BY") {
 			partitionByCopy := *sourceTable.PartitionBy
 			table.PartitionBy = &partitionByCopy
 		}
-		if table.PrimaryKey == nil && sourceTable.PrimaryKey != nil {
+		if table.PrimaryKey == nil && sourceTable.PrimaryKey != nil && shouldCopyClause(table.Engine, "PRIMARY KEY") {
 			primaryKeyCopy := *sourceTable.PrimaryKey
 			table.PrimaryKey = &primaryKeyCopy
 		}
-		if table.SampleBy == nil && sourceTable.SampleBy != nil {
+		if table.SampleBy == nil && sourceTable.SampleBy != nil && shouldCopyClause(table.Engine, "SAMPLE BY") {
 			sampleByCopy := *sourceTable.SampleBy
 			table.SampleBy = &sampleByCopy
 		}
@@ -627,6 +649,53 @@ func reverseColumnChanges(changes []ColumnDiff) []ColumnDiff {
 	return reversed
 }
 
+// SQL generation helper functions
+
+// formatQualifiedTableName returns a qualified table name with optional database prefix
+func formatQualifiedTableName(database, name string) string {
+	if database != "" {
+		return database + "." + name
+	}
+	return name
+}
+
+// writeOnClusterClause writes an ON CLUSTER clause if cluster is specified
+func writeOnClusterClause(sql *strings.Builder, cluster string) {
+	if cluster != "" {
+		sql.WriteString(" ON CLUSTER ")
+		sql.WriteString(cluster)
+	}
+}
+
+// formatColumnDefinition formats a complete column definition for DDL statements
+func formatColumnDefinition(col ColumnInfo) string {
+	var sql strings.Builder
+	sql.WriteString(col.Name)
+	sql.WriteString(" ")
+	sql.WriteString(formatColumnDataType(col.DataType))
+
+	if col.DefaultType != "" && col.Default != nil {
+		sql.WriteString(" ")
+		sql.WriteString(col.DefaultType)
+		sql.WriteString(" ")
+		sql.WriteString(col.Default.String())
+	}
+	if col.Codec != nil {
+		sql.WriteString(" ")
+		sql.WriteString(formatColumnCodec(col.Codec))
+	}
+	if col.TTL != nil {
+		sql.WriteString(" TTL ")
+		sql.WriteString(col.TTL.Expression.String())
+	}
+	if col.Comment != "" {
+		sql.WriteString(" COMMENT '")
+		sql.WriteString(col.Comment)
+		sql.WriteString("'")
+	}
+	return sql.String()
+}
+
 // SQL generation functions
 
 func generateCreateTableSQL(table *TableInfo) string {
@@ -648,50 +717,18 @@ func writeTableHeader(sql *strings.Builder, table *TableInfo) {
 	if table.IfNotExists {
 		sql.WriteString("IF NOT EXISTS ")
 	}
-
-	// Table name with database prefix
-	if table.Database != "" {
-		sql.WriteString(table.Database)
-		sql.WriteString(".")
-	}
-	sql.WriteString(table.Name)
-
-	if table.Cluster != "" {
-		sql.WriteString(" ON CLUSTER ")
-		sql.WriteString(table.Cluster)
-	}
+	sql.WriteString(formatQualifiedTableName(table.Database, table.Name))
+	writeOnClusterClause(sql, table.Cluster)
 }
 
 func writeTableColumns(sql *strings.Builder, table *TableInfo) {
-	// Columns
 	sql.WriteString(" (\n")
 	for i, col := range table.Columns {
 		if i > 0 {
 			sql.WriteString(",\n")
 		}
 		sql.WriteString("    ")
-		sql.WriteString(col.Name)
-		sql.WriteString(" ")
-		sql.WriteString(formatColumnDataType(col.DataType))
-		if col.DefaultType != "" && col.Default != nil {
-			sql.WriteString(" ")
-			sql.WriteString(col.DefaultType)
-			sql.WriteString(" ")
-			sql.WriteString(col.Default.String())
-		}
-		if col.Codec != nil {
-			sql.WriteString(" ")
-			sql.WriteString(formatColumnCodec(col.Codec))
-		}
-		if col.TTL != nil {
-			sql.WriteString(" TTL ")
-			sql.WriteString(col.TTL.Expression.String())
-		}
-		if col.Comment != "" {
-			sql.WriteString(" COMMENT '")
-			sql.WriteString(col.Comment)
-			sql.WriteString("'")
-		}
+		sql.WriteString(formatColumnDefinition(col))
 	}
 	sql.WriteString("\n)")
 }
@@ -751,15 +788,8 @@ func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 func generateDropTableSQL(table *TableInfo) string {
 	var sql strings.Builder
 	sql.WriteString("DROP TABLE ")
-	if table.Database != "" {
-		sql.WriteString(table.Database)
-		sql.WriteString(".")
-	}
-	sql.WriteString(table.Name)
-	if table.Cluster != "" {
-		sql.WriteString(" ON CLUSTER ")
-		sql.WriteString(table.Cluster)
-	}
+	sql.WriteString(formatQualifiedTableName(table.Database, table.Name))
+	writeOnClusterClause(&sql, table.Cluster)
 	return sql.String()
 }
 
@@ -769,14 +799,13 @@ func generateRenameTableSQL(from, to *TableInfo, fromName, toName string) string
 	sql.WriteString(fromName)
 	sql.WriteString(" TO ")
 	sql.WriteString(toName)
-	if from.Cluster != "" || to.Cluster != "" {
-		cluster := from.Cluster
-		if cluster == "" {
-			cluster = to.Cluster
-		}
-		sql.WriteString(" ON CLUSTER ")
-		sql.WriteString(cluster)
+
+	// Use cluster from either table (they should match after validation)
+	cluster := from.Cluster
+	if cluster == "" {
+		cluster = to.Cluster
 	}
+	writeOnClusterClause(&sql, cluster)
 	return sql.String()
 }
 
@@ -787,16 +816,8 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 
 	var sql strings.Builder
 	sql.WriteString("ALTER TABLE ")
-	if target.Database != "" {
-		sql.WriteString(target.Database)
-		sql.WriteString(".")
-	}
-	sql.WriteString(target.Name)
-
-	if target.Cluster != "" {
-		sql.WriteString(" ON CLUSTER ")
-		sql.WriteString(target.Cluster)
-	}
+	sql.WriteString(formatQualifiedTableName(target.Database, target.Name))
+	writeOnClusterClause(&sql, target.Cluster)
 
 	// Generate column modifications
 	for i, change := range columnChanges {
@@ -808,55 +829,13 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 		switch change.Type {
 		case ColumnDiffAdd:
 			sql.WriteString("ADD COLUMN ")
-			sql.WriteString(change.Target.Name)
-			sql.WriteString(" ")
-			sql.WriteString(formatColumnDataType(change.Target.DataType))
-			if change.Target.DefaultType != "" && change.Target.Default != nil {
-				sql.WriteString(" ")
-				sql.WriteString(change.Target.DefaultType)
-				sql.WriteString(" ")
-				sql.WriteString(change.Target.Default.String())
-			}
-			if change.Target.Codec != nil {
-				sql.WriteString(" ")
-				sql.WriteString(formatColumnCodec(change.Target.Codec))
-			}
-			if change.Target.TTL != nil {
-				sql.WriteString(" TTL ")
-				sql.WriteString(change.Target.TTL.Expression.String())
-			}
-			if change.Target.Comment != "" {
-				sql.WriteString(" COMMENT '")
-				sql.WriteString(change.Target.Comment)
-				sql.WriteString("'")
-			}
+			sql.WriteString(formatColumnDefinition(*change.Target))
 		case ColumnDiffDrop:
 			sql.WriteString("DROP COLUMN ")
 			sql.WriteString(change.ColumnName)
 		case ColumnDiffModify:
 			sql.WriteString("MODIFY COLUMN ")
-			sql.WriteString(change.Target.Name)
-			sql.WriteString(" ")
-			sql.WriteString(formatColumnDataType(change.Target.DataType))
-			if change.Target.DefaultType != "" && change.Target.Default != nil {
-				sql.WriteString(" ")
-				sql.WriteString(change.Target.DefaultType)
-				sql.WriteString(" ")
-				sql.WriteString(change.Target.Default.String())
-			}
-			if change.Target.Codec != nil {
-				sql.WriteString(" ")
-				sql.WriteString(formatColumnCodec(change.Target.Codec))
-			}
-			if change.Target.TTL != nil {
-				sql.WriteString(" TTL ")
-				sql.WriteString(change.Target.TTL.Expression.String())
-			}
-			if change.Target.Comment != "" {
-				sql.WriteString(" COMMENT '")
-				sql.WriteString(change.Target.Comment)
-				sql.WriteString("'")
-			}
+			sql.WriteString(formatColumnDefinition(*change.Target))
 		}
 	}
 

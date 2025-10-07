@@ -31,6 +31,8 @@ var (
 	ErrSystemObject = errors.New("system object modifications not supported")
 	// ErrInvalidType is returned for invalid type combinations
 	ErrInvalidType = errors.New("invalid type combination")
+	// ErrInvalidClause is returned when unsupported clauses are used with specific engines
+	ErrInvalidClause = errors.New("invalid clause for engine type")
 )
 
 // GenerateDiff creates a diff by comparing current and target schema states.
