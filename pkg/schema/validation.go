@@ -217,41 +217,27 @@ func validateTableClauses(table *TableInfo) error {
 		return nil // Engine has no clause restrictions
 	}
 
-	// Check if table has any restricted clauses
+	// Define clause descriptors: name and presence check
+	type clauseDescriptor struct {
+		name    string
+		present bool
+	}
+	clauses := []clauseDescriptor{
+		{"PRIMARY KEY", table.PrimaryKey != nil},
+		{"PARTITION BY", table.PartitionBy != nil},
+		{"SAMPLE BY", table.SampleBy != nil},
+		{"ORDER BY", table.OrderBy != nil},
+	}
+
 	var foundInvalidClauses []string
-
-	if table.PrimaryKey != nil {
-		for _, restricted := range restrictedClauses {
-			if restricted == "PRIMARY KEY" {
-				foundInvalidClauses = append(foundInvalidClauses, "PRIMARY KEY")
-				break
-			}
-		}
+	restrictedSet := make(map[string]struct{}, len(restrictedClauses))
+	for _, rc := range restrictedClauses {
+		restrictedSet[rc] = struct{}{}
 	}
-
-	if table.PartitionBy != nil {
-		for _, restricted := range restrictedClauses {
-			if restricted == "PARTITION BY" {
-				foundInvalidClauses = append(foundInvalidClauses, "PARTITION BY")
-				break
-			}
-		}
-	}
-
-	if table.SampleBy != nil {
-		for _, restricted := range restrictedClauses {
-			if restricted == "SAMPLE BY" {
-				foundInvalidClauses = append(foundInvalidClauses, "SAMPLE BY")
-				break
-			}
-		}
-	}
-
-	if table.OrderBy != nil {
-		for _, restricted := range restrictedClauses {
-			if restricted == "ORDER BY" {
-				foundInvalidClauses = append(foundInvalidClauses, "ORDER BY")
-				break
+	for _, clause := range clauses {
+		if clause.present {
+			if _, restricted := restrictedSet[clause.name]; restricted {
+				foundInvalidClauses = append(foundInvalidClauses, clause.name)
 			}
 		}
 	}
