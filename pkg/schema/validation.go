@@ -10,36 +10,38 @@ import (
 
 // Engine classifications for validation
 
-// integrationEngines contains ClickHouse engines that integrate with external systems
-// These engines are read-only from ClickHouse perspective and cannot have schema modifications
-var integrationEngines = map[string]bool{
-	"Kafka":      true,
-	"RabbitMQ":   true,
-	"MySQL":      true,
-	"PostgreSQL": true,
-	"MongoDB":    true,
-	"S3":         true,
-	"HDFS":       true,
-	"URL":        true,
-	"File":       true,
-}
+var (
+	// integrationEngines contains ClickHouse engines that integrate with external systems
+	// These engines are read-only from ClickHouse perspective and cannot have schema modifications
+	integrationEngines = map[string]bool{
+		"Kafka":      true,
+		"RabbitMQ":   true,
+		"MySQL":      true,
+		"PostgreSQL": true,
+		"MongoDB":    true,
+		"S3":         true,
+		"HDFS":       true,
+		"URL":        true,
+		"File":       true,
+	}
 
-// systemDatabases contains system databases that are protected from modification
-var systemDatabases = map[string]bool{
-	"system":             true,
-	"INFORMATION_SCHEMA": true,
-	"information_schema": true,
-}
+	// systemDatabases contains system databases that are protected from modification
+	systemDatabases = map[string]bool{
+		"system":             true,
+		"INFORMATION_SCHEMA": true,
+		"information_schema": true,
+	}
 
-// engineClauseRestrictions defines which clauses are restricted for specific engine types
-var engineClauseRestrictions = map[string][]string{
-	"Distributed": {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
-	"Buffer":      {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
-	"Dictionary":  {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
-	"View":        {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
-	"LiveView":    {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
-	"Memory":      {"PARTITION BY", "SAMPLE BY"}, // Memory supports ORDER BY and PRIMARY KEY
-}
+	// engineClauseRestrictions defines which clauses are restricted for specific engine types
+	engineClauseRestrictions = map[string][]string{
+		"Distributed": {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"Buffer":      {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"Dictionary":  {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"View":        {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"LiveView":    {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"Memory":      {"PARTITION BY", "SAMPLE BY"}, // Memory supports ORDER BY and PRIMARY KEY
+	}
+)
 
 // equalAST is a generic helper for comparing AST types with Equal() methods
 func equalAST[T interface{ Equal(T) bool }](a, b T) bool {
