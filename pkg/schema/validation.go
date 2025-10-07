@@ -2,6 +2,7 @@ package schema
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -9,26 +10,38 @@ import (
 
 // Engine classifications for validation
 
-// integrationEngines contains ClickHouse engines that integrate with external systems
-// These engines are read-only from ClickHouse perspective and cannot have schema modifications
-var integrationEngines = map[string]bool{
-	"Kafka":      true,
-	"RabbitMQ":   true,
-	"MySQL":      true,
-	"PostgreSQL": true,
-	"MongoDB":    true,
-	"S3":         true,
-	"HDFS":       true,
-	"URL":        true,
-	"File":       true,
-}
+var (
+	// integrationEngines contains ClickHouse engines that integrate with external systems
+	// These engines are read-only from ClickHouse perspective and cannot have schema modifications
+	integrationEngines = map[string]bool{
+		"Kafka":      true,
+		"RabbitMQ":   true,
+		"MySQL":      true,
+		"PostgreSQL": true,
+		"MongoDB":    true,
+		"S3":         true,
+		"HDFS":       true,
+		"URL":        true,
+		"File":       true,
+	}
 
-// systemDatabases contains system databases that are protected from modification
-var systemDatabases = map[string]bool{
-	"system":             true,
-	"INFORMATION_SCHEMA": true,
-	"information_schema": true,
-}
+	// systemDatabases contains system databases that are protected from modification
+	systemDatabases = map[string]bool{
+		"system":             true,
+		"INFORMATION_SCHEMA": true,
+		"information_schema": true,
+	}
+
+	// engineClauseRestrictions defines which clauses are restricted for specific engine types
+	engineClauseRestrictions = map[string][]string{
+		"Distributed": {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"Buffer":      {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"Dictionary":  {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"View":        {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"LiveView":    {"PRIMARY KEY", "PARTITION BY", "SAMPLE BY", "ORDER BY"},
+		"Memory":      {"PARTITION BY", "SAMPLE BY"}, // Memory supports ORDER BY and PRIMARY KEY
+	}
+)
 
 // equalAST is a generic helper for comparing AST types with Equal() methods
 func equalAST[T interface{ Equal(T) bool }](a, b T) bool {
@@ -98,6 +111,13 @@ func validateTableOperation(current, target *TableInfo) error {
 	if target != nil && isSystemDatabase(target.Database) {
 		return errors.Wrapf(ErrUnsupported,
 			"cannot create system table %s.%s: %v", target.Database, target.Name, ErrSystemObject)
+	}
+
+	// Category 8: Clause Restrictions for Engine Types
+	if target != nil {
+		if err := validateTableClauses(target); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -183,6 +203,52 @@ func validateViewOperation(current, target *ViewInfo) error {
 	if target != nil && isSystemDatabase(target.Database) {
 		return errors.Wrapf(ErrUnsupported,
 			"cannot create system view %s.%s: %v", target.Database, target.Name, ErrSystemObject)
+	}
+
+	return nil
+}
+
+// validateTableClauses validates that table clauses are appropriate for the engine type
+func validateTableClauses(table *TableInfo) error {
+	if table.Engine == nil {
+		return nil // No engine specified, can't validate
+	}
+
+	restrictedClauses, hasRestrictions := engineClauseRestrictions[table.Engine.Name]
+	if !hasRestrictions {
+		return nil // Engine has no clause restrictions
+	}
+
+	// Define clause descriptors: name and presence check
+	type clauseDescriptor struct {
+		name    string
+		present bool
+	}
+	clauses := []clauseDescriptor{
+		{"PRIMARY KEY", table.PrimaryKey != nil},
+		{"PARTITION BY", table.PartitionBy != nil},
+		{"SAMPLE BY", table.SampleBy != nil},
+		{"ORDER BY", table.OrderBy != nil},
+	}
+
+	var foundInvalidClauses []string
+	restrictedSet := make(map[string]struct{}, len(restrictedClauses))
+	for _, rc := range restrictedClauses {
+		restrictedSet[rc] = struct{}{}
+	}
+	for _, clause := range clauses {
+		if clause.present {
+			if _, restricted := restrictedSet[clause.name]; restricted {
+				foundInvalidClauses = append(foundInvalidClauses, clause.name)
+			}
+		}
+	}
+
+	if len(foundInvalidClauses) > 0 {
+		clauseList := strings.Join(foundInvalidClauses, ", ")
+		return errors.Wrapf(ErrUnsupported,
+			"%s clause(s) not supported for %s tables: %v",
+			clauseList, table.Engine.Name, ErrInvalidClause)
 	}
 
 	return nil

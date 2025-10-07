@@ -63,7 +63,7 @@
 
             # This will need to be updated when dependencies change
             # Run `nix build .#housekeeper` and it will tell you the correct hash
-            vendorHash = "sha256-vduBXmWFi1RJLsbouyjuZKX4d3Gwk+OEDxN+JADOYmM=";
+            vendorHash = "sha256-i5ccL8RriChwXMeMgJYKhNXN65WFRSNsJyXitBdbZGo=";
 
             env.CGO_ENABLED = "0";
             env.GOPROXY = "direct";
