@@ -145,10 +145,22 @@ SETTINGS index_granularity = 8192;
 -- Create materialized view using TO table pattern (more common approach)
 CREATE MATERIALIZED VIEW analytics.mv_to_daily_summary ON CLUSTER test_cluster
 TO analytics.daily_summary
-AS SELECT 
+AS SELECT
     toDate(timestamp) as date,
     count() as total_events,
     uniq(user_id) as unique_users,
     0.0 as avg_session_duration
 FROM analytics.events
 GROUP BY date;
+
+-- Create test users with ON CLUSTER
+CREATE USER test_analytics_reader ON CLUSTER test_cluster
+    IDENTIFIED WITH plaintext_password BY 'reader_pass'
+    HOST IP '192.168.0.0/16'
+    DEFAULT ROLE analytics_reader
+    DEFAULT DATABASE analytics;
+
+CREATE USER test_admin ON CLUSTER test_cluster
+    IDENTIFIED BY 'admin_secret'
+    HOST ANY
+    DEFAULT ROLE admin, operator;

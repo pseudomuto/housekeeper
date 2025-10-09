@@ -247,6 +247,7 @@ evolution_phase() {
   cp "$SCRIPT_DIR/fixtures/migrations/004_events_table.sql" "db/migrations/"
   cp "$SCRIPT_DIR/fixtures/migrations/005_complex_dictionary.sql" "db/migrations/"
   cp "$SCRIPT_DIR/fixtures/migrations/006_materialized_view.sql" "db/migrations/"
+  cp "$SCRIPT_DIR/fixtures/migrations/008_test_users.sql" "db/migrations/"
 
   # Run incremental migrations
   log_step "Running evolution migrations..."
@@ -259,6 +260,7 @@ evolution_phase() {
   run_validation_query "$CLICKHOUSE_DSN" "$SCRIPT_DIR/fixtures/validation/check-all-tables.sql"
   run_validation_query "$CLICKHOUSE_DSN" "$SCRIPT_DIR/fixtures/validation/check-all-dictionaries.sql"
   run_validation_query "$CLICKHOUSE_DSN" "$SCRIPT_DIR/fixtures/validation/check-views.sql"
+  run_validation_query "$CLICKHOUSE_DSN" "$SCRIPT_DIR/fixtures/validation/check-users.sql"
 
   # Validate cumulative revisions
   log_step "Validating cumulative revisions..."
@@ -382,12 +384,13 @@ Test Summary:
   
 Schema Objects Created:
   • Databases: 2 (housekeeper, analytics)
-  • Tables: 3 (revisions, users, events)  
+  • Tables: 3 (revisions, users, events)
   • Dictionaries: 2 (user_status_dict, geo_data)
   • Views: 1 (daily_stats materialized view)
+  • Users: 2 (test_reader, test_writer)
   
 Migration Files:
-  • Original migrations: 6
+  • Original migrations: 7
   • Consolidated to: 1 snapshot + 1 post-snapshot
   
 All validations passed! 🎉

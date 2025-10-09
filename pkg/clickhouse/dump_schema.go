@@ -7,7 +7,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
-// DumpSchema retrieves all schema objects (databases, tables, named collections, dictionaries, views)
+// DumpSchema retrieves all schema objects (databases, tables, named collections, dictionaries, views, users)
 // and returns them as a parsed SQL structure ready for use with migration generation.
 //
 // This function combines all individual extraction functions to provide a complete view of the
@@ -19,7 +19,8 @@ import (
 //  2. Tables - extracted with full DDL statements
 //  3. Named Collections - connection configurations that dictionaries might reference
 //  4. Dictionaries - dictionary definitions with source/layout/lifetime
-//  5. Views - both regular and materialized views (extracted last since they may depend on dictionaries)
+//  5. Views - both regular and materialized views (extracted since they may depend on dictionaries)
+//  6. Users - user definitions (extracted last since they don't depend on other schema objects)
 //
 // All system objects are automatically excluded and all DDL statements are validated.
 //
@@ -81,6 +82,13 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 	}
 	allStatements = append(allStatements, views.Statements...)
 
+	// Extract users (after all other schema objects since users don't depend on anything)
+	users, err := extractUsers(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract users")
+	}
+	allStatements = append(allStatements, users.Statements...)
+
 	// Inject ON CLUSTER clauses if cluster is specified
 	if client.options.Cluster != "" {
 		allStatements = injectOnCluster(allStatements, client.options.Cluster)
@@ -101,6 +109,7 @@ func DumpSchema(ctx context.Context, client *Client) (*parser.SQL, error) {
 //   - CREATE NAMED COLLECTION statements
 //   - CREATE DICTIONARY statements
 //   - CREATE VIEW statements (both regular and materialized)
+//   - CREATE USER statements
 //
 // Housekeeper internal objects (database 'housekeeper' and its objects) are excluded
 // from ON CLUSTER injection as they should be shard-local for migration tracking.
@@ -139,6 +148,9 @@ func injectOnCluster(statements []*parser.Statement, cluster string) []*parser.S
 			if !isHousekeeperDatabase(dbName) {
 				stmt.CreateView.OnCluster = clusterName
 			}
+		case stmt.CreateUser != nil:
+			// Users are cluster-wide by nature
+			stmt.CreateUser.OnCluster = clusterName
 		}
 	}
 

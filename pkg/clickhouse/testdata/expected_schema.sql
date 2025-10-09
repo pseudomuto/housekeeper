@@ -133,3 +133,7 @@ AS SELECT
 FROM `user_data`.`profiles`
 WHERE `status` = 'active'
 ORDER BY `created_at` DESC;
+
+CREATE USER `test_admin` ON CLUSTER `test_cluster` IDENTIFIED BY 'admin_secret' HOST ANY DEFAULT ROLE `admin`, `operator`;
+
+CREATE USER `test_analytics_reader` ON CLUSTER `test_cluster` IDENTIFIED WITH plaintext_password BY 'reader_pass' HOST IP '192.168.0.0/16' DEFAULT ROLE `analytics_reader` DEFAULT DATABASE `analytics`;
