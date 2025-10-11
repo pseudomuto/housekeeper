@@ -128,5 +128,11 @@ func compileProjectSchema(cfg *config.Config) ([]*parser.Statement, error) {
 		return nil, errors.Wrap(err, "failed to parse compiled project schema")
 	}
 
-	return sql.Statements, nil
+	// Inject ON CLUSTER if configured
+	statements := sql.Statements
+	if cfg.ClickHouse.Cluster != "" {
+		statements = parser.InjectOnCluster(statements, cfg.ClickHouse.Cluster)
+	}
+
+	return statements, nil
 }
