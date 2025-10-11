@@ -185,6 +185,11 @@ func TestFormatter_CreateUser(t *testing.T) {
 			sql:      "CREATE USER IF NOT EXISTS admin ON CLUSTER production IDENTIFIED BY 'secret' HOST IP '192.168.1.0/24' VALID UNTIL '2025-12-31' IN ldap_directory DEFAULT ROLE admin, operator DEFAULT DATABASE analytics GRANTEES user1, user2;",
 			expected: "CREATE USER IF NOT EXISTS `admin` ON CLUSTER `production` IDENTIFIED BY 'secret' HOST IP '192.168.1.0/24' VALID UNTIL '2025-12-31' IN ldap_directory DEFAULT ROLE `admin`, `operator` DEFAULT DATABASE `analytics` GRANTEES `user1`, `user2`;",
 		},
+		{
+			name:     "simple user identified with sha256_password (clickhouse exposes users in this format in case of password-based identification)",
+			sql:      "CREATE USER name44 IDENTIFIED WITH sha256_password;",
+			expected: "CREATE USER `name44` IDENTIFIED WITH sha256_password;",
+		},
 	}
 
 	for _, tt := range tests {

@@ -125,6 +125,14 @@ func (f *Formatter) formatUserIdentification(id *parser.UserIdentification) stri
 		return f.keyword("IDENTIFIED WITH") + " ssl_certificate " + f.keyword("CN") + " " + *id.IdentifiedWithSslCertificate
 	}
 
+	if id.IdentifiedWithSha256Password != nil {
+		parts := []string{f.keyword("IDENTIFIED WITH") + " sha256_password"}
+		if id.IdentifiedWithSha256Password.By != nil {
+			parts = append(parts, f.keyword("BY"), *id.IdentifiedWithSha256Password.By)
+		}
+		return strings.Join(parts, " ")
+	}
+
 	if id.IdentifiedWithOther != nil {
 		parts := []string{f.keyword("IDENTIFIED")}
 
