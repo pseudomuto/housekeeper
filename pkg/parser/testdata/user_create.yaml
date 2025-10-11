@@ -149,3 +149,10 @@ users:
       default_database: special-db
     - name: name43
       default_database_none: true
+    - name: name44
+      identification:
+        with: sha256_password
+    - name: name44
+      identification:
+        with: sha256_password
+        by: password1

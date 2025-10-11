@@ -26,11 +26,16 @@ type (
 		IdentifiedWithLdap           *string                           `parser:"| 'IDENTIFIED' 'WITH' 'ldap' 'SERVER' @String"`
 		IdentifiedWithKerberos       *UserIdentificationKerberosMethod `parser:"| 'IDENTIFIED' 'WITH' 'kerberos' @@"`
 		IdentifiedWithSslCertificate *string                           `parser:"| 'IDENTIFIED' 'WITH' 'ssl_certificate' 'CN' @String"`
+		IdentifiedWithSha256Password *UserIdentificationSha256Method   `parser:"| 'IDENTIFIED' 'WITH' 'sha256_password' @@"`
 		IdentifiedWithOther          *UserIdentificationOtherMethod    `parser:"| 'IDENTIFIED' @@"`
 	}
 
 	UserIdentificationKerberosMethod struct {
 		Realm *string `parser:"('REALM' @String)?"`
+	}
+
+	UserIdentificationSha256Method struct {
+		By *string `parser:"('BY' @String)?"`
 	}
 
 	UserIdentificationOtherMethod struct {

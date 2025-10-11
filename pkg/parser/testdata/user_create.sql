@@ -129,3 +129,9 @@ CREATE USER name42 DEFAULT DATABASE 'special-db';
 
 -- User with default database set to NONE
 CREATE USER name43 DEFAULT DATABASE NONE;
+
+--
+CREATE USER name44 IDENTIFIED WITH sha256_password;
+
+--
+CREATE USER name44 IDENTIFIED WITH sha256_password BY 'password1';

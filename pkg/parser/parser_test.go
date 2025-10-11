@@ -914,6 +914,13 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 					identification.SslCn = removeQuotes(*user.Identification.IdentifiedWithSslCertificate)
 				}
 
+				if user.Identification.IdentifiedWithSha256Password != nil {
+					identification.With = "sha256_password"
+					if user.Identification.IdentifiedWithSha256Password.By != nil {
+						identification.By = removeQuotes(*user.Identification.IdentifiedWithSha256Password.By)
+					}
+				}
+
 				if user.Identification.IdentifiedWithOther != nil {
 					if user.Identification.IdentifiedWithOther.With != nil {
 						identification.With = *user.Identification.IdentifiedWithOther.With
