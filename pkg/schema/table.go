@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -144,27 +145,10 @@ func (c ColumnInfo) Equal(other ColumnInfo) bool {
 		return false
 	}
 
-	// Compare DataType AST
-	if !equalAST(c.DataType, other.DataType) {
-		return false
-	}
-
-	// Compare Default expression AST
-	if !equalAST(c.Default, other.Default) {
-		return false
-	}
-
-	// Compare Codec AST
-	if !equalAST(c.Codec, other.Codec) {
-		return false
-	}
-
-	// Compare TTL AST
-	if !equalAST(c.TTL, other.TTL) {
-		return false
-	}
-
-	return true
+	return equalAST(c.DataType, other.DataType) &&
+		equalAST(c.Default, other.Default) &&
+		equalAST(c.Codec, other.Codec) &&
+		equalAST(c.TTL, other.TTL)
 }
 
 // settingsEqual compares two settings maps for equality
@@ -348,13 +332,7 @@ func shouldCopyClause(targetEngine *parser.TableEngine, clauseType string) bool 
 	}
 
 	// Check if this clause type is restricted for this engine
-	for _, restricted := range restrictedClauses {
-		if restricted == clauseType {
-			return false // This clause is not allowed for this engine
-		}
-	}
-
-	return true // Clause is allowed
+	return !slices.Contains(restrictedClauses, clauseType) // Clause is allowed
 }
 
 // resolveASReferences resolves AS table references to copy schema from source tables
@@ -539,7 +517,9 @@ func findRenamedTable(targetTable *TableInfo, currentTables, targetTables map[st
 		}
 
 		// Compare table properties (excluding name and database)
-		if tablesEqualIgnoringName(currentTable, targetTable) {
+		// Use flattened target table for comparison
+		flattenedTargetTable := FlattenNestedColumns(targetTable)
+		if tablesEqualIgnoringName(currentTable, flattenedTargetTable) {
 			return currentName
 		}
 	}
@@ -670,8 +650,10 @@ func writeOnClusterClause(sql *strings.Builder, cluster string) {
 // formatColumnDefinition formats a complete column definition for DDL statements
 func formatColumnDefinition(col ColumnInfo) string {
 	var sql strings.Builder
+	// Always be backticking
+	sql.WriteString("`")
 	sql.WriteString(col.Name)
-	sql.WriteString(" ")
+	sql.WriteString("` ")
 	sql.WriteString(formatColumnDataType(col.DataType))
 
 	if col.DefaultType != "" && col.Default != nil {
@@ -832,7 +814,10 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 			sql.WriteString(formatColumnDefinition(*change.Target))
 		case ColumnDiffDrop:
 			sql.WriteString("DROP COLUMN ")
+			// Always backtick column names for consistency
+			sql.WriteString("`")
 			sql.WriteString(change.ColumnName)
+			sql.WriteString("`")
 		case ColumnDiffModify:
 			sql.WriteString("MODIFY COLUMN ")
 			sql.WriteString(formatColumnDefinition(*change.Target))
@@ -996,7 +981,10 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 	}
 
 	// Table exists in both - check for changes
-	if tablesEqual(currentTable, targetTable) {
+	// For comparison purposes, flatten the target table to match ClickHouse's internal representation
+	// Current table is already flattened by ClickHouse, but target table may have Nested syntax
+	flattenedTargetTable := FlattenNestedColumns(targetTable)
+	if tablesEqual(currentTable, flattenedTargetTable) {
 		return nil, nil
 	}
 
@@ -1017,7 +1005,8 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 	}
 
 	// Generate column diffs for regular tables
-	columnChanges := compareColumns(currentTable.Columns, targetTable.Columns)
+	// Use flattened target table for comparison but preserve original for SQL generation
+	columnChanges := compareColumns(currentTable.Columns, flattenedTargetTable.Columns)
 
 	diff := &TableDiff{
 		Type:          TableDiffAlter,
