@@ -49,8 +49,8 @@ func equalAST[T interface{ Equal(T) bool }](a, b T) bool {
 	aVal := reflect.ValueOf(a)
 	bVal := reflect.ValueOf(b)
 
-	aIsNil := !aVal.IsValid() || (aVal.Kind() == reflect.Ptr && aVal.IsNil())
-	bIsNil := !bVal.IsValid() || (bVal.Kind() == reflect.Ptr && bVal.IsNil())
+	aIsNil := !aVal.IsValid() || (aVal.Kind() == reflect.Pointer && aVal.IsNil())
+	bIsNil := !bVal.IsValid() || (bVal.Kind() == reflect.Pointer && bVal.IsNil())
 
 	if aIsNil && bIsNil {
 		return true
@@ -89,8 +89,8 @@ func validateTableOperation(current, target *TableInfo) error {
 		}
 	}
 
-	// Category 4: Engine Type Changes
-	if current != nil && target != nil && !equalAST(current.Engine, target.Engine) {
+	// Category 4: Engine Type Changes (but allow parameter changes within same engine type)
+	if current != nil && target != nil {
 		currentEngineName := ""
 		targetEngineName := ""
 		if current.Engine != nil {
@@ -99,8 +99,12 @@ func validateTableOperation(current, target *TableInfo) error {
 		if target.Engine != nil {
 			targetEngineName = target.Engine.Name
 		}
-		return errors.Wrapf(ErrUnsupported,
-			"cannot change engine from %s to %s: %v", currentEngineName, targetEngineName, ErrEngineChange)
+
+		// Only prevent actual engine type changes, not parameter changes within same type
+		if currentEngineName != targetEngineName {
+			return errors.Wrapf(ErrUnsupported,
+				"cannot change engine from %s to %s: %v", currentEngineName, targetEngineName, ErrEngineChange)
+		}
 	}
 
 	// Category 7: System Object Protection
