@@ -109,7 +109,7 @@ func (t *TableInfo) Equal(other *TableInfo) bool {
 	}
 
 	// Compare AST fields
-	if !equalAST(t.Engine, other.Engine) ||
+	if !enginesEqual(t.Engine, other.Engine) ||
 		!equalAST(t.OrderBy, other.OrderBy) ||
 		!equalAST(t.PartitionBy, other.PartitionBy) ||
 		!equalAST(t.PrimaryKey, other.PrimaryKey) ||
@@ -136,6 +136,26 @@ func (c ColumnInfo) Equal(other ColumnInfo) bool {
 		equalAST(c.Default, other.Default) &&
 		equalAST(c.Codec, other.Codec) &&
 		equalAST(c.TTL, other.TTL)
+}
+
+// enginesEqual compares two table engines with special handling for ReplicatedMergeTree.
+// When the target engine is ReplicatedMergeTree with no parameters, parameters are ignored
+// in the comparison. This handles the case where ClickHouse auto-expands ReplicatedMergeTree()
+// to ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}') internally.
+func enginesEqual(target, current *parser.TableEngine) bool {
+	// Use standard equalAST for nil checks
+	if target == nil || current == nil {
+		return equalAST(target, current)
+	}
+
+	// Special handling for ReplicatedMergeTree when target has no parameters
+	if target.Name == "ReplicatedMergeTree" && len(target.Parameters) == 0 {
+		// If target has no parameters, only compare engine names (ignore current parameters)
+		return current.Name == "ReplicatedMergeTree"
+	}
+
+	// For all other cases (including ReplicatedMergeTree with explicit parameters), use standard AST comparison
+	return equalAST(target, current)
 }
 
 // compareTables compares current and target parsed schemas to find table differences.
@@ -291,6 +311,33 @@ func isViewLikeEngine(engine *parser.TableEngine) bool {
 	}
 
 	return viewLikeEngines[engine.Name]
+}
+
+// requiresDropCreate determines if changing from current engine to target engine
+// requires DROP+CREATE rather than ALTER TABLE operations
+func requiresDropCreate(current, target *parser.TableEngine) bool {
+	if current == nil || target == nil {
+		return false
+	}
+
+	// If engine names are different, this should be caught by validation
+	// This function only handles parameter changes within the same engine type
+	if current.Name != target.Name {
+		return false
+	}
+
+	// ReplicatedMergeTree parameter changes require DROP+CREATE
+	// because you cannot ALTER the replication path or replica name
+	if current.Name == "ReplicatedMergeTree" {
+		// Use our special enginesEqual logic that handles the no-parameters case
+		// If engines are not equal (respecting the no-parameters special case), DROP+CREATE is required
+		return !enginesEqual(target, current)
+	}
+
+	// Other engines with parameter changes might be added here in the future
+	// For now, most other parameter changes can be handled with ALTER TABLE
+
+	return false
 }
 
 // shouldCopyClause determines if a specific clause type should be copied from source to target table
@@ -962,14 +1009,22 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 		return nil, nil
 	}
 
-	// For integration engines, use DROP+CREATE (similar to materialized views)
-	// Integration engines are read-only from ClickHouse perspective and modifications
-	// require recreating the table anyway
-	if isIntegrationEngine(currentTable.Engine) || isIntegrationEngine(targetTable.Engine) {
+	// For integration engines or engine changes that require DROP+CREATE, use DROP+CREATE strategy
+	// Integration engines are read-only from ClickHouse perspective and modifications require recreating the table
+	// ReplicatedMergeTree parameter changes also require DROP+CREATE as they cannot be altered
+	needsDropCreate := isIntegrationEngine(currentTable.Engine) || isIntegrationEngine(targetTable.Engine) ||
+		requiresDropCreate(currentTable.Engine, targetTable.Engine)
+
+	if needsDropCreate {
+		reason := "integration engine"
+		if requiresDropCreate(currentTable.Engine, targetTable.Engine) {
+			reason = "engine parameter change"
+		}
+
 		diff := &TableDiff{
 			Type:        TableDiffAlter,
 			TableName:   tableName,
-			Description: "Alter table " + tableName + " (DROP+CREATE for integration engine)",
+			Description: fmt.Sprintf("Alter table %s (DROP+CREATE for %s)", tableName, reason),
 			Current:     currentTable,
 			Target:      targetTable,
 		}
