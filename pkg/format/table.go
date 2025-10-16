@@ -424,7 +424,8 @@ func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 	}
 
 	// Column name (with optional alignment)
-	name := f.identifier(col.Name)
+	// Special handling for dotted column names with Array types (flattened Nested columns)
+	name := f.formatColumnIdentifier(col.Name, col.DataType)
 	if alignWidth > 0 && f.options.AlignColumns {
 		name = padRight(name, alignWidth)
 	}
@@ -470,7 +471,8 @@ func (f *Formatter) formatColumnWithoutComments(col *parser.Column, alignWidth i
 	var parts []string
 
 	// Column name (with optional alignment)
-	name := f.identifier(col.Name)
+	// Special handling for dotted column names with Array types (flattened Nested columns)
+	name := f.formatColumnIdentifier(col.Name, col.DataType)
 	if alignWidth > 0 && f.options.AlignColumns {
 		name = padRight(name, alignWidth)
 	}
@@ -836,13 +838,31 @@ func (f *Formatter) calculateMaxNameWidth(elements []*parser.TableElement) int {
 	for _, element := range elements {
 		if element.Column != nil {
 			// Include backticks in width calculation
-			nameLen := len(f.identifier(element.Column.Name))
+			// Use the same logic as formatColumnDefinition for consistency
+			nameLen := len(f.formatColumnIdentifier(element.Column.Name, element.Column.DataType))
 			if nameLen > maxNameWidth {
 				maxNameWidth = nameLen
 			}
 		}
 	}
 	return maxNameWidth
+}
+
+// formatColumnIdentifier formats a column identifier, with special handling for
+// flattened Nested columns from ClickHouse (e.g., "err_gql_locations.line" with Array type).
+// When ClickHouse flattens Nested columns, it produces dotted names with Array types.
+// These should be treated as single identifiers, not qualified names.
+func (f *Formatter) formatColumnIdentifier(name string, dataType *parser.DataType) string {
+	// Check if this is a flattened Nested column:
+	// 1. Column name contains a dot
+	// 2. Data type is an Array
+	if strings.Contains(name, ".") && dataType != nil && dataType.Array != nil {
+		// This is a flattened Nested column, treat as single identifier
+		return "`" + name + "`"
+	}
+
+	// Otherwise, use standard identifier formatting (which may split on dots)
+	return f.identifier(name)
 }
 
 // padRight pads a string to the specified width with spaces

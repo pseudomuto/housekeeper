@@ -1,2 +1,2 @@
 ALTER TABLE `users`
-    ADD COLUMN `profile`.`email` Array(String);
+    ADD COLUMN `profile.email` Array(String);
