@@ -3,14 +3,15 @@ package parser
 type (
 	// CreateFunctionStmt represents CREATE FUNCTION statements
 	// Syntax: CREATE FUNCTION name [ON CLUSTER cluster] AS (parameter0, ...) -> expression;
+	//     or: CREATE FUNCTION name [ON CLUSTER cluster] AS parameter -> expression;
 	CreateFunctionStmt struct {
 		LeadingComments  []string         `parser:"@(Comment | MultilineComment)*"`
 		Name             string           `parser:"'CREATE' 'FUNCTION' @(Ident | BacktickIdent)"`
 		OnCluster        *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
-		Parameters       []*FunctionParam `parser:"'AS' '(' (@@ (',' @@)*)? ')'"`
+		Parameters       []*FunctionParam `parser:"'AS' ( '(' (@@ (',' @@)*)? ')' | @@ )"`
 		Expression       *Expression      `parser:"'->' @@"`
 		TrailingComments []string         `parser:"@(Comment | MultilineComment)*"`
-		Semicolon        bool             `parser:"';'"`
+		Semicolon        bool             `parser:"';'?"`
 	}
 
 	// DropFunctionStmt represents DROP FUNCTION statements

@@ -46,3 +46,19 @@ functions:
         - part
         - total
       expression: expression
+    - name: normalizedBrowser
+      operation: CREATE
+      parameters:
+        - br
+      expression: expression
+    - name: normalizedOS
+      operation: CREATE
+      cluster: warehouse
+      parameters:
+        - os
+      expression: expression
+    - name: testFunction
+      operation: CREATE
+      parameters:
+        - param
+      expression: expression
