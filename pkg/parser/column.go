@@ -67,8 +67,8 @@ type (
 	// TupleElement represents a single element in a tuple, which can be named or unnamed
 	TupleElement struct {
 		// Try to parse name + type first, then fall back to just type
-		Name *string   `parser:"(@(Ident | BacktickIdent)"`
-		Type *DataType `parser:"@@)"`
+		Name *string   `parser:"@(Ident | BacktickIdent)"`
+		Type *DataType `parser:"@@"`
 		// For unnamed tuples, we just have the type
 		UnnamedType *DataType `parser:"| @@"`
 	}
