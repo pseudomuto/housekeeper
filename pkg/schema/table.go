@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
@@ -97,11 +98,8 @@ const (
 
 // Equal compares two TableInfo instances for equality using AST comparison
 func (t *TableInfo) Equal(other *TableInfo) bool {
-	if t == nil && other == nil {
-		return true
-	}
-	if t == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(t, other); !done {
+		return eq
 	}
 
 	// Compare basic fields
@@ -120,22 +118,11 @@ func (t *TableInfo) Equal(other *TableInfo) bool {
 		return false
 	}
 
-	// Compare settings
-	if !settingsEqual(t.Settings, other.Settings) {
-		return false
-	}
-
-	// Compare columns
-	if len(t.Columns) != len(other.Columns) {
-		return false
-	}
-	for i := range t.Columns {
-		if !t.Columns[i].Equal(other.Columns[i]) {
-			return false
-		}
-	}
-
-	return true
+	// Compare settings and columns
+	return compare.Maps(t.Settings, other.Settings) &&
+		compare.Slices(t.Columns, other.Columns, func(a, b ColumnInfo) bool {
+			return a.Equal(b)
+		})
 }
 
 // Equal compares two ColumnInfo instances for equality using AST comparison
@@ -149,19 +136,6 @@ func (c ColumnInfo) Equal(other ColumnInfo) bool {
 		equalAST(c.Default, other.Default) &&
 		equalAST(c.Codec, other.Codec) &&
 		equalAST(c.TTL, other.TTL)
-}
-
-// settingsEqual compares two settings maps for equality
-func settingsEqual(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 // compareTables compares current and target parsed schemas to find table differences.
