@@ -1,5 +1,7 @@
 package parser
 
+import "github.com/pseudomuto/housekeeper/pkg/compare"
+
 type (
 	// Expression represents any ClickHouse expression with proper precedence handling
 	// Precedence levels (lowest to highest):
@@ -651,11 +653,8 @@ func (e *ExtractExpression) String() string {
 
 // Equal compares two Expression instances for structural equality
 func (e *Expression) Equal(other *Expression) bool {
-	if e == nil && other == nil {
-		return true
-	}
-	if e == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(e, other); !done {
+		return eq
 	}
 
 	// Compare CASE expressions
@@ -676,93 +675,48 @@ func (e *Expression) Equal(other *Expression) bool {
 
 // Equal compares two Case expressions
 func (c *CaseExpression) Equal(other *CaseExpression) bool {
-	if c == nil && other == nil {
-		return true
-	}
-	if c == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(c, other); !done {
+		return eq
 	}
 
-	if len(c.WhenClauses) != len(other.WhenClauses) {
-		return false
-	}
+	whenEqual := compare.Slices(c.WhenClauses, other.WhenClauses, func(a, b WhenClause) bool {
+		return a.Condition == b.Condition && a.Result == b.Result
+	})
 
-	for i := range c.WhenClauses {
-		if c.WhenClauses[i].Condition != other.WhenClauses[i].Condition ||
-			c.WhenClauses[i].Result != other.WhenClauses[i].Result {
-			return false
-		}
-	}
+	elseEqual := (c.ElseClause == nil && other.ElseClause == nil) ||
+		(c.ElseClause != nil && other.ElseClause != nil && c.ElseClause.Result == other.ElseClause.Result)
 
-	if (c.ElseClause == nil) != (other.ElseClause == nil) {
-		return false
-	}
-	if c.ElseClause != nil && c.ElseClause.Result != other.ElseClause.Result {
-		return false
-	}
-
-	return true
+	return whenEqual && elseEqual
 }
 
 // Equal compares two OR expressions
 func (o *OrExpression) Equal(other *OrExpression) bool {
-	if o == nil && other == nil {
-		return true
-	}
-	if o == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(o, other); !done {
+		return eq
 	}
 
-	if !o.And.Equal(other.And) {
-		return false
-	}
-
-	if len(o.Rest) != len(other.Rest) {
-		return false
-	}
-
-	for i := range o.Rest {
-		if o.Rest[i].Op != other.Rest[i].Op || !o.Rest[i].And.Equal(other.Rest[i].And) {
-			return false
-		}
-	}
-
-	return true
+	return o.And.Equal(other.And) &&
+		compare.Slices(o.Rest, other.Rest, func(a, b OrRest) bool {
+			return a.Op == b.Op && a.And.Equal(b.And)
+		})
 }
 
 // Equal compares two AND expressions
 func (a *AndExpression) Equal(other *AndExpression) bool {
-	if a == nil && other == nil {
-		return true
-	}
-	if a == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(a, other); !done {
+		return eq
 	}
 
-	if !a.Not.Equal(other.Not) {
-		return false
-	}
-
-	if len(a.Rest) != len(other.Rest) {
-		return false
-	}
-
-	for i := range a.Rest {
-		if a.Rest[i].Op != other.Rest[i].Op || !a.Rest[i].Not.Equal(other.Rest[i].Not) {
-			return false
-		}
-	}
-
-	return true
+	return a.Not.Equal(other.Not) &&
+		compare.Slices(a.Rest, other.Rest, func(x, y AndRest) bool {
+			return x.Op == y.Op && x.Not.Equal(y.Not)
+		})
 }
 
 // Equal compares two NOT expressions
 func (n *NotExpression) Equal(other *NotExpression) bool {
-	if n == nil && other == nil {
-		return true
-	}
-	if n == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(n, other); !done {
+		return eq
 	}
 
 	return n.Not == other.Not && n.Comparison.Equal(other.Comparison)
@@ -984,39 +938,14 @@ func (p *PrimaryExpression) Equal(other *PrimaryExpression) bool {
 
 // Equal compares two Literal values
 func (l *Literal) Equal(other *Literal) bool {
-	if l == nil && other == nil {
-		return true
-	}
-	if l == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(l, other); !done {
+		return eq
 	}
 
-	// Compare StringValue
-	if (l.StringValue != nil) != (other.StringValue != nil) {
-		return false
-	}
-	if l.StringValue != nil && *l.StringValue != *other.StringValue {
-		return false
-	}
-
-	// Compare Number
-	if (l.Number != nil) != (other.Number != nil) {
-		return false
-	}
-	if l.Number != nil && *l.Number != *other.Number {
-		return false
-	}
-
-	// Compare Boolean
-	if (l.Boolean != nil) != (other.Boolean != nil) {
-		return false
-	}
-	if l.Boolean != nil && *l.Boolean != *other.Boolean {
-		return false
-	}
-
-	// Compare Null
-	return l.Null == other.Null
+	return compare.Pointers(l.StringValue, other.StringValue) &&
+		compare.Pointers(l.Number, other.Number) &&
+		compare.Pointers(l.Boolean, other.Boolean) &&
+		l.Null == other.Null
 }
 
 // Equal compares two IdentifierExpr

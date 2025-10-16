@@ -1,5 +1,7 @@
 package parser
 
+import "github.com/pseudomuto/housekeeper/pkg/compare"
+
 type (
 	// Column represents a complete column definition in ClickHouse DDL.
 	// It includes the column name, data type, and all possible modifiers
@@ -217,118 +219,55 @@ func normalizeDecimalType(dt *DataType, precision string) {
 
 // Equal compares two CodecClause instances for equality
 func (c *CodecClause) Equal(other *CodecClause) bool {
-	if c == nil && other == nil {
-		return true
+	if eq, done := compare.NilCheck(c, other); !done {
+		return eq
 	}
-	if c == nil || other == nil {
-		return false
-	}
-	if len(c.Codecs) != len(other.Codecs) {
-		return false
-	}
-	for i := range c.Codecs {
-		if !c.Codecs[i].Equal(&other.Codecs[i]) {
-			return false
-		}
-	}
-	return true
+	return compare.Slices(c.Codecs, other.Codecs, func(a, b CodecSpec) bool {
+		return a.Equal(&b)
+	})
 }
 
 // Equal compares two CodecSpec instances for equality
 func (c *CodecSpec) Equal(other *CodecSpec) bool {
-	if c.Name != other.Name {
-		return false
-	}
-	if len(c.Parameters) != len(other.Parameters) {
-		return false
-	}
-	for i := range c.Parameters {
-		if !c.Parameters[i].Equal(&other.Parameters[i]) {
-			return false
-		}
-	}
-	return true
+	return c.Name == other.Name &&
+		compare.Slices(c.Parameters, other.Parameters, func(a, b TypeParameter) bool {
+			return a.Equal(&b)
+		})
 }
 
 // Equal compares two TTLClause instances for equality
 func (t *TTLClause) Equal(other *TTLClause) bool {
-	if t == nil && other == nil {
-		return true
-	}
-	if t == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(t, other); !done {
+		return eq
 	}
 	return t.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two DefaultClause instances for equality
 func (d *DefaultClause) Equal(other *DefaultClause) bool {
-	if d == nil && other == nil {
-		return true
-	}
-	if d == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(d, other); !done {
+		return eq
 	}
 	return d.Type == other.Type && d.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two TypeParameter instances for equality
 func (t *TypeParameter) Equal(other *TypeParameter) bool {
-	// Check Function
-	if (t.Function != nil) != (other.Function != nil) {
-		return false
-	}
-	if t.Function != nil && !t.Function.Equal(other.Function) {
-		return false
-	}
-
-	// Check Number
-	if (t.Number != nil) != (other.Number != nil) {
-		return false
-	}
-	if t.Number != nil && *t.Number != *other.Number {
-		return false
-	}
-
-	// Check String
-	if (t.String != nil) != (other.String != nil) {
-		return false
-	}
-	if t.String != nil && *t.String != *other.String {
-		return false
-	}
-
-	// Check Ident
-	if (t.Ident != nil) != (other.Ident != nil) {
-		return false
-	}
-	if t.Ident != nil && *t.Ident != *other.Ident {
-		return false
-	}
-
-	return true
+	return compare.PointersWithEqual(t.Function, other.Function, (*ParametricFunction).Equal) &&
+		compare.Pointers(t.Number, other.Number) &&
+		compare.Pointers(t.String, other.String) &&
+		compare.Pointers(t.Ident, other.Ident)
 }
 
 // Equal compares two ParametricFunction instances for equality
 func (p *ParametricFunction) Equal(other *ParametricFunction) bool {
-	if p == nil && other == nil {
-		return true
+	if eq, done := compare.NilCheck(p, other); !done {
+		return eq
 	}
-	if p == nil || other == nil {
-		return false
-	}
-	if p.Name != other.Name {
-		return false
-	}
-	if len(p.Parameters) != len(other.Parameters) {
-		return false
-	}
-	for i := range p.Parameters {
-		if !p.Parameters[i].Equal(&other.Parameters[i]) {
-			return false
-		}
-	}
-	return true
+	return p.Name == other.Name &&
+		compare.Slices(p.Parameters, other.Parameters, func(a, b TypeParameter) bool {
+			return a.Equal(&b)
+		})
 }
 
 // GetDefault returns the default clause for the column, if present

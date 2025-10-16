@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
@@ -677,67 +678,39 @@ func selectStatementsAreEqualAST(stmt1, stmt2 *parser.SelectStatement) bool {
 
 // withClausesAreEqual compares WITH clauses (CTEs)
 func withClausesAreEqual(with1, with2 *parser.WithClause) bool {
-	if with1 == nil && with2 == nil {
-		return true
+	if eq, done := compare.NilCheck(with1, with2); !done {
+		return eq
 	}
-	if with1 == nil || with2 == nil {
-		return false
-	}
-	if len(with1.CTEs) != len(with2.CTEs) {
-		return false
-	}
-	for i, cte1 := range with1.CTEs {
-		cte2 := with2.CTEs[i]
-		if normalizeIdentifier(cte1.Name) != normalizeIdentifier(cte2.Name) {
-			return false
-		}
-		if !selectStatementsAreEqualAST(cte1.Query, cte2.Query) {
-			return false
-		}
-	}
-	return true
+	return compare.Slices(with1.CTEs, with2.CTEs, func(a, b parser.CommonTableExpression) bool {
+		return normalizeIdentifier(a.Name) == normalizeIdentifier(b.Name) &&
+			selectStatementsAreEqualAST(a.Query, b.Query)
+	})
 }
 
 // whereClausesAreEqual compares WHERE clauses
 func whereClausesAreEqual(where1, where2 *parser.WhereClause) bool {
-	if where1 == nil && where2 == nil {
-		return true
-	}
-	if where1 == nil || where2 == nil {
-		return false
+	if eq, done := compare.NilCheck(where1, where2); !done {
+		return eq
 	}
 	return expressionsAreEqual(&where1.Condition, &where2.Condition)
 }
 
 // havingClausesAreEqual compares HAVING clauses
 func havingClausesAreEqual(having1, having2 *parser.HavingClause) bool {
-	if having1 == nil && having2 == nil {
-		return true
-	}
-	if having1 == nil || having2 == nil {
-		return false
+	if eq, done := compare.NilCheck(having1, having2); !done {
+		return eq
 	}
 	return expressionsAreEqual(&having1.Condition, &having2.Condition)
 }
 
 // selectOrderByClausesAreEqual compares SELECT ORDER BY clauses
 func selectOrderByClausesAreEqual(order1, order2 *parser.SelectOrderByClause) bool {
-	if order1 == nil && order2 == nil {
-		return true
+	if eq, done := compare.NilCheck(order1, order2); !done {
+		return eq
 	}
-	if order1 == nil || order2 == nil {
-		return false
-	}
-	if len(order1.Columns) != len(order2.Columns) {
-		return false
-	}
-	for i, col1 := range order1.Columns {
-		col2 := order2.Columns[i]
-		if !orderByColumnsAreEqual(&col1, &col2) {
-			return false
-		}
-	}
-	return true
+	return compare.Slices(order1.Columns, order2.Columns, func(a, b parser.OrderByColumn) bool {
+		return orderByColumnsAreEqual(&a, &b)
+	})
 }
 
 // orderByColumnsAreEqual compares ORDER BY columns
@@ -746,7 +719,7 @@ func orderByColumnsAreEqual(col1, col2 *parser.OrderByColumn) bool {
 		return false
 	}
 
-	// Compare direction (ASC/DESC)
+	// Compare direction (ASC/DESC) with normalization
 	dir1 := ""
 	if col1.Direction != nil {
 		dir1 = strings.ToUpper(*col1.Direction)
@@ -755,11 +728,8 @@ func orderByColumnsAreEqual(col1, col2 *parser.OrderByColumn) bool {
 	if col2.Direction != nil {
 		dir2 = strings.ToUpper(*col2.Direction)
 	}
-	if dir1 != dir2 {
-		return false
-	}
 
-	// Compare NULLS FIRST/LAST
+	// Compare NULLS FIRST/LAST with normalization
 	nulls1 := ""
 	if col1.Nulls != nil {
 		nulls1 = strings.ToUpper(*col1.Nulls)
@@ -768,7 +738,8 @@ func orderByColumnsAreEqual(col1, col2 *parser.OrderByColumn) bool {
 	if col2.Nulls != nil {
 		nulls2 = strings.ToUpper(*col2.Nulls)
 	}
-	return nulls1 == nulls2
+
+	return dir1 == dir2 && nulls1 == nulls2
 }
 
 // selectColumnsAreEqual compares SELECT column lists
@@ -799,39 +770,20 @@ func selectColumnsAreEqual(cols1, cols2 []parser.SelectColumn) bool {
 
 // fromClausesAreEqual compares FROM clauses
 func fromClausesAreEqual(from1, from2 *parser.FromClause) bool {
-	if from1 == nil && from2 == nil {
-		return true
-	}
-	if from1 == nil || from2 == nil {
-		return false
+	if eq, done := compare.NilCheck(from1, from2); !done {
+		return eq
 	}
 
-	// Compare main table
-	if !tableRefsAreEqual(&from1.Table, &from2.Table) {
-		return false
-	}
-
-	// Compare joins
-	if len(from1.Joins) != len(from2.Joins) {
-		return false
-	}
-	for i, join1 := range from1.Joins {
-		join2 := from2.Joins[i]
-		if !joinsAreEqual(&join1, &join2) {
-			return false
-		}
-	}
-
-	return true
+	return tableRefsAreEqual(&from1.Table, &from2.Table) &&
+		compare.Slices(from1.Joins, from2.Joins, func(a, b parser.JoinClause) bool {
+			return joinsAreEqual(&a, &b)
+		})
 }
 
 // tableRefsAreEqual compares table references
 func tableRefsAreEqual(table1, table2 *parser.TableRef) bool {
-	if table1 == nil && table2 == nil {
-		return true
-	}
-	if table1 == nil || table2 == nil {
-		return false
+	if eq, done := compare.NilCheck(table1, table2); !done {
+		return eq
 	}
 
 	// Compare table names
@@ -859,11 +811,8 @@ func tableRefsAreEqual(table1, table2 *parser.TableRef) bool {
 
 // tableNamesWithAliasAreEqual compares table names with aliases
 func tableNamesWithAliasAreEqual(name1, name2 *parser.TableNameWithAlias) bool {
-	if name1 == nil && name2 == nil {
-		return true
-	}
-	if name1 == nil || name2 == nil {
-		return false
+	if eq, done := compare.NilCheck(name1, name2); !done {
+		return eq
 	}
 
 	// Compare database names

@@ -1,5 +1,7 @@
 package parser
 
+import "github.com/pseudomuto/housekeeper/pkg/compare"
+
 type (
 	// TableReference represents a reference to a table in AS clause
 	// Format: [db.]table_name
@@ -739,125 +741,64 @@ func (s *AlterTableStmt) GetTrailingComments() []string {
 
 // Equal compares two OrderByClause instances for equality
 func (o *OrderByClause) Equal(other *OrderByClause) bool {
-	if o == nil && other == nil {
-		return true
-	}
-	if o == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(o, other); !done {
+		return eq
 	}
 	return o.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two PartitionByClause instances for equality
 func (p *PartitionByClause) Equal(other *PartitionByClause) bool {
-	if p == nil && other == nil {
-		return true
-	}
-	if p == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(p, other); !done {
+		return eq
 	}
 	return p.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two PrimaryKeyClause instances for equality
 func (p *PrimaryKeyClause) Equal(other *PrimaryKeyClause) bool {
-	if p == nil && other == nil {
-		return true
-	}
-	if p == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(p, other); !done {
+		return eq
 	}
 	return p.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two SampleByClause instances for equality
 func (s *SampleByClause) Equal(other *SampleByClause) bool {
-	if s == nil && other == nil {
-		return true
-	}
-	if s == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(s, other); !done {
+		return eq
 	}
 	return s.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two TableTTLClause instances for equality
 func (t *TableTTLClause) Equal(other *TableTTLClause) bool {
-	if t == nil && other == nil {
-		return true
-	}
-	if t == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(t, other); !done {
+		return eq
 	}
 	return t.Expression.Equal(&other.Expression)
 }
 
 // Equal compares two TableEngine instances for equality
 func (t *TableEngine) Equal(other *TableEngine) bool {
-	if t == nil && other == nil {
-		return true
-	}
-	if t == nil || other == nil {
-		return false
+	if eq, done := compare.NilCheck(t, other); !done {
+		return eq
 	}
 
-	if t.Name != other.Name {
-		return false
-	}
-
-	if len(t.Parameters) != len(other.Parameters) {
-		return false
-	}
-
-	for i := range t.Parameters {
-		if !t.Parameters[i].Equal(&other.Parameters[i]) {
-			return false
-		}
-	}
-
-	return true
+	return t.Name == other.Name &&
+		compare.Slices(t.Parameters, other.Parameters, func(a, b EngineParameter) bool {
+			return a.Equal(&b)
+		})
 }
 
 // Equal compares two EngineParameter instances for equality
-func (e *EngineParameter) Equal(other *EngineParameter) bool {
-	if e == nil && other == nil {
-		return true
-	}
-	if e == nil || other == nil {
-		return false
+func (p *EngineParameter) Equal(other *EngineParameter) bool {
+	if eq, done := compare.NilCheck(p, other); !done {
+		return eq
 	}
 
-	// Compare Expression
-	if (e.Expression != nil) != (other.Expression != nil) {
-		return false
-	}
-	if e.Expression != nil {
-		return e.Expression.Equal(other.Expression)
-	}
-
-	// Compare String
-	if (e.String != nil) != (other.String != nil) {
-		return false
-	}
-	if e.String != nil && *e.String != *other.String {
-		return false
-	}
-
-	// Compare Number
-	if (e.Number != nil) != (other.Number != nil) {
-		return false
-	}
-	if e.Number != nil && *e.Number != *other.Number {
-		return false
-	}
-
-	// Compare Ident
-	if (e.Ident != nil) != (other.Ident != nil) {
-		return false
-	}
-	if e.Ident != nil && *e.Ident != *other.Ident {
-		return false
-	}
-
-	return true
+	return compare.PointersWithEqual(p.Expression, other.Expression, (*Expression).Equal) &&
+		compare.Pointers(p.String, other.String) &&
+		compare.Pointers(p.Number, other.Number) &&
+		compare.Pointers(p.Ident, other.Ident)
 }
