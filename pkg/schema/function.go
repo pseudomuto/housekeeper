@@ -3,9 +3,9 @@ package schema
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 const (
@@ -163,15 +163,7 @@ func functionsEqualIgnoringName(a, b *FunctionInfo) bool {
 
 // generateCreateFunctionSQL generates CREATE FUNCTION SQL statement
 func generateCreateFunctionSQL(fn *FunctionInfo) string {
-	var parts []string
-	parts = append(parts, "CREATE FUNCTION", fmt.Sprintf("`%s`", fn.Name))
-
-	// Add ON CLUSTER if specified
-	if fn.Cluster != "" {
-		parts = append(parts, "ON CLUSTER", fmt.Sprintf("`%s`", fn.Cluster))
-	}
-
-	// Add AS clause with parameters
+	// Build parameter string
 	paramStr := "("
 	for i, param := range fn.Parameters {
 		if i > 0 {
@@ -181,22 +173,25 @@ func generateCreateFunctionSQL(fn *FunctionInfo) string {
 	}
 	paramStr += ")"
 
-	parts = append(parts, "AS", paramStr, "->", fmt.Sprintf("%v", fn.Expression))
+	// Build full AS expression
+	asExpression := fmt.Sprintf("%s -> %v", paramStr, fn.Expression)
 
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Create("FUNCTION").
+		Name(fn.Name).
+		OnCluster(fn.Cluster).
+		As(asExpression).
+		String()
 }
 
 // generateDropFunctionSQL generates DROP FUNCTION SQL statement
 func generateDropFunctionSQL(fn *FunctionInfo) string {
-	var parts []string
-	parts = append(parts, "DROP FUNCTION IF EXISTS", fmt.Sprintf("`%s`", fn.Name))
-
-	// Add ON CLUSTER if specified
-	if fn.Cluster != "" {
-		parts = append(parts, "ON CLUSTER", fmt.Sprintf("`%s`", fn.Cluster))
-	}
-
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Drop("FUNCTION").
+		IfExists().
+		Name(fn.Name).
+		OnCluster(fn.Cluster).
+		String()
 }
 
 // detectFunctionRenames detects rename operations by comparing function properties

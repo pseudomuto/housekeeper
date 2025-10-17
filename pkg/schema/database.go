@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 const (
@@ -211,14 +212,12 @@ func databasePropertiesMatch(db1, db2 *DatabaseInfo) bool {
 
 // generateRenameDatabaseSQL generates RENAME DATABASE SQL
 func generateRenameDatabaseSQL(oldName, newName, onCluster string) string {
-	var parts []string
-	parts = append(parts, "RENAME DATABASE", oldName, "TO", newName)
-
-	if onCluster != "" {
-		parts = append(parts, "ON CLUSTER", onCluster)
-	}
-
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Rename("DATABASE").
+		Name(oldName).
+		To(newName).
+		OnCluster(onCluster).
+		String()
 }
 
 // needsModification checks if a database needs to be modified
@@ -230,34 +229,23 @@ func needsModification(current, target *DatabaseInfo) bool {
 
 // generateCreateDatabaseSQL generates CREATE DATABASE SQL from database info
 func generateCreateDatabaseSQL(db *DatabaseInfo) string {
-	var parts []string
-	parts = append(parts, "CREATE DATABASE", db.Name)
-
-	if db.Cluster != "" {
-		parts = append(parts, "ON CLUSTER", db.Cluster)
-	}
-
-	if db.Engine != "" {
-		parts = append(parts, "ENGINE =", db.Engine)
-	}
-
-	if db.Comment != "" {
-		parts = append(parts, "COMMENT", fmt.Sprintf("'%s'", escapeSQL(db.Comment)))
-	}
-
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Create("DATABASE").
+		Name(db.Name).
+		OnCluster(db.Cluster).
+		Engine(db.Engine).
+		Comment(db.Comment).
+		String()
 }
 
 // generateDropDatabaseSQL generates DROP DATABASE SQL from database info
 func generateDropDatabaseSQL(db *DatabaseInfo) string {
-	var parts []string
-	parts = append(parts, "DROP DATABASE IF EXISTS", db.Name)
-
-	if db.Cluster != "" {
-		parts = append(parts, "ON CLUSTER", db.Cluster)
-	}
-
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Drop("DATABASE").
+		IfExists().
+		Name(db.Name).
+		OnCluster(db.Cluster).
+		String()
 }
 
 // generateAlterDatabaseSQL generates ALTER DATABASE SQL to change from current to target state
@@ -275,15 +263,14 @@ func generateAlterDatabaseSQL(current, target *DatabaseInfo) (string, error) {
 
 	// Check if comment changed
 	if current.Comment != target.Comment {
-		var parts []string
-		parts = append(parts, "ALTER DATABASE", target.Name)
-
-		if target.Cluster != "" {
-			parts = append(parts, "ON CLUSTER", target.Cluster)
-		}
-
-		parts = append(parts, "MODIFY COMMENT", fmt.Sprintf("'%s'", escapeSQL(target.Comment)))
-		statements = append(statements, strings.Join(parts, " ")+";")
+		sql := utils.NewSQLBuilder().
+			Alter("DATABASE").
+			Name(target.Name).
+			OnCluster(target.Cluster).
+			Modify("COMMENT").
+			Escaped(target.Comment).
+			String()
+		statements = append(statements, sql)
 	}
 
 	if len(statements) == 0 {

@@ -9,6 +9,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 const (
@@ -1117,21 +1118,23 @@ func generateCreateViewSQL(view *ViewInfo) string {
 
 // generateDropViewSQL generates DROP VIEW/TABLE SQL from ViewInfo
 func generateDropViewSQL(view *ViewInfo) string {
+	var database *string
+	if view.Database != "" {
+		database = &view.Database
+	}
+
+	objectType := "VIEW"
 	if view.IsMaterialized {
 		// Materialized views are dropped using DROP TABLE
-		sql := "DROP TABLE IF EXISTS " + getFullViewName(view)
-		if view.Cluster != "" {
-			sql += " ON CLUSTER " + view.Cluster
-		}
-		return sql + ";"
-	} else {
-		// Regular views are dropped using DROP VIEW
-		sql := "DROP VIEW IF EXISTS " + getFullViewName(view)
-		if view.Cluster != "" {
-			sql += " ON CLUSTER " + view.Cluster
-		}
-		return sql + ";"
+		objectType = "TABLE"
 	}
+
+	return utils.NewSQLBuilder().
+		Drop(objectType).
+		IfExists().
+		QualifiedName(database, view.Name).
+		OnCluster(view.Cluster).
+		String()
 }
 
 // generateCreateOrReplaceViewSQL generates CREATE OR REPLACE VIEW SQL for regular views
@@ -1151,12 +1154,18 @@ func generateCreateOrReplaceViewSQL(view *ViewInfo) string {
 
 // generateRenameViewSQL generates RENAME TABLE SQL for both regular and materialized views
 func generateRenameViewSQL(from, to *ViewInfo) string {
-	sql := "RENAME TABLE " + getFullViewName(from) + " TO " + getFullViewName(to)
-
-	// Use cluster info from the target view
-	if to.Cluster != "" {
-		sql += " ON CLUSTER " + to.Cluster
+	var fromDB, toDB *string
+	if from.Database != "" {
+		fromDB = &from.Database
+	}
+	if to.Database != "" {
+		toDB = &to.Database
 	}
 
-	return sql + ";"
+	return utils.NewSQLBuilder().
+		Rename("TABLE").
+		QualifiedName(fromDB, from.Name).
+		QualifiedTo(toDB, to.Name).
+		OnCluster(to.Cluster).
+		String()
 }

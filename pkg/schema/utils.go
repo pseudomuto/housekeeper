@@ -15,11 +15,6 @@ func removeQuotes(s string) string {
 	return s
 }
 
-// escapeSQL escapes single quotes in SQL strings
-func escapeSQL(s string) string {
-	return strings.ReplaceAll(s, "'", "\\'")
-}
-
 // formatEngine formats a database engine with its parameters
 func formatEngine(engine *parser.DatabaseEngine) string {
 	if len(engine.Parameters) == 0 {

@@ -288,7 +288,7 @@ CREATE TABLE test.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 
 		// Generate multiple migrations rapidly
 		filenames := make([]string, 3)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			filenames[i], err = GenerateMigrationFile(migrationDir, current, target)
 			require.NoError(t, err)
 			// Small delay to ensure different timestamps
