@@ -3,6 +3,15 @@ package parser
 import "github.com/pseudomuto/housekeeper/pkg/compare"
 
 type (
+	// DataTypeComparable represents a data type that can be compared for equality.
+	//
+	// This interface allows each concrete data type to implement its own comparison logic,
+	// including special handling for ClickHouse normalization patterns.
+	DataTypeComparable interface {
+		Equal(other DataTypeComparable) bool
+		TypeName() string
+	}
+
 	// Column represents a complete column definition in ClickHouse DDL.
 	// It includes the column name, data type, and all possible modifiers
 	// such as DEFAULT values, MATERIALIZED expressions, ALIAS definitions,
@@ -147,6 +156,177 @@ type (
 		Expression Expression `parser:"@@"`
 	}
 )
+
+// Interface implementations for DataTypeComparable
+
+// Equal compares two SimpleType instances with special handling for ClickHouse normalization patterns
+func (s *SimpleType) Equal(other DataTypeComparable) bool {
+	otherSimple, ok := other.(*SimpleType)
+	if !ok {
+		return false
+	}
+
+	if s.Name != otherSimple.Name {
+		return false
+	}
+
+	// Special handling for DateTime64 timezone normalization
+	// ClickHouse may normalize DateTime64(precision, timezone) to DateTime64(precision) in system.tables
+	if s.Name == "DateTime64" && otherSimple.Name == "DateTime64" {
+		return s.isDateTime64CompatibleWith(otherSimple)
+	}
+
+	// Standard parameter comparison for all other types
+	if len(s.Parameters) != len(otherSimple.Parameters) {
+		return false
+	}
+	for i := range s.Parameters {
+		if !s.Parameters[i].Equal(&otherSimple.Parameters[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// TypeName returns the type name for SimpleType
+func (s *SimpleType) TypeName() string {
+	return "SimpleType"
+}
+
+// isDateTime64CompatibleWith checks if two DateTime64 types are semantically compatible
+// despite potential timezone normalization differences from ClickHouse system.tables
+func (s *SimpleType) isDateTime64CompatibleWith(other *SimpleType) bool {
+	// Both must have at least precision parameter
+	if len(s.Parameters) == 0 || len(other.Parameters) == 0 {
+		return false
+	}
+
+	// First parameter (precision) must match
+	if !s.Parameters[0].Equal(&other.Parameters[0]) {
+		return false
+	}
+
+	// Case 1: Both have same number of parameters - use normal comparison
+	if len(s.Parameters) == len(other.Parameters) {
+		for i := range s.Parameters {
+			if !s.Parameters[i].Equal(&other.Parameters[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Case 2: Different parameter counts - check for timezone normalization
+	// One should have 1 param (precision), other should have 2 params (precision + timezone)
+	if (len(s.Parameters) == 1 && len(other.Parameters) == 2) ||
+		(len(s.Parameters) == 2 && len(other.Parameters) == 1) {
+		// Precision already matches (checked above), so this is compatible
+		return true
+	}
+
+	// Case 3: Both have more than 2 params or some other mismatch - not compatible
+	return false
+}
+
+// Equal compares two NullableType instances
+func (n *NullableType) Equal(other DataTypeComparable) bool {
+	otherNullable, ok := other.(*NullableType)
+	if !ok {
+		return false
+	}
+	return n.Type.Equal(otherNullable.Type)
+}
+
+// TypeName returns the type name for NullableType
+func (n *NullableType) TypeName() string {
+	return "NullableType"
+}
+
+// Equal compares two ArrayType instances
+func (a *ArrayType) Equal(other DataTypeComparable) bool {
+	otherArray, ok := other.(*ArrayType)
+	if !ok {
+		return false
+	}
+	return a.Type.Equal(otherArray.Type)
+}
+
+// TypeName returns the type name for ArrayType
+func (a *ArrayType) TypeName() string {
+	return "ArrayType"
+}
+
+// Equal compares two TupleType instances
+func (t *TupleType) Equal(other DataTypeComparable) bool {
+	otherTuple, ok := other.(*TupleType)
+	if !ok {
+		return false
+	}
+	if len(t.Elements) != len(otherTuple.Elements) {
+		return false
+	}
+	for i := range t.Elements {
+		if !tupleElementsEqual(&t.Elements[i], &otherTuple.Elements[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// TypeName returns the type name for TupleType
+func (t *TupleType) TypeName() string {
+	return "TupleType"
+}
+
+// Equal compares two NestedType instances
+func (n *NestedType) Equal(other DataTypeComparable) bool {
+	otherNested, ok := other.(*NestedType)
+	if !ok {
+		return false
+	}
+	if len(n.Columns) != len(otherNested.Columns) {
+		return false
+	}
+	for i := range n.Columns {
+		if !nestedColumnsEqual(&n.Columns[i], &otherNested.Columns[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// TypeName returns the type name for NestedType
+func (n *NestedType) TypeName() string {
+	return "NestedType"
+}
+
+// Equal compares two MapType instances
+func (m *MapType) Equal(other DataTypeComparable) bool {
+	otherMap, ok := other.(*MapType)
+	if !ok {
+		return false
+	}
+	return m.KeyType.Equal(otherMap.KeyType) && m.ValueType.Equal(otherMap.ValueType)
+}
+
+// TypeName returns the type name for MapType
+func (m *MapType) TypeName() string {
+	return "MapType"
+}
+
+// Equal compares two LowCardinalityType instances
+func (l *LowCardinalityType) Equal(other DataTypeComparable) bool {
+	otherLowCard, ok := other.(*LowCardinalityType)
+	if !ok {
+		return false
+	}
+	return l.Type.Equal(otherLowCard.Type)
+}
+
+// TypeName returns the type name for LowCardinalityType
+func (l *LowCardinalityType) TypeName() string {
+	return "LowCardinalityType"
+}
 
 // NormalizeDataType converts ClickHouse shorthand types to their canonical forms.
 // ClickHouse internally represents certain types differently than their shorthand:
@@ -310,7 +490,33 @@ func (c *Column) GetComment() *string {
 	return nil
 }
 
-// Equal compares two DataType instances for equality
+// getConcreteType extracts the concrete DataTypeComparable implementation from the DataType union
+func (d *DataType) getConcreteType() DataTypeComparable {
+	if d.Nullable != nil {
+		return d.Nullable
+	}
+	if d.Array != nil {
+		return d.Array
+	}
+	if d.Tuple != nil {
+		return d.Tuple
+	}
+	if d.Nested != nil {
+		return d.Nested
+	}
+	if d.Map != nil {
+		return d.Map
+	}
+	if d.LowCardinality != nil {
+		return d.LowCardinality
+	}
+	if d.Simple != nil {
+		return d.Simple
+	}
+	return nil
+}
+
+// Equal compares two DataType instances for equality using interface delegation
 func (d *DataType) Equal(other *DataType) bool {
 	if d == nil && other == nil {
 		return true
@@ -319,90 +525,19 @@ func (d *DataType) Equal(other *DataType) bool {
 		return false
 	}
 
-	// Compare Nullable
-	if (d.Nullable != nil) != (other.Nullable != nil) {
-		return false
-	}
-	if d.Nullable != nil {
-		return d.Nullable.Type.Equal(other.Nullable.Type)
-	}
+	// Extract concrete type implementations
+	dType := d.getConcreteType()
+	otherType := other.getConcreteType()
 
-	// Compare Array
-	if (d.Array != nil) != (other.Array != nil) {
-		return false
-	}
-	if d.Array != nil {
-		return d.Array.Type.Equal(other.Array.Type)
-	}
-
-	// Compare Tuple
-	if (d.Tuple != nil) != (other.Tuple != nil) {
-		return false
-	}
-	if d.Tuple != nil {
-		if len(d.Tuple.Elements) != len(other.Tuple.Elements) {
-			return false
-		}
-		for i := range d.Tuple.Elements {
-			if !tupleElementsEqual(&d.Tuple.Elements[i], &other.Tuple.Elements[i]) {
-				return false
-			}
-		}
+	if dType == nil && otherType == nil {
 		return true
 	}
-
-	// Compare Nested
-	if (d.Nested != nil) != (other.Nested != nil) {
+	if dType == nil || otherType == nil {
 		return false
 	}
-	if d.Nested != nil {
-		if len(d.Nested.Columns) != len(other.Nested.Columns) {
-			return false
-		}
-		for i := range d.Nested.Columns {
-			if !nestedColumnsEqual(&d.Nested.Columns[i], &other.Nested.Columns[i]) {
-				return false
-			}
-		}
-		return true
-	}
 
-	// Compare Map
-	if (d.Map != nil) != (other.Map != nil) {
-		return false
-	}
-	if d.Map != nil {
-		return d.Map.KeyType.Equal(other.Map.KeyType) && d.Map.ValueType.Equal(other.Map.ValueType)
-	}
-
-	// Compare LowCardinality
-	if (d.LowCardinality != nil) != (other.LowCardinality != nil) {
-		return false
-	}
-	if d.LowCardinality != nil {
-		return d.LowCardinality.Type.Equal(other.LowCardinality.Type)
-	}
-
-	// Compare Simple
-	if (d.Simple != nil) != (other.Simple != nil) {
-		return false
-	}
-	if d.Simple != nil {
-		if d.Simple.Name != other.Simple.Name {
-			return false
-		}
-		if len(d.Simple.Parameters) != len(other.Simple.Parameters) {
-			return false
-		}
-		for i := range d.Simple.Parameters {
-			if !d.Simple.Parameters[i].Equal(&other.Simple.Parameters[i]) {
-				return false
-			}
-		}
-		return true
-	}
-
-	return true
+	// Delegate to interface-based comparison
+	return dType.Equal(otherType)
 }
 
 func tupleElementsEqual(a, b *TupleElement) bool {

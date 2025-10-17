@@ -452,6 +452,16 @@ tables:
         MODIFY_COLUMN: 2
         RENAME_COLUMN: 1
         UPDATE: 1
+    - name: events
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+        MODIFY_COLUMN: 1
+    - name: events
+      operation: ALTER
+      alter_operations:
+        ADD_INDEX: 1
+        MODIFY_COLUMN: 2
     - name: logs
       operation: ALTER
       alter_operations:
