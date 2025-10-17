@@ -97,8 +97,8 @@ func (f *Formatter) formatWithClause(with *parser.WithClause) string {
 
 		// Format the SELECT statement with additional indentation
 		selectContent := f.formatSelectStatement(cte.Query)
-		selectLines := strings.Split(selectContent, "\n")
-		for _, line := range selectLines {
+		selectLines := strings.SplitSeq(selectContent, "\n")
+		for line := range selectLines {
 			if line != "" {
 				lines = append(lines, "        "+line) // Extra 4 spaces for CTE content
 			}

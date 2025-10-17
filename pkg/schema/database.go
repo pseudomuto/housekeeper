@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -158,12 +159,8 @@ func detectDatabaseRenames(currentDBs, targetDBs map[string]*DatabaseInfo) ([]*D
 	processedTarget := make(map[string]*DatabaseInfo)
 
 	// Copy all databases to processed maps initially
-	for name, db := range currentDBs {
-		processedCurrent[name] = db
-	}
-	for name, db := range targetDBs {
-		processedTarget[name] = db
-	}
+	maps.Copy(processedCurrent, currentDBs)
+	maps.Copy(processedTarget, targetDBs)
 
 	// Look for potential renames: databases that don't exist by name but have identical properties
 	for currentName, currentDB := range currentDBs {
