@@ -20,6 +20,93 @@ dir: db/migrations                   # Migration output directory
 
 ## Configuration Sections
 
+### Format Options
+
+Configure SQL formatting preferences to customize how Housekeeper generates and formats SQL output:
+
+```yaml
+format_options:
+  # Basic formatting settings
+  indent_size: 4                         # Number of spaces for indentation (default: 4)
+  max_line_length: 120                   # Maximum line length before wrapping (default: 120)
+  uppercase_keywords: true               # Use uppercase SQL keywords (default: true)
+  align_columns: true                    # Align column definitions in tables (default: true)
+  
+  # Function formatting settings
+  multiline_functions: true              # Enable multi-line function formatting (default: true)
+  function_arg_threshold: 4              # Arguments needed to trigger multi-line (default: 4)
+  function_indent_size: 4                # Extra indentation for function args (default: 4)
+  
+  # Advanced function formatting
+  smart_function_pairing: true           # Enable intelligent argument pairing (default: true)
+  pair_size: 2                           # Arguments per pair for conditional functions (default: 2)
+  
+  # Function names for specific formatting behavior
+  multiline_function_names:              # Functions that should always be multi-line
+    - "multiIf"
+    - "case"
+    - "transform"
+    - "multiSearchAllPositions"
+  paired_function_names:                 # Functions that use paired argument formatting
+    - "multiIf"
+    - "if"
+    - "case"
+    - "transform"
+```
+
+#### Format Option Details
+
+**Basic Formatting**:
+- `indent_size`: Controls the number of spaces used for each level of indentation in formatted SQL
+- `max_line_length`: Suggests when to break long lines (0 = no limit)
+- `uppercase_keywords`: When true, SQL keywords like `CREATE`, `TABLE`, `SELECT` are formatted in uppercase
+- `align_columns`: When true, column definitions in `CREATE TABLE` statements are aligned for readability
+
+**Function Formatting**:
+- `multiline_functions`: Enables breaking complex function calls across multiple lines
+- `function_arg_threshold`: Number of arguments that triggers multi-line formatting for functions
+- `function_indent_size`: Additional indentation applied to function arguments (defaults to `indent_size`)
+
+**Smart Function Pairing** (New):
+- `smart_function_pairing`: Enables intelligent pairing of arguments for conditional functions like `multiIf`
+- `pair_size`: How many arguments constitute a logical pair (typically 2 for condition-value pairs)
+- `multiline_function_names`: Function names that should always use multi-line formatting
+- `paired_function_names`: Function names that should use paired argument formatting
+
+#### Smart Function Pairing Example
+
+With smart function pairing enabled, conditional functions are formatted with logical argument groupings:
+
+```sql
+-- Before (each argument on separate line):
+CREATE FUNCTION calculate_discount AS (price, category) -> multiIf(
+  category = 'premium',
+  multiply(price, 0.9),
+  category = 'standard',
+  multiply(price, 0.95),
+  price
+);
+
+-- After (condition-value pairs on same line):
+CREATE FUNCTION calculate_discount AS (price, category) -> multiIf(
+  category = 'premium', multiply(price, 0.9),
+  category = 'standard', multiply(price, 0.95),
+  price
+);
+```
+
+#### Configuration Inheritance
+
+Format options follow a merging strategy where user values override defaults:
+
+```yaml
+# Only specify the options you want to change
+format_options:
+  indent_size: 2                         # Override default of 4
+  uppercase_keywords: false              # Override default of true
+  # All other options will use their default values
+```
+
 ### ClickHouse Settings
 
 Configure ClickHouse-specific options:
@@ -313,7 +400,81 @@ housekeeper schema dump --url localhost:9000
 housekeeper --help
 ```
 
+## Format Options in Practice
+
+### Development vs Production Formatting
+
+Consider different formatting preferences for different environments:
+
+```yaml
+# development.yaml - More compact for quick reading
+format_options:
+  indent_size: 2
+  align_columns: true
+  multiline_functions: false          # Keep functions compact during development
+  function_arg_threshold: 5           # Higher threshold for multi-line
+
+# production.yaml - More readable for reviews and documentation
+format_options:
+  indent_size: 4                      # Default, but explicit for team clarity
+  align_columns: true
+  uppercase_keywords: true            # Default, formal appearance
+  multiline_functions: true
+  function_arg_threshold: 3           # Lower threshold for better readability
+  smart_function_pairing: true        # Default, improve conditional function readability
+```
+
+### Team Formatting Standards
+
+Establish consistent formatting across your team by committing format options to version control:
+
+```yaml
+# .housekeeper/format.yaml - Team-wide formatting standards
+format_options:
+  # Consistent indentation
+  indent_size: 2
+  max_line_length: 100
+  
+  # Readable function formatting
+  multiline_functions: true
+  function_arg_threshold: 3
+  smart_function_pairing: true
+  
+  # Standard function lists
+  multiline_function_names:
+    - "multiIf"
+    - "transform"
+    - "arrayMap"
+  paired_function_names:
+    - "multiIf"
+    - "if"
+    - "case"
+```
+
+### Migration File Formatting
+
+Format options affect all generated SQL, including migration files:
+
+```bash
+# Generate migration with custom formatting
+housekeeper diff --config custom-format.yaml
+
+# The resulting migration will use your format preferences:
+# - Proper indentation for readability
+# - Aligned columns in CREATE TABLE statements  
+# - Smart pairing for conditional functions
+# - Consistent keyword casing
+```
+
 ## Configuration Best Practices
+
+### Formatting
+
+1. **Team Consistency**: Establish team-wide formatting standards in your main configuration
+2. **Environment Specific**: Consider different formatting for development vs production
+3. **Function Readability**: Use smart function pairing for complex conditional logic
+4. **Line Length**: Set appropriate `max_line_length` for your code review tools
+5. **Documentation**: Comment your format choices in the configuration file
 
 ### Security
 

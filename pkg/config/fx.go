@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"go.uber.org/fx"
 )
 
@@ -19,5 +20,8 @@ var Module = fx.Module("config", fx.Provide(
 
 		// Load and return the config
 		return LoadConfigFile("housekeeper.yaml")
+	},
+	func(c *Config) *format.Formatter {
+		return c.GetFormatter()
 	},
 ))

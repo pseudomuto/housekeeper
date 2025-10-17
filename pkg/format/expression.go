@@ -8,59 +8,64 @@ import (
 
 // formatExpression formats an expression with proper identifier backticking
 func (f *Formatter) formatExpression(expr *parser.Expression) string {
+	return f.formatExpressionWithContext(expr, false, 0)
+}
+
+// formatExpressionWithContext formats an expression with multi-line context
+func (f *Formatter) formatExpressionWithContext(expr *parser.Expression, multilineContext bool, baseIndent int) string {
 	if expr == nil {
 		return ""
 	}
 	if expr.Case != nil {
 		return f.formatCaseExpression(expr.Case)
 	}
-	return f.formatOrExpression(expr.Or)
+	return f.formatOrExpressionWithContext(expr.Or, multilineContext, baseIndent)
 }
 
-// formatOrExpression formats an OR expression
-func (f *Formatter) formatOrExpression(or *parser.OrExpression) string {
+// formatOrExpressionWithContext formats an OR expression with multi-line context
+func (f *Formatter) formatOrExpressionWithContext(or *parser.OrExpression, multilineContext bool, baseIndent int) string {
 	if or == nil {
 		return ""
 	}
 
-	result := f.formatAndExpression(or.And)
+	result := f.formatAndExpressionWithContext(or.And, multilineContext, baseIndent)
 	for _, rest := range or.Rest {
-		result += " OR " + f.formatAndExpression(rest.And)
+		result += " OR " + f.formatAndExpressionWithContext(rest.And, multilineContext, baseIndent)
 	}
 	return result
 }
 
-// formatAndExpression formats an AND expression
-func (f *Formatter) formatAndExpression(and *parser.AndExpression) string {
+// formatAndExpressionWithContext formats an AND expression with multi-line context
+func (f *Formatter) formatAndExpressionWithContext(and *parser.AndExpression, multilineContext bool, baseIndent int) string {
 	if and == nil {
 		return ""
 	}
 
-	result := f.formatNotExpression(and.Not)
+	result := f.formatNotExpressionWithContext(and.Not, multilineContext, baseIndent)
 	for _, rest := range and.Rest {
-		result += " AND " + f.formatNotExpression(rest.Not)
+		result += " AND " + f.formatNotExpressionWithContext(rest.Not, multilineContext, baseIndent)
 	}
 	return result
 }
 
-// formatNotExpression formats a NOT expression
-func (f *Formatter) formatNotExpression(not *parser.NotExpression) string {
+// formatNotExpressionWithContext formats a NOT expression with multi-line context
+func (f *Formatter) formatNotExpressionWithContext(not *parser.NotExpression, multilineContext bool, baseIndent int) string {
 	if not == nil {
 		return ""
 	}
 	if not.Not {
-		return "NOT " + f.formatComparisonExpression(not.Comparison)
+		return "NOT " + f.formatComparisonExpressionWithContext(not.Comparison, multilineContext, baseIndent)
 	}
-	return f.formatComparisonExpression(not.Comparison)
+	return f.formatComparisonExpressionWithContext(not.Comparison, multilineContext, baseIndent)
 }
 
-// formatComparisonExpression formats a comparison expression
-func (f *Formatter) formatComparisonExpression(comp *parser.ComparisonExpression) string {
+// formatComparisonExpressionWithContext formats a comparison expression with multi-line context
+func (f *Formatter) formatComparisonExpressionWithContext(comp *parser.ComparisonExpression, multilineContext bool, baseIndent int) string {
 	if comp == nil {
 		return ""
 	}
 
-	left := f.formatAdditionExpression(comp.Addition)
+	left := f.formatAdditionExpressionWithContext(comp.Addition, multilineContext, baseIndent)
 
 	// Handle IS NULL/IS NOT NULL
 	if comp.IsNull != nil {
@@ -74,7 +79,7 @@ func (f *Formatter) formatComparisonExpression(comp *parser.ComparisonExpression
 	if comp.Rest != nil { // nolint nestif
 		if comp.Rest.SimpleOp != nil {
 			op := f.formatSimpleComparisonOp(comp.Rest.SimpleOp.Op)
-			right := f.formatAdditionExpression(comp.Rest.SimpleOp.Addition)
+			right := f.formatAdditionExpressionWithContext(comp.Rest.SimpleOp.Addition, multilineContext, baseIndent)
 			return left + " " + op + " " + right
 		} else if comp.Rest.InOp != nil {
 			inOp := "IN"
@@ -143,50 +148,50 @@ func (f *Formatter) formatBetweenExpression(between *parser.BetweenExpression) s
 	return between.String()
 }
 
-// formatAdditionExpression formats an addition expression
-func (f *Formatter) formatAdditionExpression(add *parser.AdditionExpression) string {
+// formatAdditionExpressionWithContext formats an addition expression with multi-line context
+func (f *Formatter) formatAdditionExpressionWithContext(add *parser.AdditionExpression, multilineContext bool, baseIndent int) string {
 	if add == nil {
 		return ""
 	}
 
-	result := f.formatMultiplicationExpression(add.Multiplication)
+	result := f.formatMultiplicationExpressionWithContext(add.Multiplication, multilineContext, baseIndent)
 
 	for _, rest := range add.Rest {
-		result += " " + rest.Op + " " + f.formatMultiplicationExpression(rest.Multiplication)
+		result += " " + rest.Op + " " + f.formatMultiplicationExpressionWithContext(rest.Multiplication, multilineContext, baseIndent)
 	}
 
 	return result
 }
 
-// formatMultiplicationExpression formats a multiplication expression
-func (f *Formatter) formatMultiplicationExpression(mul *parser.MultiplicationExpression) string {
+// formatMultiplicationExpressionWithContext formats a multiplication expression with multi-line context
+func (f *Formatter) formatMultiplicationExpressionWithContext(mul *parser.MultiplicationExpression, multilineContext bool, baseIndent int) string {
 	if mul == nil {
 		return ""
 	}
 
-	result := f.formatUnaryExpression(mul.Unary)
+	result := f.formatUnaryExpressionWithContext(mul.Unary, multilineContext, baseIndent)
 
 	for _, rest := range mul.Rest {
-		result += " " + rest.Op + " " + f.formatUnaryExpression(rest.Unary)
+		result += " " + rest.Op + " " + f.formatUnaryExpressionWithContext(rest.Unary, multilineContext, baseIndent)
 	}
 
 	return result
 }
 
-// formatUnaryExpression formats a unary expression
-func (f *Formatter) formatUnaryExpression(unary *parser.UnaryExpression) string {
+// formatUnaryExpressionWithContext formats a unary expression with multi-line context
+func (f *Formatter) formatUnaryExpressionWithContext(unary *parser.UnaryExpression, multilineContext bool, baseIndent int) string {
 	if unary == nil {
 		return ""
 	}
 
 	if unary.Op != "" {
-		return unary.Op + f.formatPrimaryExpression(unary.Primary)
+		return unary.Op + f.formatPrimaryExpressionWithContext(unary.Primary, multilineContext, baseIndent)
 	}
-	return f.formatPrimaryExpression(unary.Primary)
+	return f.formatPrimaryExpressionWithContext(unary.Primary, multilineContext, baseIndent)
 }
 
-// formatPrimaryExpression formats a primary expression
-func (f *Formatter) formatPrimaryExpression(primary *parser.PrimaryExpression) string {
+// formatPrimaryExpressionWithContext formats a primary expression with multi-line context
+func (f *Formatter) formatPrimaryExpressionWithContext(primary *parser.PrimaryExpression, multilineContext bool, baseIndent int) string {
 	if primary == nil {
 		return ""
 	}
@@ -197,9 +202,9 @@ func (f *Formatter) formatPrimaryExpression(primary *parser.PrimaryExpression) s
 	case primary.Identifier != nil:
 		return f.formatIdentifierExpr(primary.Identifier)
 	case primary.Function != nil:
-		return f.formatFunctionCall(primary.Function)
+		return f.formatFunctionCallWithContext(primary.Function, multilineContext)
 	case primary.Parentheses != nil:
-		return "(" + f.formatExpression(&primary.Parentheses.Expression) + ")"
+		return "(" + f.formatExpressionWithContext(&primary.Parentheses.Expression, multilineContext, baseIndent) + ")"
 	case primary.Tuple != nil:
 		return f.formatTupleExpression(primary.Tuple)
 	case primary.Array != nil:
@@ -264,12 +269,20 @@ func isBooleanLiteral(name string) bool {
 	return name == "true" || name == "false"
 }
 
-// formatFunctionCall formats a function call
-func (f *Formatter) formatFunctionCall(fn *parser.FunctionCall) string {
+// formatFunctionCallWithContext formats a function call with multi-line context
+func (f *Formatter) formatFunctionCallWithContext(fn *parser.FunctionCall, multilineContext bool) string {
 	if fn == nil {
 		return ""
 	}
 
+	// Check if this function should be formatted multi-line
+	shouldUseMultiline := f.shouldFormatFunctionMultiline(fn, multilineContext)
+
+	if shouldUseMultiline {
+		return f.formatFunctionCallMultiline(fn)
+	}
+
+	// Use original single-line formatting
 	result := fn.Name + "("
 	if len(fn.FirstParentheses) > 0 {
 		var args []string
@@ -294,6 +307,120 @@ func (f *Formatter) formatFunctionCall(fn *parser.FunctionCall) string {
 	// Handle OVER clause for window functions
 	if fn.Over != nil {
 		result += " " + fn.Over.String()
+	}
+
+	return result
+}
+
+// shouldFormatFunctionMultiline determines if a function should be formatted multi-line
+func (f *Formatter) shouldFormatFunctionMultiline(fn *parser.FunctionCall, multilineContext bool) bool {
+	if !f.options.MultilineFunctions {
+		return false
+	}
+
+	// Always format multi-line if in multiline context
+	if multilineContext {
+		return true
+	}
+
+	// Check if function name is in the always-multiline list
+	for _, name := range f.options.MultilineFunctionNames {
+		if strings.EqualFold(fn.Name, name) {
+			return true
+		}
+	}
+
+	// Check if function has enough arguments to trigger multi-line
+	argCount := len(fn.FirstParentheses) + len(fn.SecondParentheses)
+	return argCount >= f.options.FunctionArgThreshold
+}
+
+// formatFunctionCallMultiline formats a function call across multiple lines
+func (f *Formatter) formatFunctionCallMultiline(fn *parser.FunctionCall) string {
+	// Use a reasonable indentation for readability
+	indentStr := strings.Repeat(" ", f.options.FunctionIndentSize)
+
+	result := fn.Name + "(\n"
+
+	// Format first parentheses arguments
+	if len(fn.FirstParentheses) > 0 {
+		if f.shouldUsePairedFormatting(fn) {
+			result += f.formatArgumentsPaired(fn.FirstParentheses, indentStr)
+		} else {
+			result += f.formatArgumentsLineByLine(fn.FirstParentheses, indentStr)
+		}
+	}
+
+	result += ")"
+
+	// Handle second parentheses for parameterized functions
+	if len(fn.SecondParentheses) > 0 {
+		result += "(\n"
+		// Always use line-by-line for second parentheses (less common, simpler approach)
+		result += f.formatArgumentsLineByLine(fn.SecondParentheses, indentStr)
+		result += ")"
+	}
+
+	// Handle OVER clause for window functions
+	if fn.Over != nil {
+		result += " " + fn.Over.String()
+	}
+
+	return result
+}
+
+// shouldUsePairedFormatting determines if a function should use smart argument pairing
+func (f *Formatter) shouldUsePairedFormatting(fn *parser.FunctionCall) bool {
+	if !f.options.SmartFunctionPairing {
+		return false
+	}
+
+	// Check if function name is in the paired functions list
+	for _, name := range f.options.PairedFunctionNames {
+		if strings.EqualFold(fn.Name, name) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// formatArgumentsPaired formats arguments in pairs (e.g., condition-value pairs for multiIf)
+func (f *Formatter) formatArgumentsPaired(args []parser.FunctionArg, indentStr string) string {
+	result := ""
+	pairSize := f.options.PairSize
+
+	for i := 0; i < len(args); i += pairSize {
+		result += indentStr
+
+		// Add arguments in pairs
+		for j := 0; j < pairSize && i+j < len(args); j++ {
+			if j > 0 {
+				result += ", "
+			}
+			result += f.formatFunctionArg(&args[i+j])
+		}
+
+		// Add comma unless it's the last group
+		if i+pairSize < len(args) {
+			result += ","
+		}
+		result += "\n"
+	}
+
+	return result
+}
+
+// formatArgumentsLineByLine formats arguments with each argument on its own line
+func (f *Formatter) formatArgumentsLineByLine(args []parser.FunctionArg, indentStr string) string {
+	result := ""
+
+	for i, arg := range args {
+		result += indentStr + f.formatFunctionArg(&arg)
+		if i < len(args)-1 {
+			result += ","
+		}
+		result += "\n"
 	}
 
 	return result

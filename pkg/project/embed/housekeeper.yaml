@@ -17,3 +17,37 @@ clickhouse:
 entrypoint: db/main.sql
 # Where to store/find migrations.
 dir: db/migrations
+
+# SQL formatting options for generated migrations and output.
+# Uncomment and modify any of these options to override defaults.
+# format_options:
+#   # Number of spaces to use for indentation (default: 4)
+#   indent_size: 4
+#   # Maximum line length before breaking lines (default: 120, 0 = no limit)
+#   max_line_length: 120
+#   # Whether to format SQL keywords in uppercase (default: true)
+#   uppercase_keywords: true
+#   # Whether to align column definitions in CREATE TABLE statements (default: true)
+#   align_columns: true
+#   # Whether to enable multi-line formatting for complex function expressions (default: true)
+#   multiline_functions: true
+#   # Number of function arguments that triggers multi-line formatting (default: 4)
+#   function_arg_threshold: 4
+#   # List of function names that should always be formatted multi-line (default: ["multiIf", "case", "transform", "multiSearchAllPositions"])
+#   multiline_function_names:
+#     - "multiIf"
+#     - "case"
+#     - "transform"
+#     - "multiSearchAllPositions"
+#   # Extra indentation for function arguments (default: 4)
+#   function_indent_size: 4
+#   # Whether to enable smart argument pairing for conditional functions (default: true)
+#   smart_function_pairing: true
+#   # List of function names that should use paired argument formatting (default: ["multiIf", "if", "case", "transform"])
+#   paired_function_names:
+#     - "multiIf"
+#     - "if"
+#     - "case"
+#     - "transform"
+#   # How many arguments constitute a pair for paired formatting (default: 2)
+#   pair_size: 2

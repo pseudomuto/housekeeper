@@ -11,7 +11,6 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/clickhouse"
 	"github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/docker"
-	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
@@ -70,7 +69,7 @@ func runContainer(ctx context.Context, w io.Writer, opts docker.DockerOptions, c
 	// 4. Apply existing migrations
 	if len(migrationDir.Migrations) > 0 {
 		fmt.Fprintf(w, "Applying %d migrations...\n", len(migrationDir.Migrations))
-		fmtr := format.New(format.Defaults)
+		fmtr := cfg.GetFormatter()
 
 		for _, migration := range migrationDir.Migrations {
 			fmt.Fprintf(w, "Applying migration %s...\n", migration.Version)

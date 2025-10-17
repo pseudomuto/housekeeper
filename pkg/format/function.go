@@ -49,8 +49,24 @@ func (f *Formatter) formatCreateFunction(w io.Writer, stmt *parser.CreateFunctio
 			return err
 		}
 
-		// Format the expression
-		exprStr := f.formatExpression(stmt.Expression)
+		// Format the expression with multi-line context if needed
+		// Calculate base indentation for the expression (length of "CREATE FUNCTION name ON CLUSTER cluster AS (params) -> ")
+		baseIndent := len("CREATE FUNCTION ") + len(stmt.Name)
+		if stmt.OnCluster != nil {
+			baseIndent += len(" ON CLUSTER ") + len(*stmt.OnCluster)
+		}
+		baseIndent += len(" AS (")
+		for i, param := range stmt.Parameters {
+			if i > 0 {
+				baseIndent += len(", ")
+			}
+			baseIndent += len(param.Name)
+		}
+		baseIndent += len(") -> ")
+
+		// Only use multi-line context if the formatter has multi-line functions enabled
+		// Let the individual function calls decide if they need multi-line formatting
+		exprStr := f.formatExpressionWithContext(stmt.Expression, false, baseIndent)
 		if _, err := w.Write([]byte(exprStr)); err != nil {
 			return err
 		}
