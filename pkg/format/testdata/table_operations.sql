@@ -29,5 +29,5 @@ COMMENT 'Product catalog table';
 
 ALTER TABLE `analytics`.`events`
     ADD COLUMN `session_id` String DEFAULT '' AFTER `user_id`,
-    MODIFY COLUMN `metadata` String,
+    MODIFY COLUMN `metadata` String COMMENT ''Updated metadata column'',
     DROP COLUMN `version`;

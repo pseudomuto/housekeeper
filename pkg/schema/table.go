@@ -584,20 +584,25 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 		if currentCol, exists := currentCols[targetCol.Name]; exists {
 			// Column exists - check for changes using Equal() method
 			if !currentCol.Equal(targetCol) {
+				// Fix: Create copies to avoid loop variable pointer issues
+				currentColCopy := currentCol
+				targetColCopy := targetCol
 				diffs = append(diffs, ColumnDiff{
 					Type:        ColumnDiffModify,
 					ColumnName:  targetCol.Name,
-					Current:     &currentCol,
-					Target:      &targetCol,
+					Current:     &currentColCopy,
+					Target:      &targetColCopy,
 					Description: "Modify column " + targetCol.Name,
 				})
 			}
 		} else {
 			// Column needs to be added
+			// Fix: Create copy to avoid loop variable pointer issues
+			targetColCopy := targetCol
 			diffs = append(diffs, ColumnDiff{
 				Type:        ColumnDiffAdd,
 				ColumnName:  targetCol.Name,
-				Target:      &targetCol,
+				Target:      &targetColCopy,
 				Description: "Add column " + targetCol.Name,
 			})
 		}
@@ -606,10 +611,12 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 	// Find columns to drop
 	for _, currentCol := range current {
 		if _, exists := targetCols[currentCol.Name]; !exists {
+			// Fix: Create copy to avoid loop variable pointer issues
+			currentColCopy := currentCol
 			diffs = append(diffs, ColumnDiff{
 				Type:        ColumnDiffDrop,
 				ColumnName:  currentCol.Name,
-				Current:     &currentCol,
+				Current:     &currentColCopy,
 				Description: "Drop column " + currentCol.Name,
 			})
 		}
@@ -624,25 +631,32 @@ func reverseColumnChanges(changes []ColumnDiff) []ColumnDiff {
 	for _, change := range changes {
 		switch change.Type {
 		case ColumnDiffAdd:
+			// Fix: Create copy to avoid pointer corruption
+			currentCopy := *change.Target
 			reversed = append(reversed, ColumnDiff{
 				Type:        ColumnDiffDrop,
 				ColumnName:  change.ColumnName,
-				Current:     change.Target,
+				Current:     &currentCopy,
 				Description: "Drop column " + change.ColumnName,
 			})
 		case ColumnDiffDrop:
+			// Fix: Create copy to avoid pointer corruption
+			targetCopy := *change.Current
 			reversed = append(reversed, ColumnDiff{
 				Type:        ColumnDiffAdd,
 				ColumnName:  change.ColumnName,
-				Target:      change.Current,
+				Target:      &targetCopy,
 				Description: "Add column " + change.ColumnName,
 			})
 		case ColumnDiffModify:
+			// Fix: Create copies to avoid pointer corruption between UP and DOWN SQL generation
+			currentCopy := *change.Target
+			targetCopy := *change.Current
 			reversed = append(reversed, ColumnDiff{
 				Type:        ColumnDiffModify,
 				ColumnName:  change.ColumnName,
-				Current:     change.Target,
-				Target:      change.Current,
+				Current:     &currentCopy,
+				Target:      &targetCopy,
 				Description: "Modify column " + change.ColumnName,
 			})
 		}

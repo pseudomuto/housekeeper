@@ -383,7 +383,7 @@ type (
 		Name     string              `parser:"@(Ident | BacktickIdent)"`
 		Type     *DataType           `parser:"@@?"`
 		Default  *DefaultClause      `parser:"@@?"`
-		Codec    *string             `parser:"('CODEC' '(' @String ')')?"`
+		Codec    *CodecClause        `parser:"@@?"`
 		TTL      *Expression         `parser:"('TTL' @@)?"`
 		Comment  *string             `parser:"('COMMENT' @String)?"`
 		Remove   *ModifyColumnRemove `parser:"@@?"`
