@@ -9,6 +9,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 const (
@@ -803,27 +804,32 @@ func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 }
 
 func generateDropTableSQL(table *TableInfo) string {
-	var sql strings.Builder
-	sql.WriteString("DROP TABLE ")
-	sql.WriteString(formatQualifiedTableName(table.Database, table.Name))
-	writeOnClusterClause(&sql, table.Cluster)
-	return sql.String()
+	var database *string
+	if table.Database != "" {
+		database = &table.Database
+	}
+
+	return utils.NewSQLBuilder().
+		Drop("TABLE").
+		QualifiedName(database, table.Name).
+		OnCluster(table.Cluster).
+		String()
 }
 
 func generateRenameTableSQL(from, to *TableInfo, fromName, toName string) string {
-	var sql strings.Builder
-	sql.WriteString("RENAME TABLE ")
-	sql.WriteString(fromName)
-	sql.WriteString(" TO ")
-	sql.WriteString(toName)
-
 	// Use cluster from either table (they should match after validation)
 	cluster := from.Cluster
 	if cluster == "" {
 		cluster = to.Cluster
 	}
-	writeOnClusterClause(&sql, cluster)
-	return sql.String()
+
+	return utils.NewSQLBuilder().
+		Rename("TABLE").
+		Raw(fromName).
+		Raw("TO").
+		Raw(toName).
+		OnCluster(cluster).
+		String()
 }
 
 func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string {

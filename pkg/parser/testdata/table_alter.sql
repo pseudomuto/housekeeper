@@ -163,7 +163,7 @@ DETACH PARTITION '202303';
 
 -- ALTER TABLE ADD PROJECTION basic
 ALTER TABLE analytics.events ADD PROJECTION user_stats (
-    SELECT 
+    SELECT
         user_id,
         count() AS event_count
     GROUP BY user_id
@@ -171,7 +171,7 @@ ALTER TABLE analytics.events ADD PROJECTION user_stats (
 
 -- ALTER TABLE ADD PROJECTION with IF NOT EXISTS
 ALTER TABLE analytics.events ADD PROJECTION IF NOT EXISTS daily_stats (
-    SELECT 
+    SELECT
         toDate(timestamp) AS date,
         count() AS total_events,
         uniq(user_id) AS unique_users
@@ -181,7 +181,7 @@ ALTER TABLE analytics.events ADD PROJECTION IF NOT EXISTS daily_stats (
 
 -- ALTER TABLE ADD PROJECTION with complex SELECT
 ALTER TABLE analytics.events ADD PROJECTION revenue_summary (
-    SELECT 
+    SELECT
         user_id,
         toYYYYMM(timestamp) AS month,
         sum(revenue) AS total_revenue,
@@ -201,7 +201,7 @@ ALTER TABLE analytics.events DROP PROJECTION IF EXISTS old_projection;
 ALTER TABLE analytics.events
 ADD COLUMN revenue Decimal(10, 2) DEFAULT 0,
 ADD PROJECTION revenue_stats (
-    SELECT 
+    SELECT
         toYYYYMM(timestamp) AS month,
         sum(revenue) AS monthly_revenue
     GROUP BY month

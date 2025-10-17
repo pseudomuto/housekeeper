@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 const (
@@ -262,14 +263,12 @@ func dictionaryPropertiesMatch(dict1, dict2 *DictionaryInfo) bool {
 
 // generateRenameDictionarySQL generates RENAME DICTIONARY SQL
 func generateRenameDictionarySQL(oldName, newName, onCluster string) string {
-	var parts []string
-	parts = append(parts, "RENAME DICTIONARY", oldName, "TO", newName)
-
-	if onCluster != "" {
-		parts = append(parts, "ON CLUSTER", onCluster)
-	}
-
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Rename("DICTIONARY").
+		Name(oldName).
+		To(newName).
+		OnCluster(onCluster).
+		String()
 }
 
 // needsDictionaryModification checks if a dictionary needs to be modified
@@ -742,20 +741,17 @@ func generateReplaceDictionarySQL(dict *DictionaryInfo) string {
 
 // generateDropDictionarySQL generates DROP DICTIONARY SQL from dictionary info
 func generateDropDictionarySQL(dict *DictionaryInfo) string {
-	var parts []string
-	parts = append(parts, "DROP DICTIONARY IF EXISTS")
-
+	var database *string
 	if dict.Database != "" {
-		parts = append(parts, dict.Database+"."+dict.Name)
-	} else {
-		parts = append(parts, dict.Name)
+		database = &dict.Database
 	}
 
-	if dict.Cluster != "" {
-		parts = append(parts, "ON CLUSTER", dict.Cluster)
-	}
-
-	return strings.Join(parts, " ") + ";"
+	return utils.NewSQLBuilder().
+		Drop("DICTIONARY").
+		IfExists().
+		QualifiedName(database, dict.Name).
+		OnCluster(dict.Cluster).
+		String()
 }
 
 // reconstructDictionarySQL reconstructs CREATE DICTIONARY SQL from parsed statement
