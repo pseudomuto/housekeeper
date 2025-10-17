@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"sort"
 	"strings"
@@ -200,12 +201,8 @@ func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInf
 	processedTarget := make(map[string]*DictionaryInfo)
 
 	// Copy all dictionaries to processed maps initially
-	for name, dict := range currentDicts {
-		processedCurrent[name] = dict
-	}
-	for name, dict := range targetDicts {
-		processedTarget[name] = dict
-	}
+	maps.Copy(processedCurrent, currentDicts)
+	maps.Copy(processedTarget, targetDicts)
 
 	// Look for potential renames: dictionaries that don't exist by name but have identical properties
 	for currentName, currentDict := range currentDicts {

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -268,12 +269,8 @@ func detectRoleRenames(current, target map[string]*RoleInfo) ([]*RoleDiff, map[s
 	processedTarget := make(map[string]*RoleInfo)
 
 	// Copy all to processed maps initially
-	for k, v := range current {
-		processedCurrent[k] = v
-	}
-	for k, v := range target {
-		processedTarget[k] = v
-	}
+	maps.Copy(processedCurrent, current)
+	maps.Copy(processedTarget, target)
 
 	// Look for potential renames
 	for currentName, currentRole := range current {

@@ -259,7 +259,7 @@ func (p *ProjectFixture) updateClickHouseXML(cluster string) error {
 }
 
 // replaceClusterInXML replaces cluster names in ClickHouse XML configuration
-func replaceClusterInXML(xml, newCluster string) string {
+func replaceClusterInXML(xml, _ string) string {
 	// This is a simplified implementation
 	// In a real scenario, you might want to use proper XML parsing
 	// For now, we'll just do basic string replacement

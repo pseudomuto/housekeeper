@@ -309,7 +309,7 @@ func TestSumFile_LargeContent(t *testing.T) {
 
 	// Create large content
 	var contentBuilder strings.Builder
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		contentBuilder.WriteString(fmt.Sprintf("CREATE TABLE table_%d (id UInt64) ENGINE = MergeTree() ORDER BY id;\n", i))
 	}
 	largeContent := contentBuilder.String()

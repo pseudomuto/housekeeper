@@ -27,7 +27,9 @@ tasks:
   lint:fix:
     desc: Run golangci-lint --fix on the codebase
     silent: true
-    cmd: "golangci-lint run --fix"
+    cmds:
+      - go tool modernize -fix -test ./...
+      - golangci-lint run --fix
 
   test:
     desc: Run the test suite (unit tests only)

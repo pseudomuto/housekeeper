@@ -4,6 +4,7 @@ import (
 	"embed"
 	"flag"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -851,9 +852,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 			}
 
 			// Copy the accumulated operations for this table
-			for opType, count := range alterOperations[tableName] {
-				expectedTable.AlterOperations[opType] = count
-			}
+			maps.Copy(expectedTable.AlterOperations, alterOperations[tableName])
 
 			expectedTables = append(expectedTables, expectedTable)
 		} else if stmt.CreateRole != nil {
