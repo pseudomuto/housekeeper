@@ -53,6 +53,20 @@ type (
 		UppercaseKeywords bool
 		// AlignColumns whether to align column definitions in tables
 		AlignColumns bool
+		// MultilineFunctions enables multi-line formatting for complex function expressions
+		MultilineFunctions bool
+		// FunctionArgThreshold is the number of function arguments that triggers multi-line formatting
+		FunctionArgThreshold int
+		// MultilineFunctionNames contains function names that should always be formatted multi-line
+		MultilineFunctionNames []string
+		// FunctionIndentSize specifies extra indentation for function arguments (defaults to IndentSize)
+		FunctionIndentSize int
+		// SmartFunctionPairing enables intelligent argument pairing for specific functions
+		SmartFunctionPairing bool
+		// PairedFunctionNames contains function names that should use argument pairing
+		PairedFunctionNames []string
+		// PairSize specifies how many arguments to group per line (default: 2)
+		PairSize int
 	}
 
 	// Formatter handles SQL statement formatting with configurable options
@@ -68,11 +82,22 @@ type (
 //   - Uppercase SQL keywords
 //   - Column alignment in table definitions
 //   - 120 character line length suggestion
+//   - Multi-line formatting for complex functions
+//   - 4+ arguments triggers multi-line formatting
+//   - Specific functions always formatted multi-line
+//   - Smart argument pairing for conditional functions
 var Defaults = FormatterOptions{
-	IndentSize:        4,
-	MaxLineLength:     120,
-	UppercaseKeywords: true,
-	AlignColumns:      true,
+	IndentSize:             4,
+	MaxLineLength:          120,
+	UppercaseKeywords:      true,
+	AlignColumns:           true,
+	MultilineFunctions:     true,
+	FunctionArgThreshold:   4,
+	MultilineFunctionNames: []string{"multiIf", "case", "transform", "multiSearchAllPositions"},
+	FunctionIndentSize:     4,
+	SmartFunctionPairing:   true,
+	PairedFunctionNames:    []string{"multiIf", "if", "case", "transform"},
+	PairSize:               2,
 }
 
 // New creates a new Formatter with the specified options.

@@ -8,6 +8,7 @@ import (
 
 	. "github.com/pseudomuto/housekeeper/pkg/config"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/stretchr/testify/require"
 )
 
@@ -203,4 +204,379 @@ dir: migrations
 		require.NotNil(t, config.ClickHouse.IgnoreDatabases)
 		require.Empty(t, config.ClickHouse.IgnoreDatabases)
 	})
+}
+
+func TestConfigGetFormatterOptions(t *testing.T) {
+	tests := []struct {
+		name        string
+		configYAML  string
+		expected    format.FormatterOptions
+		description string
+	}{
+		{
+			name:        "nil config returns defaults",
+			configYAML:  "",
+			expected:    format.Defaults,
+			description: "When config is nil, should return default formatter options",
+		},
+		{
+			name: "config with no format_options returns defaults",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+clickhouse:
+  version: "25.7"
+`,
+			expected:    format.Defaults,
+			description: "When config has no format_options section, should return defaults",
+		},
+		{
+			name: "config with partial format_options merges with defaults",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  indent_size: 4
+  uppercase_keywords: true
+`,
+			expected: format.FormatterOptions{
+				IndentSize:             4,
+				MaxLineLength:          format.Defaults.MaxLineLength,
+				UppercaseKeywords:      true,
+				AlignColumns:           format.Defaults.AlignColumns,
+				MultilineFunctions:     format.Defaults.MultilineFunctions,
+				FunctionArgThreshold:   format.Defaults.FunctionArgThreshold,
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames,
+				FunctionIndentSize:     format.Defaults.FunctionIndentSize,
+				SmartFunctionPairing:   format.Defaults.SmartFunctionPairing,
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames,
+				PairSize:               format.Defaults.PairSize,
+			},
+			description: "Should merge user values with defaults, preserving unspecified options",
+		},
+		{
+			name: "config with all format_options overrides defaults",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  indent_size: 8
+  max_line_length: 80
+  uppercase_keywords: true
+  align_columns: false
+  multiline_functions: false
+  function_arg_threshold: 6
+  multiline_function_names:
+    - "customMultiIf"
+  function_indent_size: 2
+  smart_function_pairing: false
+  paired_function_names:
+    - "customIf"
+    - "customCase"
+  pair_size: 3
+`,
+			expected: format.FormatterOptions{
+				IndentSize:             8,
+				MaxLineLength:          80,
+				UppercaseKeywords:      true,
+				AlignColumns:           false,
+				MultilineFunctions:     false,
+				FunctionArgThreshold:   6,
+				MultilineFunctionNames: []string{"customMultiIf"},
+				FunctionIndentSize:     2,
+				SmartFunctionPairing:   false,
+				PairedFunctionNames:    []string{"customIf", "customCase"},
+				PairSize:               3,
+			},
+			description: "Should use all user-specified values, overriding all defaults",
+		},
+		{
+			name: "config with zero values should use zero values not defaults",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  indent_size: 0
+  max_line_length: 0
+  uppercase_keywords: false
+  align_columns: false
+  multiline_functions: false
+  function_arg_threshold: 0
+  function_indent_size: 0
+  smart_function_pairing: false
+  pair_size: 0
+`,
+			expected: format.FormatterOptions{
+				IndentSize:             0,
+				MaxLineLength:          0,
+				UppercaseKeywords:      false,
+				AlignColumns:           false,
+				MultilineFunctions:     false,
+				FunctionArgThreshold:   0,
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames, // not specified, should use default
+				FunctionIndentSize:     0,
+				SmartFunctionPairing:   false,
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames, // not specified, should use default
+				PairSize:               0,
+			},
+			description: "Should respect explicitly set zero values, not replace them with defaults",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg *Config
+			var err error
+
+			if tt.configYAML != "" {
+				cfg, err = LoadConfig(strings.NewReader(tt.configYAML))
+				require.NoError(t, err)
+			}
+
+			result := cfg.GetFormatterOptions()
+			require.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+func TestConfigGetFormatter(t *testing.T) {
+	configYAML := `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  indent_size: 4
+  uppercase_keywords: true
+`
+
+	cfg, err := LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+
+	formatter := cfg.GetFormatter()
+	require.NotNil(t, formatter)
+
+	// Verify the formatter was created with the merged options
+	// We can't directly access formatter internals, but we can verify it was created
+	require.IsType(t, &format.Formatter{}, formatter)
+}
+
+func TestConfigMergeLogic(t *testing.T) {
+	tests := []struct {
+		name           string
+		formatOptions  *FormatterOptionsConfig
+		expectedMerged format.FormatterOptions
+		description    string
+	}{
+		{
+			name:           "empty format options config merges with defaults",
+			formatOptions:  &FormatterOptionsConfig{},
+			expectedMerged: format.Defaults,
+			description:    "Empty config should result in defaults after merge",
+		},
+		{
+			name: "partial config merges correctly",
+			formatOptions: &FormatterOptionsConfig{
+				IndentSize:        intPtr(4),
+				UppercaseKeywords: boolPtr(true),
+				// Other fields are nil, should use defaults
+			},
+			expectedMerged: format.FormatterOptions{
+				IndentSize:             4,
+				MaxLineLength:          format.Defaults.MaxLineLength,
+				UppercaseKeywords:      true,
+				AlignColumns:           format.Defaults.AlignColumns,
+				MultilineFunctions:     format.Defaults.MultilineFunctions,
+				FunctionArgThreshold:   format.Defaults.FunctionArgThreshold,
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames,
+				FunctionIndentSize:     format.Defaults.FunctionIndentSize,
+				SmartFunctionPairing:   format.Defaults.SmartFunctionPairing,
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames,
+				PairSize:               format.Defaults.PairSize,
+			},
+			description: "Partial config should override some values while preserving defaults for others",
+		},
+		{
+			name: "zero values override defaults",
+			formatOptions: &FormatterOptionsConfig{
+				IndentSize:           intPtr(0),
+				UppercaseKeywords:    boolPtr(false),
+				AlignColumns:         boolPtr(false),
+				SmartFunctionPairing: boolPtr(false),
+				PairSize:             intPtr(0),
+				// Other fields not set, should use defaults
+			},
+			expectedMerged: format.FormatterOptions{
+				IndentSize:             0,
+				MaxLineLength:          format.Defaults.MaxLineLength,
+				UppercaseKeywords:      false,
+				AlignColumns:           false,
+				MultilineFunctions:     format.Defaults.MultilineFunctions,
+				FunctionArgThreshold:   format.Defaults.FunctionArgThreshold,
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames,
+				FunctionIndentSize:     format.Defaults.FunctionIndentSize,
+				SmartFunctionPairing:   false,
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames,
+				PairSize:               0,
+			},
+			description: "Zero values should override defaults when explicitly set",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a config with the test format options
+			cfg := &Config{
+				FormatOptions: tt.formatOptions,
+			}
+
+			result := cfg.GetFormatterOptions()
+			require.Equal(t, tt.expectedMerged, result, tt.description)
+		})
+	}
+}
+
+func TestNilConfigGetFormatterOptions(t *testing.T) {
+	var cfg *Config
+	result := cfg.GetFormatterOptions()
+	require.Equal(t, format.Defaults, result, "Nil config should return defaults")
+}
+
+func TestNilConfigGetFormatter(t *testing.T) {
+	var cfg *Config
+	formatter := cfg.GetFormatter()
+	require.NotNil(t, formatter)
+	require.IsType(t, &format.Formatter{}, formatter)
+}
+
+func TestBooleanFieldOverrideEdgeCases(t *testing.T) {
+	// Test specific boolean override scenarios to ensure pointer logic works correctly
+	tests := []struct {
+		name        string
+		configYAML  string
+		expected    format.FormatterOptions
+		description string
+	}{
+		{
+			name: "override default true with explicit false",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  uppercase_keywords: false        # Default is true, override with false
+  align_columns: false             # Default is true, override with false
+  multiline_functions: false       # Default is true, override with false
+  smart_function_pairing: false    # Default is true, override with false
+`,
+			expected: format.FormatterOptions{
+				IndentSize:             format.Defaults.IndentSize,             // not specified, use default
+				MaxLineLength:          format.Defaults.MaxLineLength,          // not specified, use default
+				UppercaseKeywords:      false,                                  // explicitly set to false
+				AlignColumns:           false,                                  // explicitly set to false
+				MultilineFunctions:     false,                                  // explicitly set to false
+				FunctionArgThreshold:   format.Defaults.FunctionArgThreshold,   // not specified, use default
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames, // not specified, use default
+				FunctionIndentSize:     format.Defaults.FunctionIndentSize,     // not specified, use default
+				SmartFunctionPairing:   false,                                  // explicitly set to false
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames,    // not specified, use default
+				PairSize:               format.Defaults.PairSize,               // not specified, use default
+			},
+			description: "Should override default true values with explicitly set false values",
+		},
+		{
+			name: "set default true values explicitly to true",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  uppercase_keywords: true         # Default is true, explicitly set to true
+  align_columns: true              # Default is true, explicitly set to true
+  multiline_functions: true        # Default is true, explicitly set to true
+  smart_function_pairing: true     # Default is true, explicitly set to true
+`,
+			expected: format.FormatterOptions{
+				IndentSize:             format.Defaults.IndentSize,             // not specified, use default
+				MaxLineLength:          format.Defaults.MaxLineLength,          // not specified, use default
+				UppercaseKeywords:      true,                                   // explicitly set to true (same as default)
+				AlignColumns:           true,                                   // explicitly set to true (same as default)
+				MultilineFunctions:     true,                                   // explicitly set to true (same as default)
+				FunctionArgThreshold:   format.Defaults.FunctionArgThreshold,   // not specified, use default
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames, // not specified, use default
+				FunctionIndentSize:     format.Defaults.FunctionIndentSize,     // not specified, use default
+				SmartFunctionPairing:   true,                                   // explicitly set to true (same as default)
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames,    // not specified, use default
+				PairSize:               format.Defaults.PairSize,               // not specified, use default
+			},
+			description: "Should respect explicitly set true values even when they match defaults",
+		},
+		{
+			name: "mixed boolean overrides",
+			configYAML: `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  uppercase_keywords: false        # Default is true, override with false
+  align_columns: true              # Default is true, explicitly set to true
+  multiline_functions: false       # Default is true, override with false
+  smart_function_pairing: true     # Default is true, explicitly set to true
+`,
+			expected: format.FormatterOptions{
+				IndentSize:             format.Defaults.IndentSize,             // not specified, use default
+				MaxLineLength:          format.Defaults.MaxLineLength,          // not specified, use default
+				UppercaseKeywords:      false,                                  // explicitly set to false
+				AlignColumns:           true,                                   // explicitly set to true
+				MultilineFunctions:     false,                                  // explicitly set to false
+				FunctionArgThreshold:   format.Defaults.FunctionArgThreshold,   // not specified, use default
+				MultilineFunctionNames: format.Defaults.MultilineFunctionNames, // not specified, use default
+				FunctionIndentSize:     format.Defaults.FunctionIndentSize,     // not specified, use default
+				SmartFunctionPairing:   true,                                   // explicitly set to true
+				PairedFunctionNames:    format.Defaults.PairedFunctionNames,    // not specified, use default
+				PairSize:               format.Defaults.PairSize,               // not specified, use default
+			},
+			description: "Should handle mixed boolean overrides correctly",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := LoadConfig(strings.NewReader(tt.configYAML))
+			require.NoError(t, err)
+
+			result := cfg.GetFormatterOptions()
+			require.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+// Helper functions for creating pointers to primitive types
+func intPtr(i int) *int {
+	return &i
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func TestYAMLUnmarshalingPointerFields(t *testing.T) {
+	// Test that YAML unmarshaling correctly creates non-nil pointers for explicitly set boolean values
+	configYAML := `
+entrypoint: db/main.sql
+dir: db/migrations
+format_options:
+  uppercase_keywords: false
+  align_columns: true
+`
+
+	cfg, err := LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+	require.NotNil(t, cfg.FormatOptions)
+
+	// These fields were explicitly set in YAML, so pointers should be non-nil
+	require.NotNil(t, cfg.FormatOptions.UppercaseKeywords, "UppercaseKeywords should have non-nil pointer when explicitly set")
+	require.NotNil(t, cfg.FormatOptions.AlignColumns, "AlignColumns should have non-nil pointer when explicitly set")
+	require.False(t, *cfg.FormatOptions.UppercaseKeywords, "UppercaseKeywords should be false")
+	require.True(t, *cfg.FormatOptions.AlignColumns, "AlignColumns should be true")
+
+	// These fields were not set in YAML, so pointers should be nil
+	require.Nil(t, cfg.FormatOptions.MultilineFunctions, "MultilineFunctions should have nil pointer when not set")
+	require.Nil(t, cfg.FormatOptions.SmartFunctionPairing, "SmartFunctionPairing should have nil pointer when not set")
+	require.Nil(t, cfg.FormatOptions.IndentSize, "IndentSize should have nil pointer when not set")
 }
