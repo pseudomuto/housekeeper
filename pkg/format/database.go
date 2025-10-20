@@ -10,23 +10,13 @@ import (
 // CreateDatabase formats a CREATE DATABASE statement
 func (f *Formatter) createDatabase(w io.Writer, stmt *parser.CreateDatabaseStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		// CREATE DATABASE
-		parts = append(parts, f.keyword("CREATE DATABASE"))
+		// Build basic CREATE statement
+		parts := ddl.buildCreateStatement("DATABASE", false, stmt.IfNotExists, stmt.Name)
 
-		// IF NOT EXISTS
-		if stmt.IfNotExists {
-			parts = append(parts, f.keyword("IF NOT EXISTS"))
-		}
-
-		// Database name
-		parts = append(parts, f.identifier(stmt.Name))
-
-		// ON CLUSTER
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
+		// Add ON CLUSTER
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
 
 		// ENGINE
 		if stmt.Engine != nil {
@@ -34,12 +24,9 @@ func (f *Formatter) createDatabase(w io.Writer, stmt *parser.CreateDatabaseStmt)
 		}
 
 		// COMMENT
-		if stmt.Comment != nil {
-			parts = append(parts, f.keyword("COMMENT"), *stmt.Comment)
-		}
+		parts = ddl.appendComment(parts, stmt.Comment)
 
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
@@ -136,31 +123,18 @@ func (f *Formatter) detachDatabase(w io.Writer, stmt *parser.DetachDatabaseStmt)
 // DropDatabase formats a DROP DATABASE statement
 func (f *Formatter) dropDatabase(w io.Writer, stmt *parser.DropDatabaseStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		// DROP DATABASE
-		parts = append(parts, f.keyword("DROP DATABASE"))
+		// Build basic DROP statement
+		parts := ddl.buildDropStatement("DATABASE", stmt.IfExists, stmt.Name)
 
-		// IF EXISTS
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
+		// Add ON CLUSTER
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
 
-		// Database name
-		parts = append(parts, f.identifier(stmt.Name))
+		// Add SYNC
+		parts = ddl.appendSync(parts, stmt.Sync)
 
-		// ON CLUSTER
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		// SYNC
-		if stmt.Sync {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
