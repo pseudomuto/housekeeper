@@ -1,21 +1,21 @@
 package compare
 
 // NilCheck performs a nil check on two pointers and returns whether they are equal
-// and whether the comparison should continue.
+// and whether more comparison checks are needed.
 //
-// Returns (equal, shouldContinue) where:
-//   - equal: true if both are nil or neither is nil (when shouldContinue is false, this indicates both are nil)
-//   - shouldContinue: false if a definitive result can be returned (both nil or one is nil)
+// Returns (equal, needsMoreChecks) where:
+//   - equal: true if both are nil, false if only one is nil
+//   - needsMoreChecks: true if both pointers are non-nil and further comparison is needed
 //
 // Example:
 //
 //	func (e *Expression) Equal(other *Expression) bool {
-//	    if eq, done := compare.NilCheck(e, other); !done {
+//	    if eq, needsMoreChecks := compare.NilCheck(e, other); !needsMoreChecks {
 //	        return eq
 //	    }
 //	    // Continue with field comparisons...
 //	}
-func NilCheck[T any](a, b *T) (equal bool, shouldContinue bool) {
+func NilCheck[T any](a, b *T) (equal bool, needsMoreChecks bool) {
 	if a == nil && b == nil {
 		return true, false
 	}

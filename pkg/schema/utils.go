@@ -3,6 +3,7 @@ package schema
 import (
 	"strings"
 
+	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
@@ -79,68 +80,31 @@ func normalizeIdentifier(s string) string {
 
 // expressionsAreEqual compares expressions using AST-based structural comparison
 func expressionsAreEqual(expr1, expr2 *parser.Expression) bool {
-	if expr1 == nil && expr2 == nil {
-		return true
-	}
-	if expr1 == nil || expr2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(expr1, expr2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare AST structure directly
-	if expr1.Case != nil && expr2.Case != nil {
-		return caseExpressionsEqual(expr1.Case, expr2.Case)
-	}
-	if expr1.Case != nil || expr2.Case != nil {
-		return false
-	}
-
-	if expr1.Or != nil && expr2.Or != nil {
-		return orExpressionsEqual(expr1.Or, expr2.Or)
-	}
-	if expr1.Or != nil || expr2.Or != nil {
-		return false
-	}
-
-	return true
+	return compare.PointersWithEqual(expr1.Case, expr2.Case, caseExpressionsEqual) &&
+		compare.PointersWithEqual(expr1.Or, expr2.Or, orExpressionsEqual)
 }
 
 // caseExpressionsEqual compares CASE expressions structurally
 func caseExpressionsEqual(case1, case2 *parser.CaseExpression) bool {
-	if case1 == nil && case2 == nil {
-		return true
-	}
-	if case1 == nil || case2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(case1, case2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare WHEN clauses
-	if len(case1.WhenClauses) != len(case2.WhenClauses) {
-		return false
-	}
-	for i, when1 := range case1.WhenClauses {
-		when2 := case2.WhenClauses[i]
-		if !whenClausesEqual(&when1, &when2) {
-			return false
-		}
-	}
-
-	// Compare ELSE clause
-	if case1.ElseClause == nil && case2.ElseClause == nil {
-		return true
-	}
-	if case1.ElseClause == nil || case2.ElseClause == nil {
-		return false
-	}
-	return elseClausesEqual(case1.ElseClause, case2.ElseClause)
+	return compare.Slices(case1.WhenClauses, case2.WhenClauses, func(a, b parser.WhenClause) bool {
+		return whenClausesEqual(&a, &b)
+	}) && compare.PointersWithEqual(case1.ElseClause, case2.ElseClause, elseClausesEqual)
 }
 
 // whenClausesEqual compares WHEN clauses (using string comparison for now)
 func whenClausesEqual(when1, when2 *parser.WhenClause) bool {
-	if when1 == nil && when2 == nil {
-		return true
-	}
-	if when1 == nil || when2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(when1, when2); !needsMoreChecks {
+		return eq
 	}
 
 	// For now, use string comparison on the parsed string values
@@ -151,11 +115,8 @@ func whenClausesEqual(when1, when2 *parser.WhenClause) bool {
 
 // elseClausesEqual compares ELSE clauses (using string comparison for now)
 func elseClausesEqual(else1, else2 *parser.ElseClause) bool {
-	if else1 == nil && else2 == nil {
-		return true
-	}
-	if else1 == nil || else2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(else1, else2); !needsMoreChecks {
+		return eq
 	}
 
 	// For now, use string comparison on the parsed string value
@@ -221,11 +182,8 @@ func andExpressionsEqual(and1, and2 *parser.AndExpression) bool {
 
 // notExpressionsEqual compares NOT expressions structurally
 func notExpressionsEqual(not1, not2 *parser.NotExpression) bool {
-	if not1 == nil && not2 == nil {
-		return true
-	}
-	if not1 == nil || not2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(not1, not2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare NOT flag and comparison
@@ -280,11 +238,8 @@ func comparisonExpressionsEqual(comp1, comp2 *parser.ComparisonExpression) bool 
 
 // simpleComparisonsEqual compares simple comparison operations
 func simpleComparisonsEqual(comp1, comp2 *parser.SimpleComparison) bool {
-	if comp1 == nil && comp2 == nil {
-		return true
-	}
-	if comp1 == nil || comp2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(comp1, comp2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare operators
@@ -317,11 +272,8 @@ func simpleComparisonOpsEqual(op1, op2 *parser.SimpleComparisonOp) bool {
 
 // inComparisonsEqual compares IN operations
 func inComparisonsEqual(in1, in2 *parser.InComparison) bool {
-	if in1 == nil && in2 == nil {
-		return true
-	}
-	if in1 == nil || in2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(in1, in2); !needsMoreChecks {
+		return eq
 	}
 
 	return in1.Not == in2.Not && in1.In == in2.In
@@ -330,11 +282,8 @@ func inComparisonsEqual(in1, in2 *parser.InComparison) bool {
 
 // betweenComparisonsEqual compares BETWEEN operations
 func betweenComparisonsEqual(between1, between2 *parser.BetweenComparison) bool {
-	if between1 == nil && between2 == nil {
-		return true
-	}
-	if between1 == nil || between2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(between1, between2); !needsMoreChecks {
+		return eq
 	}
 
 	return between1.Not == between2.Not && between1.Between == between2.Between
@@ -343,11 +292,8 @@ func betweenComparisonsEqual(between1, between2 *parser.BetweenComparison) bool 
 
 // additionExpressionsEqual compares addition/subtraction expressions
 func additionExpressionsEqual(add1, add2 *parser.AdditionExpression) bool {
-	if add1 == nil && add2 == nil {
-		return true
-	}
-	if add1 == nil || add2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(add1, add2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare base multiplication expression
@@ -371,11 +317,8 @@ func additionExpressionsEqual(add1, add2 *parser.AdditionExpression) bool {
 
 // multiplicationExpressionsEqual compares multiplication/division expressions
 func multiplicationExpressionsEqual(mul1, mul2 *parser.MultiplicationExpression) bool {
-	if mul1 == nil && mul2 == nil {
-		return true
-	}
-	if mul1 == nil || mul2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(mul1, mul2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare base unary expression
@@ -399,11 +342,8 @@ func multiplicationExpressionsEqual(mul1, mul2 *parser.MultiplicationExpression)
 
 // unaryExpressionsEqual compares unary expressions
 func unaryExpressionsEqual(unary1, unary2 *parser.UnaryExpression) bool {
-	if unary1 == nil && unary2 == nil {
-		return true
-	}
-	if unary1 == nil || unary2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(unary1, unary2); !needsMoreChecks {
+		return eq
 	}
 
 	return unary1.Op == unary2.Op && primaryExpressionsEqual(unary1.Primary, unary2.Primary)
@@ -411,11 +351,8 @@ func unaryExpressionsEqual(unary1, unary2 *parser.UnaryExpression) bool {
 
 // primaryExpressionsEqual compares primary expressions
 func primaryExpressionsEqual(prim1, prim2 *parser.PrimaryExpression) bool {
-	if prim1 == nil && prim2 == nil {
-		return true
-	}
-	if prim1 == nil || prim2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(prim1, prim2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare literals
