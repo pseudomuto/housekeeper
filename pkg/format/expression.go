@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 // formatExpression formats an expression with proper identifier backticking
@@ -257,6 +258,10 @@ func (f *Formatter) formatIdentifierExpr(id *parser.IdentifierExpr) string {
 	// Special case: don't backtick boolean literals that are parsed as identifiers
 	if id.Database == nil && id.Table == nil && isBooleanLiteral(id.Name) {
 		parts = append(parts, id.Name)
+	} else if id.Database == nil && id.Table == nil && strings.Contains(id.Name, ".") {
+		// If there's no database or table qualification, but the name contains dots,
+		// treat it as a single column identifier (e.g., flattened nested column)
+		parts = append(parts, utils.BacktickColumnName(id.Name))
 	} else {
 		parts = append(parts, f.identifier(id.Name))
 	}
