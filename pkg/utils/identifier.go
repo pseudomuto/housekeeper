@@ -42,6 +42,31 @@ func BacktickIdentifier(name string) string {
 	return strings.Join(parts, ".")
 }
 
+// BacktickColumnName adds backticks around a column name without splitting on dots.
+// This is specifically for column names that may contain dots (like flattened nested columns).
+//
+// Examples:
+//   - "column" -> "`column`"
+//   - "metadata.source" -> "`metadata.source`"  (NOT split)
+//   - "`column`" -> "`column`" (already backticked)
+//   - "" -> ""
+//
+// This function treats the entire input as a single identifier, unlike BacktickIdentifier
+// which splits on dots for qualified names.
+func BacktickColumnName(name string) string {
+	if name == "" {
+		return ""
+	}
+
+	// If already backticked, return as-is
+	if len(name) >= 2 && name[0] == '`' && name[len(name)-1] == '`' {
+		return name
+	}
+
+	// Just backtick the whole thing without splitting
+	return "`" + name + "`"
+}
+
 // BacktickQualifiedName formats a qualified name (database.name) with proper backticks.
 // If database is nil or empty, only the name is backticked.
 //

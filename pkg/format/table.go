@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 // CreateTable formats a CREATE TABLE statement with proper indentation and alignment
@@ -869,7 +870,7 @@ func (f *Formatter) formatColumnIdentifier(name string, dataType *parser.DataTyp
 	// 2. Data type is an Array
 	if strings.Contains(name, ".") && dataType != nil && dataType.Array != nil {
 		// This is a flattened Nested column, treat as single identifier
-		return "`" + name + "`"
+		return utils.BacktickColumnName(name)
 	}
 
 	// Otherwise, use standard identifier formatting (which may split on dots)

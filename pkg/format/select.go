@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
 
 // SelectStatement formats a top-level SELECT statement
@@ -126,7 +127,8 @@ func (f *Formatter) formatSelectColumns(columns []parser.SelectColumn) []string 
 		} else if col.Expression != nil {
 			colStr := f.formatExpression(col.Expression)
 			if col.Alias != nil {
-				colStr += " " + f.keyword("AS") + " " + f.identifier(*col.Alias)
+				// Use BacktickColumnName for aliases to handle dotted column names correctly
+				colStr += " " + f.keyword("AS") + " " + utils.BacktickColumnName(*col.Alias)
 			}
 			result = append(result, colStr)
 		}
