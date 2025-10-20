@@ -35,6 +35,92 @@ var (
 	ErrInvalidClause = errors.New("invalid clause for engine type")
 )
 
+// diffProcessor defines the interface needed for generic diff processing.
+// This interface is satisfied implicitly by all diff types without requiring
+// explicit method implementations.
+type diffProcessor interface {
+	GetDiffType() string // Returns the operation type (CREATE, ALTER, DROP, RENAME, etc.)
+	GetUpSQL() string    // Returns the forward migration SQL
+}
+
+// Processing order configurations for each object type.
+// These define the exact order in which different operation types should be applied
+// for each schema object type to ensure proper dependency management and safety.
+var (
+	// roleProcessingOrder defines the order for role operations
+	// CREATE -> ALTER -> RENAME -> GRANT -> REVOKE -> DROP
+	roleProcessingOrder = []string{"CREATE", "ALTER", "RENAME", "GRANT", "REVOKE", "DROP"}
+
+	// functionProcessingOrder defines the order for function operations
+	// CREATE -> REPLACE -> RENAME -> DROP
+	functionProcessingOrder = []string{"CREATE", "REPLACE", "RENAME", "DROP"}
+
+	// databaseProcessingOrder defines the order for database operations
+	// CREATE -> ALTER -> RENAME -> DROP
+	databaseProcessingOrder = []string{"CREATE", "ALTER", "RENAME", "DROP"}
+
+	// tableProcessingOrder defines the order for table operations
+	// CREATE -> ALTER -> RENAME -> DROP
+	tableProcessingOrder = []string{"CREATE", "ALTER", "RENAME", "DROP"}
+
+	// dictionaryProcessingOrder defines the order for dictionary operations
+	// CREATE -> REPLACE -> RENAME -> DROP
+	dictionaryProcessingOrder = []string{"CREATE", "REPLACE", "RENAME", "DROP"}
+
+	// viewProcessingOrder defines the order for view operations
+	// CREATE -> ALTER -> RENAME -> DROP
+	viewProcessingOrder = []string{"CREATE", "ALTER", "RENAME", "DROP"}
+)
+
+// groupDiffsByType groups a slice of diffs by their type using a generic approach.
+// This eliminates the need for repetitive switch statements for each diff type.
+//
+// Type parameter T must implement diffProcessor interface.
+//
+// Returns a map where keys are diff types (CREATE, ALTER, DROP, etc.) and values
+// are slices of diffs of that type.
+func groupDiffsByType[T diffProcessor](diffs []T) map[string][]T {
+	groups := make(map[string][]T)
+	for _, diff := range diffs {
+		diffType := diff.GetDiffType()
+		groups[diffType] = append(groups[diffType], diff)
+	}
+	return groups
+}
+
+// processDiffsInOrder processes grouped diffs in the specified order and returns
+// a slice of SQL statements. This eliminates repetitive for loop patterns.
+//
+// Parameters:
+//   - groups: Map of diff type to slice of diffs (from groupDiffsByType)
+//   - order: Slice specifying the processing order (e.g., ["CREATE", "ALTER", "RENAME", "DROP"])
+//
+// Returns a slice of SQL statements in the correct order.
+func processDiffsInOrder[T diffProcessor](groups map[string][]T, order []string) []string {
+	var statements []string
+	for _, diffType := range order {
+		if diffs, exists := groups[diffType]; exists {
+			for _, diff := range diffs {
+				statements = append(statements, diff.GetUpSQL())
+			}
+		}
+	}
+	return statements
+}
+
+// processAllDiffsInOrder is a convenience function that combines grouping and processing
+// for a single diff type. This replaces the repetitive group->process pattern.
+//
+// Parameters:
+//   - diffs: Slice of diffs to process
+//   - order: Processing order for the diff types
+//
+// Returns a slice of SQL statements in the correct order.
+func processAllDiffsInOrder[T diffProcessor](diffs []T, order []string) []string {
+	groups := groupDiffsByType(diffs)
+	return processDiffsInOrder(groups, order)
+}
+
 // GenerateDiff creates a diff by comparing current and target schema states.
 // It analyzes the differences between the current schema and the desired target schema,
 // then generates appropriate DDL statements.
@@ -119,190 +205,27 @@ func GenerateDiff(current, target *parser.SQL) (*parser.SQL, error) {
 	// Within each type: CREATE first, then ALTER/REPLACE, then RENAME, then DROP/GRANT/REVOKE
 	statements := make([]string, 0, 50) // Pre-allocate with estimated capacity
 
-	// Group role diffs by type for proper ordering
-	var roleCreateDiffs, roleAlterDiffs, roleRenameDiffs, roleDropDiffs, roleGrantDiffs, roleRevokeDiffs []*RoleDiff
-	for _, diff := range roleDiffs {
-		switch diff.Type {
-		case RoleDiffCreate:
-			roleCreateDiffs = append(roleCreateDiffs, diff)
-		case RoleDiffAlter:
-			roleAlterDiffs = append(roleAlterDiffs, diff)
-		case RoleDiffRename:
-			roleRenameDiffs = append(roleRenameDiffs, diff)
-		case RoleDiffDrop:
-			roleDropDiffs = append(roleDropDiffs, diff)
-		case RoleDiffGrant:
-			roleGrantDiffs = append(roleGrantDiffs, diff)
-		case RoleDiffRevoke:
-			roleRevokeDiffs = append(roleRevokeDiffs, diff)
-		}
-	}
+	// Process all diffs using generic diff processor in proper order:
+	// Roles first (global objects), then functions (global objects), then databases,
+	// then tables, then dictionaries, then views
 
-	// Role order: CREATE -> ALTER -> RENAME -> GRANT -> REVOKE -> DROP
-	for _, diff := range roleCreateDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range roleAlterDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range roleRenameDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range roleGrantDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range roleRevokeDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range roleDropDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
+	// Process roles: CREATE -> ALTER -> RENAME -> GRANT -> REVOKE -> DROP
+	statements = append(statements, processAllDiffsInOrder(roleDiffs, roleProcessingOrder)...)
 
-	// Group function diffs by type for proper ordering
-	var functionCreateDiffs, functionReplaceDiffs, functionRenameDiffs, functionDropDiffs []*FunctionDiff
-	for _, diff := range functionDiffs {
-		switch diff.Type {
-		case FunctionDiffCreate:
-			functionCreateDiffs = append(functionCreateDiffs, diff)
-		case FunctionDiffReplace:
-			functionReplaceDiffs = append(functionReplaceDiffs, diff)
-		case FunctionDiffRename:
-			functionRenameDiffs = append(functionRenameDiffs, diff)
-		case FunctionDiffDrop:
-			functionDropDiffs = append(functionDropDiffs, diff)
-		}
-	}
+	// Process functions: CREATE -> REPLACE -> RENAME -> DROP
+	statements = append(statements, processAllDiffsInOrder(functionDiffs, functionProcessingOrder)...)
 
-	// Function order: CREATE -> REPLACE -> RENAME -> DROP
-	for _, diff := range functionCreateDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range functionReplaceDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range functionRenameDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range functionDropDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
+	// Process databases: CREATE -> ALTER -> RENAME -> DROP
+	statements = append(statements, processAllDiffsInOrder(dbDiffs, databaseProcessingOrder)...)
 
-	// Group database diffs by type for proper ordering
-	var dbCreateDiffs, dbAlterDiffs, dbRenameDiffs, dbDropDiffs []*DatabaseDiff
-	for _, diff := range dbDiffs {
-		switch diff.Type {
-		case DatabaseDiffCreate:
-			dbCreateDiffs = append(dbCreateDiffs, diff)
-		case DatabaseDiffAlter:
-			dbAlterDiffs = append(dbAlterDiffs, diff)
-		case DatabaseDiffRename:
-			dbRenameDiffs = append(dbRenameDiffs, diff)
-		case DatabaseDiffDrop:
-			dbDropDiffs = append(dbDropDiffs, diff)
-		}
-	}
+	// Process tables: CREATE -> ALTER -> RENAME -> DROP
+	statements = append(statements, processAllDiffsInOrder(tableDiffs, tableProcessingOrder)...)
 
-	// Group dictionary diffs by type for proper ordering
-	var dictCreateDiffs, dictReplaceDiffs, dictRenameDiffs, dictDropDiffs []*DictionaryDiff
-	for _, diff := range dictDiffs {
-		switch diff.Type {
-		case DictionaryDiffCreate:
-			dictCreateDiffs = append(dictCreateDiffs, diff)
-		case DictionaryDiffReplace:
-			dictReplaceDiffs = append(dictReplaceDiffs, diff)
-		case DictionaryDiffRename:
-			dictRenameDiffs = append(dictRenameDiffs, diff)
-		case DictionaryDiffDrop:
-			dictDropDiffs = append(dictDropDiffs, diff)
-		}
-	}
+	// Process dictionaries: CREATE -> REPLACE -> RENAME -> DROP
+	statements = append(statements, processAllDiffsInOrder(dictDiffs, dictionaryProcessingOrder)...)
 
-	// Group view diffs by type for proper ordering
-	var viewCreateDiffs, viewAlterDiffs, viewRenameDiffs, viewDropDiffs []*ViewDiff
-	for _, diff := range viewDiffs {
-		switch diff.Type {
-		case ViewDiffCreate:
-			viewCreateDiffs = append(viewCreateDiffs, diff)
-		case ViewDiffAlter:
-			viewAlterDiffs = append(viewAlterDiffs, diff)
-		case ViewDiffRename:
-			viewRenameDiffs = append(viewRenameDiffs, diff)
-		case ViewDiffDrop:
-			viewDropDiffs = append(viewDropDiffs, diff)
-		}
-	}
-
-	// Group table diffs by type for proper ordering
-	var tableCreateDiffs, tableAlterDiffs, tableRenameDiffs, tableDropDiffs []*TableDiff
-	for _, diff := range tableDiffs {
-		switch diff.Type {
-		case TableDiffCreate:
-			tableCreateDiffs = append(tableCreateDiffs, diff)
-		case TableDiffAlter:
-			tableAlterDiffs = append(tableAlterDiffs, diff)
-		case TableDiffRename:
-			tableRenameDiffs = append(tableRenameDiffs, diff)
-		case TableDiffDrop:
-			tableDropDiffs = append(tableDropDiffs, diff)
-		}
-	}
-
-	// Migration order: Roles first, then functions, then databases, then named collections, then tables, then dictionaries, then views
-	// Database order: CREATE -> ALTER -> RENAME -> DROP
-	for _, diff := range dbCreateDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range dbAlterDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range dbRenameDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range dbDropDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-
-	// Table order: CREATE -> ALTER -> RENAME -> DROP
-	for _, diff := range tableCreateDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range tableAlterDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range tableRenameDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range tableDropDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-
-	// Dictionary order: CREATE -> REPLACE -> RENAME -> DROP
-	for _, diff := range dictCreateDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range dictReplaceDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range dictRenameDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range dictDropDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-
-	// View order: CREATE -> ALTER -> RENAME -> DROP
-	for _, diff := range viewCreateDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range viewAlterDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range viewRenameDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
-	for _, diff := range viewDropDiffs {
-		statements = append(statements, diff.UpSQL)
-	}
+	// Process views: CREATE -> ALTER -> RENAME -> DROP
+	statements = append(statements, processAllDiffsInOrder(viewDiffs, viewProcessingOrder)...)
 
 	// Split any statements that contain multiple SQL statements (separated by \n\n)
 	// and ensure each individual SQL statement ends with a semicolon

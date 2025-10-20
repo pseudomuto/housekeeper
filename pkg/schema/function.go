@@ -343,3 +343,13 @@ func processCreationsAndDeletions(currentMap, targetMap map[string]*FunctionInfo
 
 	return diffs
 }
+
+// GetDiffType returns the diff type for FunctionDiff (implements diffProcessor interface)
+func (d *FunctionDiff) GetDiffType() string {
+	return string(d.Type)
+}
+
+// GetUpSQL returns the up SQL for FunctionDiff (implements diffProcessor interface)
+func (d *FunctionDiff) GetUpSQL() string {
+	return d.UpSQL
+}

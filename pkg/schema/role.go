@@ -507,3 +507,13 @@ func formatSettings(settings map[string]string) string {
 	sort.Strings(parts) // For deterministic output
 	return strings.Join(parts, ", ")
 }
+
+// GetDiffType returns the diff type for RoleDiff (implements diffProcessor interface)
+func (d *RoleDiff) GetDiffType() string {
+	return string(d.Type)
+}
+
+// GetUpSQL returns the up SQL for RoleDiff (implements diffProcessor interface)
+func (d *RoleDiff) GetUpSQL() string {
+	return d.UpSQL
+}

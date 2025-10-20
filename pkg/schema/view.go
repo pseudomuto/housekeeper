@@ -1169,3 +1169,13 @@ func generateRenameViewSQL(from, to *ViewInfo) string {
 		OnCluster(to.Cluster).
 		String()
 }
+
+// GetDiffType returns the diff type for ViewDiff (implements diffProcessor interface)
+func (d *ViewDiff) GetDiffType() string {
+	return string(d.Type)
+}
+
+// GetUpSQL returns the up SQL for ViewDiff (implements diffProcessor interface)
+func (d *ViewDiff) GetUpSQL() string {
+	return d.UpSQL
+}

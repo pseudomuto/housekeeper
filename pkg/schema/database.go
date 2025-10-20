@@ -320,3 +320,13 @@ func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists b
 		DownSQL:      downSQL,
 	}, nil
 }
+
+// GetDiffType returns the diff type for DatabaseDiff (implements diffProcessor interface)
+func (d *DatabaseDiff) GetDiffType() string {
+	return string(d.Type)
+}
+
+// GetUpSQL returns the up SQL for DatabaseDiff (implements diffProcessor interface)
+func (d *DatabaseDiff) GetUpSQL() string {
+	return d.UpSQL
+}
