@@ -126,11 +126,8 @@ func elseClausesEqual(else1, else2 *parser.ElseClause) bool {
 
 // orExpressionsEqual compares OR expressions structurally
 func orExpressionsEqual(or1, or2 *parser.OrExpression) bool {
-	if or1 == nil && or2 == nil {
-		return true
-	}
-	if or1 == nil || or2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(or1, or2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare base AND expression
@@ -139,26 +136,15 @@ func orExpressionsEqual(or1, or2 *parser.OrExpression) bool {
 	}
 
 	// Compare OR rest clauses
-	if len(or1.Rest) != len(or2.Rest) {
-		return false
-	}
-	for i, rest1 := range or1.Rest {
-		rest2 := or2.Rest[i]
-		if rest1.Op != rest2.Op || !andExpressionsEqual(rest1.And, rest2.And) {
-			return false
-		}
-	}
-
-	return true
+	return compare.Slices(or1.Rest, or2.Rest, func(a, b parser.OrRest) bool {
+		return a.Op == b.Op && andExpressionsEqual(a.And, b.And)
+	})
 }
 
 // andExpressionsEqual compares AND expressions structurally
 func andExpressionsEqual(and1, and2 *parser.AndExpression) bool {
-	if and1 == nil && and2 == nil {
-		return true
-	}
-	if and1 == nil || and2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(and1, and2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare base NOT expression
@@ -167,17 +153,9 @@ func andExpressionsEqual(and1, and2 *parser.AndExpression) bool {
 	}
 
 	// Compare AND rest clauses
-	if len(and1.Rest) != len(and2.Rest) {
-		return false
-	}
-	for i, rest1 := range and1.Rest {
-		rest2 := and2.Rest[i]
-		if rest1.Op != rest2.Op || !notExpressionsEqual(rest1.Not, rest2.Not) {
-			return false
-		}
-	}
-
-	return true
+	return compare.Slices(and1.Rest, and2.Rest, func(a, b parser.AndRest) bool {
+		return a.Op == b.Op && notExpressionsEqual(a.Not, b.Not)
+	})
 }
 
 // notExpressionsEqual compares NOT expressions structurally
@@ -192,11 +170,8 @@ func notExpressionsEqual(not1, not2 *parser.NotExpression) bool {
 
 // comparisonExpressionsEqual compares comparison expressions structurally
 func comparisonExpressionsEqual(comp1, comp2 *parser.ComparisonExpression) bool {
-	if comp1 == nil && comp2 == nil {
-		return true
-	}
-	if comp1 == nil || comp2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(comp1, comp2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare base addition expression
@@ -205,35 +180,28 @@ func comparisonExpressionsEqual(comp1, comp2 *parser.ComparisonExpression) bool 
 	}
 
 	// Compare comparison rest (operations)
-	if comp1.Rest == nil && comp2.Rest == nil {
-		return true
-	}
-	if comp1.Rest == nil || comp2.Rest == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(comp1.Rest, comp2.Rest); !needsMoreChecks {
+		return eq
 	}
 
+	// Compare operation types using helper function
+	return compareComparisonOperations(comp1.Rest, comp2.Rest)
+}
+
+// compareComparisonOperations is a helper to compare different types of comparison operations
+func compareComparisonOperations(rest1, rest2 *parser.ComparisonRest) bool {
 	// Compare simple operations
-	if comp1.Rest.SimpleOp != nil && comp2.Rest.SimpleOp != nil {
-		return simpleComparisonsEqual(comp1.Rest.SimpleOp, comp2.Rest.SimpleOp)
-	}
-	if comp1.Rest.SimpleOp != nil || comp2.Rest.SimpleOp != nil {
+	if !compare.PointersWithEqual(rest1.SimpleOp, rest2.SimpleOp, simpleComparisonsEqual) {
 		return false
 	}
 
 	// Compare IN operations
-	if comp1.Rest.InOp != nil && comp2.Rest.InOp != nil {
-		return inComparisonsEqual(comp1.Rest.InOp, comp2.Rest.InOp)
-	}
-	if comp1.Rest.InOp != nil || comp2.Rest.InOp != nil {
+	if !compare.PointersWithEqual(rest1.InOp, rest2.InOp, inComparisonsEqual) {
 		return false
 	}
 
 	// Compare BETWEEN operations
-	if comp1.Rest.BetweenOp != nil && comp2.Rest.BetweenOp != nil {
-		return betweenComparisonsEqual(comp1.Rest.BetweenOp, comp2.Rest.BetweenOp)
-	}
-
-	return comp1.Rest.BetweenOp == nil && comp2.Rest.BetweenOp == nil
+	return compare.PointersWithEqual(rest1.BetweenOp, rest2.BetweenOp, betweenComparisonsEqual)
 }
 
 // simpleComparisonsEqual compares simple comparison operations
@@ -253,11 +221,8 @@ func simpleComparisonsEqual(comp1, comp2 *parser.SimpleComparison) bool {
 
 // simpleComparisonOpsEqual compares simple comparison operators
 func simpleComparisonOpsEqual(op1, op2 *parser.SimpleComparisonOp) bool {
-	if op1 == nil && op2 == nil {
-		return true
-	}
-	if op1 == nil || op2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(op1, op2); !needsMoreChecks {
+		return eq
 	}
 
 	return op1.Eq == op2.Eq &&
@@ -302,17 +267,9 @@ func additionExpressionsEqual(add1, add2 *parser.AdditionExpression) bool {
 	}
 
 	// Compare addition rest clauses
-	if len(add1.Rest) != len(add2.Rest) {
-		return false
-	}
-	for i, rest1 := range add1.Rest {
-		rest2 := add2.Rest[i]
-		if rest1.Op != rest2.Op || !multiplicationExpressionsEqual(rest1.Multiplication, rest2.Multiplication) {
-			return false
-		}
-	}
-
-	return true
+	return compare.Slices(add1.Rest, add2.Rest, func(a, b parser.AdditionRest) bool {
+		return a.Op == b.Op && multiplicationExpressionsEqual(a.Multiplication, b.Multiplication)
+	})
 }
 
 // multiplicationExpressionsEqual compares multiplication/division expressions
@@ -327,17 +284,9 @@ func multiplicationExpressionsEqual(mul1, mul2 *parser.MultiplicationExpression)
 	}
 
 	// Compare multiplication rest clauses
-	if len(mul1.Rest) != len(mul2.Rest) {
-		return false
-	}
-	for i, rest1 := range mul1.Rest {
-		rest2 := mul2.Rest[i]
-		if rest1.Op != rest2.Op || !unaryExpressionsEqual(rest1.Unary, rest2.Unary) {
-			return false
-		}
-	}
-
-	return true
+	return compare.Slices(mul1.Rest, mul2.Rest, func(a, b parser.MultiplicationRest) bool {
+		return a.Op == b.Op && unaryExpressionsEqual(a.Unary, b.Unary)
+	})
 }
 
 // unaryExpressionsEqual compares unary expressions
@@ -394,34 +343,22 @@ func primaryExpressionsEqual(prim1, prim2 *parser.PrimaryExpression) bool {
 
 // literalsEqual compares literal values
 func literalsEqual(lit1, lit2 *parser.Literal) bool {
-	if lit1 == nil && lit2 == nil {
-		return true
-	}
-	if lit1 == nil || lit2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(lit1, lit2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare string values
-	if lit1.StringValue != nil && lit2.StringValue != nil {
-		return *lit1.StringValue == *lit2.StringValue
-	}
-	if lit1.StringValue != nil || lit2.StringValue != nil {
+	if !compare.Pointers(lit1.StringValue, lit2.StringValue) {
 		return false
 	}
 
-	// Compare numbers
-	if lit1.Number != nil && lit2.Number != nil {
-		return *lit1.Number == *lit2.Number
-	}
-	if lit1.Number != nil || lit2.Number != nil {
+	// Compare numbers (stored as strings in parser)
+	if !compare.Pointers(lit1.Number, lit2.Number) {
 		return false
 	}
 
-	// Compare booleans
-	if lit1.Boolean != nil && lit2.Boolean != nil {
-		return *lit1.Boolean == *lit2.Boolean
-	}
-	if lit1.Boolean != nil || lit2.Boolean != nil {
+	// Compare booleans (stored as strings in parser)
+	if !compare.Pointers(lit1.Boolean, lit2.Boolean) {
 		return false
 	}
 
@@ -431,28 +368,17 @@ func literalsEqual(lit1, lit2 *parser.Literal) bool {
 
 // identifiersEqual compares identifier expressions
 func identifiersEqual(id1, id2 *parser.IdentifierExpr) bool {
-	if id1 == nil && id2 == nil {
-		return true
-	}
-	if id1 == nil || id2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(id1, id2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare database qualifier
-	if id1.Database != nil && id2.Database != nil {
-		if *id1.Database != *id2.Database {
-			return false
-		}
-	} else if id1.Database != nil || id2.Database != nil {
+	if !compare.Pointers(id1.Database, id2.Database) {
 		return false
 	}
 
 	// Compare table qualifier
-	if id1.Table != nil && id2.Table != nil {
-		if *id1.Table != *id2.Table {
-			return false
-		}
-	} else if id1.Table != nil || id2.Table != nil {
+	if !compare.Pointers(id1.Table, id2.Table) {
 		return false
 	}
 
@@ -462,11 +388,8 @@ func identifiersEqual(id1, id2 *parser.IdentifierExpr) bool {
 
 // functionCallsEqual compares function calls including arguments
 func functionCallsEqual(func1, func2 *parser.FunctionCall) bool {
-	if func1 == nil && func2 == nil {
-		return true
-	}
-	if func1 == nil || func2 == nil {
-		return false
+	if eq, needsMoreChecks := compare.NilCheck(func1, func2); !needsMoreChecks {
+		return eq
 	}
 
 	// Compare function names (case-insensitive for ClickHouse)
@@ -475,27 +398,17 @@ func functionCallsEqual(func1, func2 *parser.FunctionCall) bool {
 	}
 
 	// Compare first parentheses argument lists
-	if len(func1.FirstParentheses) != len(func2.FirstParentheses) {
+	if !compare.Slices(func1.FirstParentheses, func2.FirstParentheses, func(a, b parser.FunctionArg) bool {
+		return functionArgsEqual(&a, &b)
+	}) {
 		return false
-	}
-
-	for i, arg1 := range func1.FirstParentheses {
-		arg2 := func2.FirstParentheses[i]
-		if !functionArgsEqual(&arg1, &arg2) {
-			return false
-		}
 	}
 
 	// Compare second parentheses argument lists (for parameterized functions)
-	if len(func1.SecondParentheses) != len(func2.SecondParentheses) {
+	if !compare.Slices(func1.SecondParentheses, func2.SecondParentheses, func(a, b parser.FunctionArg) bool {
+		return functionArgsEqual(&a, &b)
+	}) {
 		return false
-	}
-
-	for i, arg1 := range func1.SecondParentheses {
-		arg2 := func2.SecondParentheses[i]
-		if !functionArgsEqual(&arg1, &arg2) {
-			return false
-		}
 	}
 
 	return true
