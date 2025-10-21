@@ -922,3 +922,13 @@ func normalizeComment(comment string) string {
 
 	return result
 }
+
+// GetDiffType returns the diff type for DictionaryDiff (implements diffProcessor interface)
+func (d *DictionaryDiff) GetDiffType() string {
+	return string(d.Type)
+}
+
+// GetUpSQL returns the up SQL for DictionaryDiff (implements diffProcessor interface)
+func (d *DictionaryDiff) GetUpSQL() string {
+	return d.UpSQL
+}

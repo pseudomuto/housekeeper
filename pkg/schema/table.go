@@ -1069,3 +1069,13 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 	diff.DownSQL = generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges))
 	return diff, nil
 }
+
+// GetDiffType returns the diff type for TableDiff (implements diffProcessor interface)
+func (d *TableDiff) GetDiffType() string {
+	return string(d.Type)
+}
+
+// GetUpSQL returns the up SQL for TableDiff (implements diffProcessor interface)
+func (d *TableDiff) GetUpSQL() string {
+	return d.UpSQL
+}
