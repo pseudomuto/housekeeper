@@ -992,35 +992,32 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 	}
 
 	if !exists {
-		// Check if this might be a renamed table
-		renamedFrom := findRenamedTable(targetTable, currentTables, targetTables)
-		if renamedFrom != "" {
-			// This is a rename operation
-			diff := &TableDiff{
-				Type:         TableDiffRename,
-				TableName:    renamedFrom,
-				NewTableName: tableName,
-				Description:  fmt.Sprintf("Rename table %s to %s", renamedFrom, tableName),
-				Current:      currentTables[renamedFrom],
-				Target:       targetTable,
-			}
-			diff.UpSQL = generateRenameTableSQL(diff.Current, diff.Target, renamedFrom, tableName)
-			diff.DownSQL = generateRenameTableSQL(diff.Target, diff.Current, tableName, renamedFrom)
-			return diff, nil
-		}
-
-		// This is a create operation
-		diff := &TableDiff{
-			Type:        TableDiffCreate,
-			TableName:   tableName,
-			Description: "Create table " + tableName,
-			Target:      targetTable,
-		}
-		diff.UpSQL = generateCreateTableSQL(targetTable)
-		diff.DownSQL = generateDropTableSQL(targetTable)
-		return diff, nil
+		return handleTableNotExists(tableName, targetTable, currentTables, targetTables)
 	}
 
+	return handleTableExists(tableName, currentTable, targetTable)
+}
+
+// handleTableNotExists handles the case when a table doesn't exist in the current schema
+func handleTableNotExists(tableName string, targetTable *TableInfo, currentTables, targetTables map[string]*TableInfo) (*TableDiff, error) {
+	// Check if this might be a renamed table
+	renamedFrom := findRenamedTable(targetTable, currentTables, targetTables)
+	if renamedFrom != "" {
+		return createRenameDiff(renamedFrom, tableName, currentTables[renamedFrom], targetTable), nil
+	}
+
+	// This is a create operation
+	return createCreateDiff(tableName, targetTable), nil
+}
+
+// handleTableExists determines the appropriate action when a table exists in both the current and target schemas.
+// It compares the current and target table definitions to decide whether no changes are needed (no-op),
+// an ALTER operation is required, or a DROP+CREATE strategy should be used.
+// The function first flattens nested columns in the target table to match ClickHouse's internal representation.
+// If the tables are equal after flattening, no changes are needed.
+// If significant differences are detected (e.g., engine or partition changes), a DROP+CREATE is performed.
+// Otherwise, column-level differences are computed and an ALTER operation is generated.
+func handleTableExists(tableName string, currentTable, targetTable *TableInfo) (*TableDiff, error) {
 	// Table exists in both - check for changes
 	// For comparison purposes, flatten the target table to match ClickHouse's internal representation
 	// Current table is already flattened by ClickHouse, but target table may have Nested syntax
@@ -1029,34 +1026,85 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 		return nil, nil
 	}
 
-	// For integration engines or engine changes that require DROP+CREATE, use DROP+CREATE strategy
-	// Integration engines are read-only from ClickHouse perspective and modifications require recreating the table
-	// ReplicatedMergeTree parameter changes also require DROP+CREATE as they cannot be altered
-	needsDropCreate := isIntegrationEngine(currentTable.Engine) || isIntegrationEngine(targetTable.Engine) ||
-		requiresDropCreate(currentTable.Engine, targetTable.Engine)
-
-	if needsDropCreate {
-		reason := "integration engine"
-		if requiresDropCreate(currentTable.Engine, targetTable.Engine) {
-			reason = "engine parameter change"
-		}
-
-		diff := &TableDiff{
-			Type:        TableDiffAlter,
-			TableName:   tableName,
-			Description: fmt.Sprintf("Alter table %s (DROP+CREATE for %s)", tableName, reason),
-			Current:     currentTable,
-			Target:      targetTable,
-		}
-		diff.UpSQL = generateDropTableSQL(currentTable) + "\n\n" + generateCreateTableSQL(targetTable)
-		diff.DownSQL = generateDropTableSQL(targetTable) + "\n\n" + generateCreateTableSQL(currentTable)
-		return diff, nil
+	// Check if we need DROP+CREATE strategy
+	if shouldUseDropCreate(currentTable, targetTable) {
+		return createDropCreateDiff(tableName, currentTable, targetTable), nil
 	}
 
 	// Generate column diffs for regular tables
 	// Use flattened target table for comparison but preserve original for SQL generation
 	columnChanges := compareColumns(currentTable.Columns, flattenedTargetTable.Columns)
 
+	return createAlterDiff(tableName, currentTable, targetTable, columnChanges), nil
+}
+
+// shouldUseDropCreate determines if a table modification requires DROP+CREATE strategy.
+//
+// DROP+CREATE is required instead of ALTER in the following cases:
+//   - Integration engines (e.g., Kafka, RabbitMQ, MySQL, ODBC, JDBC, etc.) are read-only from ClickHouse's perspective.
+//     Any modification to tables using these engines cannot be performed via ALTER and requires dropping and recreating the table.
+//   - Certain engine changes, such as ReplicatedMergeTree parameter changes (e.g., changing the replica path, zookeeper path, or other engine settings),
+//     cannot be altered in-place and require the table to be dropped and recreated.
+//
+// This function checks for these conditions and returns true if DROP+CREATE is necessary.
+func shouldUseDropCreate(currentTable, targetTable *TableInfo) bool {
+	// For integration engines or engine changes that require DROP+CREATE, use DROP+CREATE strategy
+	// Integration engines are read-only from ClickHouse perspective and modifications require recreating the table
+	// ReplicatedMergeTree parameter changes also require DROP+CREATE as they cannot be altered
+	return isIntegrationEngine(currentTable.Engine) ||
+		isIntegrationEngine(targetTable.Engine) ||
+		requiresDropCreate(currentTable.Engine, targetTable.Engine)
+}
+
+// createRenameDiff creates a TableDiff for rename operation
+func createRenameDiff(oldName, newName string, currentTable, targetTable *TableInfo) *TableDiff {
+	diff := &TableDiff{
+		Type:         TableDiffRename,
+		TableName:    oldName,
+		NewTableName: newName,
+		Description:  fmt.Sprintf("Rename table %s to %s", oldName, newName),
+		Current:      currentTable,
+		Target:       targetTable,
+	}
+	diff.UpSQL = generateRenameTableSQL(diff.Current, diff.Target, oldName, newName)
+	diff.DownSQL = generateRenameTableSQL(diff.Target, diff.Current, newName, oldName)
+	return diff
+}
+
+// createCreateDiff creates a TableDiff for create operation
+func createCreateDiff(tableName string, targetTable *TableInfo) *TableDiff {
+	diff := &TableDiff{
+		Type:        TableDiffCreate,
+		TableName:   tableName,
+		Description: "Create table " + tableName,
+		Target:      targetTable,
+	}
+	diff.UpSQL = generateCreateTableSQL(targetTable)
+	diff.DownSQL = generateDropTableSQL(targetTable)
+	return diff
+}
+
+// createDropCreateDiff creates a TableDiff for DROP+CREATE operation
+func createDropCreateDiff(tableName string, currentTable, targetTable *TableInfo) *TableDiff {
+	reason := "integration engine"
+	if requiresDropCreate(currentTable.Engine, targetTable.Engine) {
+		reason = "engine parameter change"
+	}
+
+	diff := &TableDiff{
+		Type:        TableDiffAlter,
+		TableName:   tableName,
+		Description: fmt.Sprintf("Alter table %s (DROP+CREATE for %s)", tableName, reason),
+		Current:     currentTable,
+		Target:      targetTable,
+	}
+	diff.UpSQL = generateDropTableSQL(currentTable) + "\n\n" + generateCreateTableSQL(targetTable)
+	diff.DownSQL = generateDropTableSQL(targetTable) + "\n\n" + generateCreateTableSQL(currentTable)
+	return diff
+}
+
+// createAlterDiff creates a TableDiff for alter operation
+func createAlterDiff(tableName string, currentTable, targetTable *TableInfo, columnChanges []ColumnDiff) *TableDiff {
 	diff := &TableDiff{
 		Type:          TableDiffAlter,
 		TableName:     tableName,
@@ -1067,7 +1115,7 @@ func createTableDiff(tableName string, currentTable, targetTable *TableInfo, cur
 	}
 	diff.UpSQL = generateAlterTableSQL(targetTable, columnChanges)
 	diff.DownSQL = generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges))
-	return diff, nil
+	return diff
 }
 
 // GetDiffType returns the diff type for TableDiff (implements diffProcessor interface)
