@@ -10,7 +10,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v3 v3.4.1
+	github.com/urfave/cli/v3 v3.6.1
 	go.uber.org/fx v1.24.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
