@@ -29,11 +29,14 @@ func (f *Formatter) formatOrExpressionWithContext(or *parser.OrExpression, multi
 		return ""
 	}
 
-	result := f.formatAndExpressionWithContext(or.And, multilineContext, baseIndent)
+	var results strings.Builder
+	results.WriteString(f.formatAndExpressionWithContext(or.And, multilineContext, baseIndent))
+
 	for _, rest := range or.Rest {
-		result += " OR " + f.formatAndExpressionWithContext(rest.And, multilineContext, baseIndent)
+		results.WriteString(" OR " + f.formatAndExpressionWithContext(rest.And, multilineContext, baseIndent))
 	}
-	return result
+
+	return results.String()
 }
 
 // formatAndExpressionWithContext formats an AND expression with multi-line context
@@ -42,11 +45,13 @@ func (f *Formatter) formatAndExpressionWithContext(and *parser.AndExpression, mu
 		return ""
 	}
 
-	result := f.formatNotExpressionWithContext(and.Not, multilineContext, baseIndent)
+	var results strings.Builder
+	results.WriteString(f.formatNotExpressionWithContext(and.Not, multilineContext, baseIndent))
 	for _, rest := range and.Rest {
-		result += " AND " + f.formatNotExpressionWithContext(rest.Not, multilineContext, baseIndent)
+		results.WriteString(" AND " + f.formatNotExpressionWithContext(rest.Not, multilineContext, baseIndent))
 	}
-	return result
+
+	return results.String()
 }
 
 // formatNotExpressionWithContext formats a NOT expression with multi-line context
@@ -155,13 +160,14 @@ func (f *Formatter) formatAdditionExpressionWithContext(add *parser.AdditionExpr
 		return ""
 	}
 
-	result := f.formatMultiplicationExpressionWithContext(add.Multiplication, multilineContext, baseIndent)
+	var results strings.Builder
+	results.WriteString(f.formatMultiplicationExpressionWithContext(add.Multiplication, multilineContext, baseIndent))
 
 	for _, rest := range add.Rest {
-		result += " " + rest.Op + " " + f.formatMultiplicationExpressionWithContext(rest.Multiplication, multilineContext, baseIndent)
+		results.WriteString(" " + rest.Op + " " + f.formatMultiplicationExpressionWithContext(rest.Multiplication, multilineContext, baseIndent))
 	}
 
-	return result
+	return results.String()
 }
 
 // formatMultiplicationExpressionWithContext formats a multiplication expression with multi-line context
@@ -170,13 +176,14 @@ func (f *Formatter) formatMultiplicationExpressionWithContext(mul *parser.Multip
 		return ""
 	}
 
-	result := f.formatUnaryExpressionWithContext(mul.Unary, multilineContext, baseIndent)
+	var results strings.Builder
+	results.WriteString(f.formatUnaryExpressionWithContext(mul.Unary, multilineContext, baseIndent))
 
 	for _, rest := range mul.Rest {
-		result += " " + rest.Op + " " + f.formatUnaryExpressionWithContext(rest.Unary, multilineContext, baseIndent)
+		results.WriteString(" " + rest.Op + " " + f.formatUnaryExpressionWithContext(rest.Unary, multilineContext, baseIndent))
 	}
 
-	return result
+	return results.String()
 }
 
 // formatUnaryExpressionWithContext formats a unary expression with multi-line context
@@ -392,43 +399,43 @@ func (f *Formatter) shouldUsePairedFormatting(fn *parser.FunctionCall) bool {
 
 // formatArgumentsPaired formats arguments in pairs (e.g., condition-value pairs for multiIf)
 func (f *Formatter) formatArgumentsPaired(args []parser.FunctionArg, indentStr string) string {
-	result := ""
 	pairSize := f.options.PairSize
 
+	var results strings.Builder
 	for i := 0; i < len(args); i += pairSize {
-		result += indentStr
+		results.WriteString(indentStr)
 
 		// Add arguments in pairs
 		for j := 0; j < pairSize && i+j < len(args); j++ {
 			if j > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
-			result += f.formatFunctionArg(&args[i+j])
+			results.WriteString(f.formatFunctionArg(&args[i+j]))
 		}
 
 		// Add comma unless it's the last group
 		if i+pairSize < len(args) {
-			result += ","
+			results.WriteString(",")
 		}
-		result += "\n"
+
+		results.WriteString("\n")
 	}
 
-	return result
+	return results.String()
 }
 
 // formatArgumentsLineByLine formats arguments with each argument on its own line
 func (f *Formatter) formatArgumentsLineByLine(args []parser.FunctionArg, indentStr string) string {
-	result := ""
-
+	var results strings.Builder
 	for i, arg := range args {
-		result += indentStr + f.formatFunctionArg(&arg)
+		results.WriteString(indentStr + f.formatFunctionArg(&arg))
 		if i < len(args)-1 {
-			result += ","
+			results.WriteString(",")
 		}
-		result += "\n"
+		results.WriteString("\n")
 	}
 
-	return result
+	return results.String()
 }
 
 // formatFunctionArg formats a function argument

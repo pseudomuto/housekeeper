@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/pseudomuto/housekeeper/pkg/utils"
@@ -165,12 +166,14 @@ func functionsEqualIgnoringName(a, b *FunctionInfo) bool {
 func generateCreateFunctionSQL(fn *FunctionInfo) string {
 	// Build parameter string
 	paramStr := "("
+	var paramStrSb168 strings.Builder
 	for i, param := range fn.Parameters {
 		if i > 0 {
-			paramStr += ", "
+			paramStrSb168.WriteString(", ")
 		}
-		paramStr += fmt.Sprintf("`%s`", param)
+		paramStrSb168.WriteString(fmt.Sprintf("`%s`", param))
 	}
+	paramStr += paramStrSb168.String()
 	paramStr += ")"
 
 	// Build full AS expression

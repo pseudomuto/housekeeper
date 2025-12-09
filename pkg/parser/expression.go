@@ -1,6 +1,10 @@
 package parser
 
-import "github.com/pseudomuto/housekeeper/pkg/compare"
+import (
+	"strings"
+
+	"github.com/pseudomuto/housekeeper/pkg/compare"
+)
 
 type (
 	// Expression represents any ClickHouse expression with proper precedence handling
@@ -297,11 +301,13 @@ func (e *Expression) String() string {
 // String returns the string representation of an OrExpression with proper OR operator placement.
 func (o *OrExpression) String() string {
 	if o.And != nil {
-		result := o.And.String()
+		var results strings.Builder
+		results.WriteString(o.And.String())
 		for _, rest := range o.Rest {
-			result += " OR " + rest.And.String()
+			results.WriteString(" OR " + rest.And.String())
 		}
-		return result
+
+		return results.String()
 	}
 	return ""
 }
@@ -309,11 +315,13 @@ func (o *OrExpression) String() string {
 // String returns the string representation of an AndExpression with proper AND operator placement.
 func (a *AndExpression) String() string {
 	if a.Not != nil {
-		result := a.Not.String()
+		var results strings.Builder
+		results.WriteString(a.Not.String())
 		for _, rest := range a.Rest {
-			result += " AND " + rest.Not.String()
+			results.WriteString(" AND " + rest.Not.String())
 		}
-		return result
+
+		return results.String()
 	}
 	return ""
 }
@@ -394,22 +402,26 @@ func (c *SimpleComparisonOp) String() string {
 
 func (a *AdditionExpression) String() string {
 	if a.Multiplication != nil {
-		result := a.Multiplication.String()
+		var results strings.Builder
+		results.WriteString(a.Multiplication.String())
 		for _, rest := range a.Rest {
-			result += " " + rest.Op + " " + rest.Multiplication.String()
+			results.WriteString(" " + rest.Op + " " + rest.Multiplication.String())
 		}
-		return result
+
+		return results.String()
 	}
 	return ""
 }
 
 func (m *MultiplicationExpression) String() string {
 	if m.Unary != nil {
-		result := m.Unary.String()
+		var results strings.Builder
+		results.WriteString(m.Unary.String())
 		for _, rest := range m.Rest {
-			result += " " + rest.Op + " " + rest.Unary.String()
+			results.WriteString(" " + rest.Op + " " + rest.Unary.String())
 		}
-		return result
+
+		return results.String()
 	}
 	return ""
 }
@@ -485,36 +497,34 @@ func (i *IdentifierExpr) String() string {
 
 // String returns the string representation of a FunctionCall with function name and arguments.
 func (f *FunctionCall) String() string {
-	result := f.Name
-
-	// First set of parentheses
-	result += "("
+	var results strings.Builder
+	results.WriteString(f.Name + "(")
 	for i, arg := range f.FirstParentheses {
 		if i > 0 {
-			result += ", "
+			results.WriteString(", ")
 		}
-		result += arg.String()
+		results.WriteString(arg.String())
 	}
-	result += ")"
+	results.WriteString(")")
 
 	// Second set of parentheses if present (for parameterized functions)
 	if len(f.SecondParentheses) > 0 {
-		result += "("
+		results.WriteString("(")
 		for i, arg := range f.SecondParentheses {
 			if i > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
-			result += arg.String()
+			results.WriteString(arg.String())
 		}
-		result += ")"
+		results.WriteString(")")
 	}
 
 	// Add OVER clause for window functions
 	if f.Over != nil {
-		result += " " + f.Over.String()
+		results.WriteString(" " + f.Over.String())
 	}
 
-	return result
+	return results.String()
 }
 
 func (a *FunctionArg) String() string {
@@ -529,43 +539,45 @@ func (a *FunctionArg) String() string {
 
 // String returns the string representation of an OverClause for window functions
 func (o *OverClause) String() string {
-	result := "OVER ("
+	var results strings.Builder
+	results.WriteString("OVER (")
 
 	// Add PARTITION BY clause if present
 	if len(o.PartitionBy) > 0 {
-		result += "PARTITION BY "
+		results.WriteString("PARTITION BY ")
 		for i, expr := range o.PartitionBy {
 			if i > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
-			result += expr.String()
+			results.WriteString(expr.String())
 		}
 	}
 
 	// Add ORDER BY clause if present
 	if len(o.OrderBy) > 0 {
 		if len(o.PartitionBy) > 0 {
-			result += " "
+			results.WriteString(" ")
 		}
-		result += "ORDER BY "
+
+		results.WriteString("ORDER BY ")
 		for i, orderExpr := range o.OrderBy {
 			if i > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
-			result += orderExpr.String()
+			results.WriteString(orderExpr.String())
 		}
 	}
 
 	// Add frame clause if present
 	if o.Frame != nil {
 		if len(o.PartitionBy) > 0 || len(o.OrderBy) > 0 {
-			result += " "
+			results.WriteString(" ")
 		}
-		result += o.Frame.String()
+		results.WriteString(o.Frame.String())
 	}
 
-	result += ")"
-	return result
+	results.WriteString(")")
+	return results.String()
 }
 
 // String returns the string representation of an OrderByExpr for ORDER BY in OVER clauses
@@ -604,27 +616,33 @@ func (f *FrameBound) String() string {
 }
 
 func (t *TupleExpression) String() string {
-	result := "("
+	var results strings.Builder
+	results.WriteString("(")
+
 	for i, elem := range t.Elements {
 		if i > 0 {
-			result += ","
+			results.WriteString(",")
 		}
-		result += elem.String()
+		results.WriteString(elem.String())
 	}
-	result += ")"
-	return result
+
+	results.WriteString(")")
+	return results.String()
 }
 
 func (a *ArrayExpression) String() string {
-	result := "["
+	var results strings.Builder
+	results.WriteString("[")
+
 	for i, elem := range a.Elements {
 		if i > 0 {
-			result += ", "
+			results.WriteString(", ")
 		}
-		result += elem.String()
+		results.WriteString(elem.String())
 	}
-	result += "]"
-	return result
+
+	results.WriteString("]")
+	return results.String()
 }
 
 func (i *IntervalExpr) String() string {
@@ -632,15 +650,19 @@ func (i *IntervalExpr) String() string {
 }
 
 func (c *CaseExpression) String() string {
-	result := "CASE"
+	var results strings.Builder
+	results.WriteString("CASE")
+
 	for _, when := range c.WhenClauses {
-		result += " WHEN " + when.Condition + " THEN " + when.Result
+		results.WriteString(" WHEN " + when.Condition + " THEN " + when.Result)
 	}
+
 	if c.ElseClause != nil {
-		result += " ELSE " + c.ElseClause.Result
+		results.WriteString(" ELSE " + c.ElseClause.Result)
 	}
-	result += " END"
-	return result
+
+	results.WriteString(" END")
+	return results.String()
 }
 
 func (c *CastExpression) String() string {
@@ -1041,22 +1063,28 @@ func (f *FunctionArg) Equal(other *FunctionArg) bool {
 
 func (i InExpression) String() string {
 	if len(i.List) > 0 {
-		result := "("
+		var results strings.Builder
+		results.WriteString("(")
+
 		for idx, expr := range i.List {
 			if idx > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
-			result += expr.String()
+			results.WriteString(expr.String())
 		}
-		result += ")"
-		return result
+
+		results.WriteString(")")
+		return results.String()
 	}
+
 	if i.Array != nil {
 		return i.Array.String()
 	}
+
 	if i.Subquery != nil {
 		return i.Subquery.String()
 	}
+
 	return "()"
 }
 
@@ -1076,23 +1104,26 @@ func formatParametricFunctionForExpression(fn *ParametricFunction) string {
 		return ""
 	}
 
-	result := fn.Name + "("
+	var results strings.Builder
+	results.WriteString(fn.Name + "(")
+
 	for i, param := range fn.Parameters {
 		if i > 0 {
-			result += ", "
+			results.WriteString(", ")
 		}
 		if param.Function != nil {
-			result += formatParametricFunctionForExpression(param.Function)
+			results.WriteString(formatParametricFunctionForExpression(param.Function))
 		} else if param.String != nil {
-			result += *param.String
+			results.WriteString(*param.String)
 		} else if param.Number != nil {
-			result += *param.Number
+			results.WriteString(*param.Number)
 		} else if param.Ident != nil {
-			result += *param.Ident
+			results.WriteString(*param.Ident)
 		}
 	}
-	result += ")"
-	return result
+
+	results.WriteString(")")
+	return results.String()
 }
 
 // formatDataTypeForExpression formats a DataType for use in expressions
@@ -1100,51 +1131,65 @@ func formatDataTypeForExpression(dataType DataType) string {
 	if dataType.Nullable != nil {
 		return "Nullable(" + formatDataTypeForExpression(*dataType.Nullable.Type) + ")"
 	}
+
 	if dataType.Array != nil {
 		return "Array(" + formatDataTypeForExpression(*dataType.Array.Type) + ")"
 	}
+
 	if dataType.Tuple != nil {
-		result := "Tuple("
+		var results strings.Builder
+		results.WriteString("Tuple(")
+
 		for i, element := range dataType.Tuple.Elements {
 			if i > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
 			if element.Name != nil {
-				result += *element.Name + " " + formatDataTypeForExpression(*element.Type)
+				results.WriteString(*element.Name + " " + formatDataTypeForExpression(*element.Type))
 			} else {
-				result += formatDataTypeForExpression(*element.UnnamedType)
+				results.WriteString(formatDataTypeForExpression(*element.UnnamedType))
 			}
 		}
-		return result + ")"
+
+		results.WriteString(")")
+		return results.String()
 	}
+
 	if dataType.Map != nil {
 		return "Map(" + formatDataTypeForExpression(*dataType.Map.KeyType) + ", " + formatDataTypeForExpression(*dataType.Map.ValueType) + ")"
 	}
+
 	if dataType.LowCardinality != nil {
 		return "LowCardinality(" + formatDataTypeForExpression(*dataType.LowCardinality.Type) + ")"
 	}
+
 	//nolint:nestif // Complex nested logic needed for data type formatting in expressions
 	if dataType.Simple != nil {
-		result := dataType.Simple.Name
+		var results strings.Builder
+		results.WriteString(dataType.Simple.Name)
+
 		if len(dataType.Simple.Parameters) > 0 {
-			result += "("
+			results.WriteString("(")
 			for i, param := range dataType.Simple.Parameters {
 				if i > 0 {
-					result += ", "
+					results.WriteString(", ")
 				}
 				if param.Function != nil {
-					result += formatParametricFunctionForExpression(param.Function)
+					results.WriteString(formatParametricFunctionForExpression(param.Function))
 				} else if param.String != nil {
-					result += *param.String
+					results.WriteString(*param.String)
 				} else if param.Number != nil {
-					result += *param.Number
+					results.WriteString(*param.Number)
 				} else if param.Ident != nil {
-					result += *param.Ident
+					results.WriteString(*param.Ident)
 				}
 			}
-			result += ")"
+
+			results.WriteString(")")
 		}
-		return result
+
+		return results.String()
 	}
+
 	return ""
 }
