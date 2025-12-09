@@ -804,9 +804,11 @@ func buildDictionaryColumns(parts []string, stmt *parser.CreateDictionaryStmt) [
 			}
 
 			// Add attributes (IS_OBJECT_ID, HIERARCHICAL, INJECTIVE)
+			var columnStrSb807 strings.Builder
 			for _, attr := range col.Attributes {
-				columnStr += " " + attr.Name
+				columnStrSb807.WriteString(" " + attr.Name)
 			}
+			columnStr += columnStrSb807.String()
 
 			columnParts = append(columnParts, columnStr)
 		}

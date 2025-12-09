@@ -1,5 +1,7 @@
 package parser
 
+import "strings"
+
 // Dictionary-related grammar types for ClickHouse CREATE DICTIONARY statements
 
 type (
@@ -229,19 +231,22 @@ func (p *DictionaryParameter) GetName() string {
 
 // String returns the string representation of a DictionaryDSLFunc
 func (d *DictionaryDSLFunc) String() string {
-	result := d.Name + "("
+	var results strings.Builder
+	results.WriteString(d.Name + "(")
+
 	for i, param := range d.Params {
 		if i > 0 {
-			result += " "
+			results.WriteString(" ")
 		}
 		if param.NestedFunc != nil {
-			result += param.NestedFunc.String()
+			results.WriteString(param.NestedFunc.String())
 		} else if param.SimpleParam != nil {
-			result += param.SimpleParam.Name + " " + param.SimpleParam.Value.String()
+			results.WriteString(param.SimpleParam.Name + " " + param.SimpleParam.Value.String())
 		}
 	}
-	result += ")"
-	return result
+
+	results.WriteString(")")
+	return results.String()
 }
 
 // GetValue returns the string representation of the default value

@@ -28,7 +28,7 @@
           };
 
           # Pick language/tool versions here (adjust as you like)
-          go = pkgs.go_1_25;
+          go = pkgs.go;
           python = pkgs.python314;
 
           # Common build utils
@@ -63,7 +63,7 @@
 
             # This will need to be updated when dependencies change
             # Run `nix build .#housekeeper` and it will tell you the correct hash
-            vendorHash = "sha256-kCs2cy3TW+NUYu2xHus+9ssjynOl6IOqpOKzPRCW7IA=";
+            vendorHash = "sha256-E7anfLeCkMW9TfGAj9oOLwuT9fzUaIIUtkyhmkoKAu8=";
 
             env.CGO_ENABLED = "0";
             env.GOPROXY = "direct";

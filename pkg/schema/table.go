@@ -878,12 +878,14 @@ func formatTableEngine(engine *parser.TableEngine) string {
 	result := engine.Name
 	if len(engine.Parameters) > 0 {
 		result += "("
+		var resultSb881 strings.Builder
 		for i, param := range engine.Parameters {
 			if i > 0 {
-				result += ", "
+				resultSb881.WriteString(", ")
 			}
-			result += param.Value()
+			resultSb881.WriteString(param.Value())
 		}
+		result += resultSb881.String()
 		result += ")"
 	}
 	return result
@@ -902,26 +904,30 @@ func formatColumnDataType(dataType *parser.DataType) string {
 	}
 	if dataType.Tuple != nil {
 		result := "Tuple("
+		var resultSb905 strings.Builder
 		for i, element := range dataType.Tuple.Elements {
 			if i > 0 {
-				result += ", "
+				resultSb905.WriteString(", ")
 			}
 			if element.Name != nil {
-				result += *element.Name + " " + formatColumnDataType(element.Type)
+				resultSb905.WriteString(*element.Name + " " + formatColumnDataType(element.Type))
 			} else {
-				result += formatColumnDataType(element.UnnamedType)
+				resultSb905.WriteString(formatColumnDataType(element.UnnamedType))
 			}
 		}
+		result += resultSb905.String()
 		return result + ")"
 	}
 	if dataType.Nested != nil {
 		result := "Nested("
+		var resultSb919 strings.Builder
 		for i, col := range dataType.Nested.Columns {
 			if i > 0 {
-				result += ", "
+				resultSb919.WriteString(", ")
 			}
-			result += col.Name + " " + formatColumnDataType(col.Type)
+			resultSb919.WriteString(col.Name + " " + formatColumnDataType(col.Type))
 		}
+		result += resultSb919.String()
 		return result + ")"
 	}
 	if dataType.Map != nil {
@@ -932,24 +938,28 @@ func formatColumnDataType(dataType *parser.DataType) string {
 	}
 	//nolint:nestif // Complex nested logic needed for data type formatting
 	if dataType.Simple != nil {
-		result := dataType.Simple.Name
+		var results strings.Builder
+		results.WriteString(dataType.Simple.Name)
+
 		if len(dataType.Simple.Parameters) > 0 {
-			result += "("
+			results.WriteString("(")
 			for i, param := range dataType.Simple.Parameters {
 				if i > 0 {
-					result += ", "
+					results.WriteString(", ")
 				}
 				if param.String != nil {
-					result += *param.String
+					results.WriteString(*param.String)
 				} else if param.Number != nil {
-					result += *param.Number
+					results.WriteString(*param.Number)
 				} else if param.Ident != nil {
-					result += *param.Ident
+					results.WriteString(*param.Ident)
 				}
 			}
-			result += ")"
+
+			results.WriteString(")")
 		}
-		return result
+
+		return results.String()
 	}
 	return ""
 }
@@ -959,30 +969,35 @@ func formatColumnCodec(codec *parser.CodecClause) string {
 		return ""
 	}
 
-	result := "CODEC("
+	var results strings.Builder
+	results.WriteString("CODEC(")
+
 	for i, codecSpec := range codec.Codecs {
 		if i > 0 {
-			result += ", "
+			results.WriteString(", ")
 		}
-		result += codecSpec.Name
+		results.WriteString(codecSpec.Name)
 		if len(codecSpec.Parameters) > 0 {
-			result += "("
+			results.WriteString("(")
 			for j, param := range codecSpec.Parameters {
 				if j > 0 {
-					result += ", "
+					results.WriteString(", ")
 				}
 				if param.String != nil {
-					result += *param.String
+					results.WriteString(*param.String)
 				} else if param.Number != nil {
-					result += *param.Number
+					results.WriteString(*param.Number)
 				} else if param.Ident != nil {
-					result += *param.Ident
+					results.WriteString(*param.Ident)
 				}
 			}
-			result += ")"
+
+			results.WriteString(")")
 		}
 	}
-	return result + ")"
+
+	results.WriteString(")")
+	return results.String()
 }
 
 func createTableDiff(tableName string, currentTable, targetTable *TableInfo, currentTables, targetTables map[string]*TableInfo, exists bool) (*TableDiff, error) {

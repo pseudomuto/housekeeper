@@ -1327,18 +1327,22 @@ func formatTableEngine(engine *TableEngine) string {
 		return ""
 	}
 
-	result := engine.Name
+	var results strings.Builder
+	results.WriteString(engine.Name)
+
 	if len(engine.Parameters) > 0 {
-		result += "("
+		results.WriteString("(")
 		for i, param := range engine.Parameters {
 			if i > 0 {
-				result += ", "
+				results.WriteString(", ")
 			}
-			result += param.Value()
+			results.WriteString(param.Value())
 		}
-		result += ")"
+
+		results.WriteString(")")
 	}
-	return result
+
+	return results.String()
 }
 
 // formatParametricFunction formats a function call within type parameters for tests
@@ -1347,23 +1351,26 @@ func formatParametricFunction(fn *ParametricFunction) string {
 		return ""
 	}
 
-	result := fn.Name + "("
+	var results strings.Builder
+	results.WriteString(fn.Name + "(")
+
 	for i, param := range fn.Parameters {
 		if i > 0 {
-			result += ", "
+			results.WriteString(", ")
 		}
 		if param.Function != nil {
-			result += formatParametricFunction(param.Function)
+			results.WriteString(formatParametricFunction(param.Function))
 		} else if param.String != nil {
-			result += *param.String
+			results.WriteString(*param.String)
 		} else if param.Number != nil {
-			result += *param.Number
+			results.WriteString(*param.Number)
 		} else if param.Ident != nil {
-			result += *param.Ident
+			results.WriteString(*param.Ident)
 		}
 	}
-	result += ")"
-	return result
+
+	results.WriteString(")")
+	return results.String()
 }
 
 // formatDataType formats a data type with all its components
@@ -1380,26 +1387,30 @@ func formatDataType(dataType *DataType) string {
 	}
 	if dataType.Tuple != nil {
 		result := "Tuple("
+		var resultSb1383 strings.Builder
 		for i, element := range dataType.Tuple.Elements {
 			if i > 0 {
-				result += ", "
+				resultSb1383.WriteString(", ")
 			}
 			if element.Name != nil {
-				result += *element.Name + " " + formatDataType(element.Type)
+				resultSb1383.WriteString(*element.Name + " " + formatDataType(element.Type))
 			} else {
-				result += formatDataType(element.UnnamedType)
+				resultSb1383.WriteString(formatDataType(element.UnnamedType))
 			}
 		}
+		result += resultSb1383.String()
 		return result + ")"
 	}
 	if dataType.Nested != nil {
 		result := "Nested("
+		var resultSb1397 strings.Builder
 		for i, col := range dataType.Nested.Columns {
 			if i > 0 {
-				result += ", "
+				resultSb1397.WriteString(", ")
 			}
-			result += col.Name + " " + formatDataType(col.Type)
+			resultSb1397.WriteString(col.Name + " " + formatDataType(col.Type))
 		}
+		result += resultSb1397.String()
 		return result + ")"
 	}
 	if dataType.Map != nil {
@@ -1410,26 +1421,31 @@ func formatDataType(dataType *DataType) string {
 	}
 	//nolint:nestif // Complex nested logic needed for data type formatting in tests
 	if dataType.Simple != nil {
-		result := dataType.Simple.Name
+		var results strings.Builder
+		results.WriteString(dataType.Simple.Name)
+
 		if len(dataType.Simple.Parameters) > 0 {
-			result += "("
+			results.WriteString("(")
+
 			for i, param := range dataType.Simple.Parameters {
 				if i > 0 {
-					result += ", "
+					results.WriteString(", ")
 				}
 				if param.Function != nil {
-					result += formatParametricFunction(param.Function)
+					results.WriteString(formatParametricFunction(param.Function))
 				} else if param.String != nil {
-					result += *param.String
+					results.WriteString(*param.String)
 				} else if param.Number != nil {
-					result += *param.Number
+					results.WriteString(*param.Number)
 				} else if param.Ident != nil {
-					result += *param.Ident
+					results.WriteString(*param.Ident)
 				}
 			}
-			result += ")"
+
+			results.WriteString(")")
 		}
-		return result
+
+		return results.String()
 	}
 	return ""
 }
@@ -1440,30 +1456,36 @@ func formatCodec(codec *CodecClause) string {
 		return ""
 	}
 
-	result := "CODEC("
+	var results strings.Builder
+	results.WriteString("CODEC(")
+
 	for i, codecSpec := range codec.Codecs {
 		if i > 0 {
-			result += ", "
+			results.WriteString(", ")
 		}
-		result += codecSpec.Name
+
+		results.WriteString(codecSpec.Name)
 		if len(codecSpec.Parameters) > 0 {
-			result += "("
+			results.WriteString("(")
 			for j, param := range codecSpec.Parameters {
 				if j > 0 {
-					result += ", "
+					results.WriteString(", ")
 				}
 				if param.String != nil {
-					result += *param.String
+					results.WriteString(*param.String)
 				} else if param.Number != nil {
-					result += *param.Number
+					results.WriteString(*param.Number)
 				} else if param.Ident != nil {
-					result += *param.Ident
+					results.WriteString(*param.Ident)
 				}
 			}
-			result += ")"
+
+			results.WriteString(")")
 		}
 	}
-	return result + ")"
+
+	results.WriteString(")")
+	return results.String()
 }
 
 func TestParse(t *testing.T) {

@@ -142,14 +142,15 @@ func (f *Formatter) formatFromClause(from *parser.FromClause) string {
 		return ""
 	}
 
-	result := f.keyword("FROM") + " " + f.formatTableRef(&from.Table)
-
 	// Add joins
+	var results strings.Builder
+	results.WriteString(f.keyword("FROM") + " ")
+	results.WriteString(f.formatTableRef(&from.Table))
 	for _, join := range from.Joins {
-		result += "\n" + f.formatJoinClause(&join)
+		results.WriteString("\n" + f.formatJoinClause(&join))
 	}
 
-	return result
+	return results.String()
 }
 
 // formatTableRef formats a table reference
