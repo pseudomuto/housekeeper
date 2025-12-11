@@ -28,15 +28,10 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// table operations including CREATE, ALTER, DROP, and RENAME.
 	TableDiff struct {
-		Type          TableDiffType // Type of operation (CREATE, ALTER, DROP, RENAME)
-		TableName     string        // Name of the table being modified (with database prefix if needed)
-		Description   string        // Human-readable description of the change
-		UpSQL         string        // SQL to apply the change (forward migration)
-		DownSQL       string        // SQL to rollback the change (reverse migration)
-		Current       *TableInfo    // Current state (nil if table doesn't exist)
-		Target        *TableInfo    // Target state (nil if table should be dropped)
-		NewTableName  string        // For rename operations - the new name
-		ColumnChanges []ColumnDiff  // For ALTER operations - specific column changes
+		DiffBase                   // Embeds Type, Name, NewName, Description, UpSQL, DownSQL
+		Current       *TableInfo   // Current state (nil if table doesn't exist)
+		Target        *TableInfo   // Target state (nil if table should be dropped)
+		ColumnChanges []ColumnDiff // For ALTER operations - specific column changes
 	}
 
 	// TableDiffType represents the type of table difference
@@ -96,6 +91,30 @@ const (
 	// ColumnDiffModify indicates a column needs to be modified
 	ColumnDiffModify ColumnDiffType = "MODIFY"
 )
+
+// GetName implements SchemaObject interface.
+// Returns the full table name (database.name or just name).
+func (t *TableInfo) GetName() string {
+	if t.Database != "" {
+		return t.Database + "." + t.Name
+	}
+	return t.Name
+}
+
+// GetCluster implements SchemaObject interface.
+func (t *TableInfo) GetCluster() string {
+	return t.Cluster
+}
+
+// PropertiesMatch implements SchemaObject interface.
+// Returns true if the two tables have identical properties (excluding name).
+func (t *TableInfo) PropertiesMatch(other SchemaObject) bool {
+	otherTable, ok := other.(*TableInfo)
+	if !ok {
+		return false
+	}
+	return tablesEqualIgnoringName(t, otherTable)
+}
 
 // Equal compares two TableInfo instances for equality using AST comparison
 func (t *TableInfo) Equal(other *TableInfo) bool {
@@ -198,12 +217,12 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 		if diff != nil {
 			diffs = append(diffs, diff)
 			// Remove from currentTables if this was a rename to avoid processing as a drop
-			if diff.Type == TableDiffRename {
-				delete(currentTables, diff.TableName)
+			if diff.Type == string(TableDiffRename) {
+				delete(currentTables, diff.Name)
 			}
 
 			// Propagate column changes to AS dependents (only for ALTER operations)
-			if diff.Type == TableDiffAlter && targetTable.AsDependents != nil && len(diff.ColumnChanges) > 0 {
+			if diff.Type == string(TableDiffAlter) && targetTable.AsDependents != nil && len(diff.ColumnChanges) > 0 {
 				propagatedDiffs := propagateColumnChangesToDependents(
 					diff,
 					targetTable.AsDependents,
@@ -227,13 +246,15 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	for _, tableName := range currentTableNames {
 		currentTable := currentTables[tableName]
 		diff := &TableDiff{
-			Type:        TableDiffDrop,
-			TableName:   tableName,
-			Description: "Drop table " + tableName,
-			Current:     currentTable,
+			DiffBase: DiffBase{
+				Type:        string(TableDiffDrop),
+				Name:        tableName,
+				Description: "Drop table " + tableName,
+				UpSQL:       generateDropTableSQL(currentTable),
+				DownSQL:     generateCreateTableSQL(currentTable),
+			},
+			Current: currentTable,
 		}
-		diff.UpSQL = generateDropTableSQL(currentTable)
-		diff.DownSQL = generateCreateTableSQL(currentTable)
 		diffs = append(diffs, diff)
 	}
 
@@ -265,9 +286,11 @@ func propagateColumnChangesToDependents(
 
 		// Create a propagated diff with column changes
 		propDiff := &TableDiff{
-			Type:          TableDiffAlter,
-			TableName:     dependentName,
-			Description:   fmt.Sprintf("Propagated column changes from %s (AS dependency)", sourceDiff.TableName),
+			DiffBase: DiffBase{
+				Type:        string(TableDiffAlter),
+				Name:        dependentName,
+				Description: fmt.Sprintf("Propagated column changes from %s (AS dependency)", sourceDiff.Name),
+			},
 			Current:       currentDep,
 			Target:        targetDep,
 			ColumnChanges: sourceDiff.ColumnChanges, // Same column changes
@@ -276,14 +299,14 @@ func propagateColumnChangesToDependents(
 		// Generate SQL based on engine type
 		if isViewLikeEngine(targetDep.Engine) {
 			// For Distributed, Memory, etc.: DROP + CREATE is safe and necessary
-			propDiff.UpSQL = fmt.Sprintf("-- Recreate to match schema changes from %s\n", sourceDiff.TableName) +
+			propDiff.UpSQL = fmt.Sprintf("-- Recreate to match schema changes from %s\n", sourceDiff.Name) +
 				generateDropTableSQL(currentDep) + ";\n" +
 				generateCreateTableSQL(targetDep)
 			propDiff.DownSQL = generateDropTableSQL(targetDep) + ";\n" +
 				generateCreateTableSQL(currentDep)
 		} else {
 			// For MergeTree, etc.: Use ALTER to preserve data
-			propDiff.UpSQL = fmt.Sprintf("-- Propagated from %s (AS dependency)\n", sourceDiff.TableName) +
+			propDiff.UpSQL = fmt.Sprintf("-- Propagated from %s (AS dependency)\n", sourceDiff.Name) +
 				generateAlterTableSQL(targetDep, sourceDiff.ColumnChanges)
 			propDiff.DownSQL = generateAlterTableSQL(currentDep, reverseColumnChanges(sourceDiff.ColumnChanges))
 		}
@@ -1073,30 +1096,32 @@ func shouldUseDropCreate(currentTable, targetTable *TableInfo) bool {
 
 // createRenameDiff creates a TableDiff for rename operation
 func createRenameDiff(oldName, newName string, currentTable, targetTable *TableInfo) *TableDiff {
-	diff := &TableDiff{
-		Type:         TableDiffRename,
-		TableName:    oldName,
-		NewTableName: newName,
-		Description:  fmt.Sprintf("Rename table %s to %s", oldName, newName),
-		Current:      currentTable,
-		Target:       targetTable,
+	return &TableDiff{
+		DiffBase: DiffBase{
+			Type:        string(TableDiffRename),
+			Name:        oldName,
+			NewName:     newName,
+			Description: fmt.Sprintf("Rename table %s to %s", oldName, newName),
+			UpSQL:       generateRenameTableSQL(currentTable, targetTable, oldName, newName),
+			DownSQL:     generateRenameTableSQL(targetTable, currentTable, newName, oldName),
+		},
+		Current: currentTable,
+		Target:  targetTable,
 	}
-	diff.UpSQL = generateRenameTableSQL(diff.Current, diff.Target, oldName, newName)
-	diff.DownSQL = generateRenameTableSQL(diff.Target, diff.Current, newName, oldName)
-	return diff
 }
 
 // createCreateDiff creates a TableDiff for create operation
 func createCreateDiff(tableName string, targetTable *TableInfo) *TableDiff {
-	diff := &TableDiff{
-		Type:        TableDiffCreate,
-		TableName:   tableName,
-		Description: "Create table " + tableName,
-		Target:      targetTable,
+	return &TableDiff{
+		DiffBase: DiffBase{
+			Type:        string(TableDiffCreate),
+			Name:        tableName,
+			Description: "Create table " + tableName,
+			UpSQL:       generateCreateTableSQL(targetTable),
+			DownSQL:     generateDropTableSQL(targetTable),
+		},
+		Target: targetTable,
 	}
-	diff.UpSQL = generateCreateTableSQL(targetTable)
-	diff.DownSQL = generateDropTableSQL(targetTable)
-	return diff
 }
 
 // createDropCreateDiff creates a TableDiff for DROP+CREATE operation
@@ -1106,39 +1131,31 @@ func createDropCreateDiff(tableName string, currentTable, targetTable *TableInfo
 		reason = "engine parameter change"
 	}
 
-	diff := &TableDiff{
-		Type:        TableDiffAlter,
-		TableName:   tableName,
-		Description: fmt.Sprintf("Alter table %s (DROP+CREATE for %s)", tableName, reason),
-		Current:     currentTable,
-		Target:      targetTable,
+	return &TableDiff{
+		DiffBase: DiffBase{
+			Type:        string(TableDiffAlter),
+			Name:        tableName,
+			Description: fmt.Sprintf("Alter table %s (DROP+CREATE for %s)", tableName, reason),
+			UpSQL:       generateDropTableSQL(currentTable) + "\n\n" + generateCreateTableSQL(targetTable),
+			DownSQL:     generateDropTableSQL(targetTable) + "\n\n" + generateCreateTableSQL(currentTable),
+		},
+		Current: currentTable,
+		Target:  targetTable,
 	}
-	diff.UpSQL = generateDropTableSQL(currentTable) + "\n\n" + generateCreateTableSQL(targetTable)
-	diff.DownSQL = generateDropTableSQL(targetTable) + "\n\n" + generateCreateTableSQL(currentTable)
-	return diff
 }
 
 // createAlterDiff creates a TableDiff for alter operation
 func createAlterDiff(tableName string, currentTable, targetTable *TableInfo, columnChanges []ColumnDiff) *TableDiff {
-	diff := &TableDiff{
-		Type:          TableDiffAlter,
-		TableName:     tableName,
-		Description:   "Alter table " + tableName,
+	return &TableDiff{
+		DiffBase: DiffBase{
+			Type:        string(TableDiffAlter),
+			Name:        tableName,
+			Description: "Alter table " + tableName,
+			UpSQL:       generateAlterTableSQL(targetTable, columnChanges),
+			DownSQL:     generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges)),
+		},
 		Current:       currentTable,
 		Target:        targetTable,
 		ColumnChanges: columnChanges,
 	}
-	diff.UpSQL = generateAlterTableSQL(targetTable, columnChanges)
-	diff.DownSQL = generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges))
-	return diff
-}
-
-// GetDiffType returns the diff type for TableDiff (implements diffProcessor interface)
-func (d *TableDiff) GetDiffType() string {
-	return string(d.Type)
-}
-
-// GetUpSQL returns the up SQL for TableDiff (implements diffProcessor interface)
-func (d *TableDiff) GetUpSQL() string {
-	return d.UpSQL
 }

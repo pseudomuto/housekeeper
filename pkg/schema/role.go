@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"maps"
 	"sort"
 	"strings"
 
@@ -29,14 +28,9 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// role operations including CREATE, ALTER, DROP, RENAME, GRANT, and REVOKE.
 	RoleDiff struct {
-		Type        RoleDiffType // Type of operation (CREATE, ALTER, DROP, RENAME, GRANT, REVOKE)
-		RoleName    string       // Name of the role being modified
-		Description string       // Human-readable description of the change
-		UpSQL       string       // SQL to apply the change (forward migration)
-		DownSQL     string       // SQL to rollback the change (reverse migration)
-		Current     *RoleInfo    // Current state (nil if role doesn't exist)
-		Target      *RoleInfo    // Target state (nil if role should be dropped)
-		NewRoleName string       // For rename operations - the new name
+		DiffBase           // Embeds Type, Name, NewName, Description, UpSQL, DownSQL
+		Current  *RoleInfo // Current state (nil if role doesn't exist)
+		Target   *RoleInfo // Target state (nil if role should be dropped)
 	}
 
 	// RoleDiffType represents the type of role difference
@@ -61,6 +55,42 @@ type (
 		Cluster    string   // Cluster name if specified
 	}
 )
+
+// GetName implements SchemaObject interface
+func (r *RoleInfo) GetName() string {
+	return r.Name
+}
+
+// GetCluster implements SchemaObject interface
+func (r *RoleInfo) GetCluster() string {
+	return r.Cluster
+}
+
+// PropertiesMatch implements SchemaObject interface.
+// Returns true if the two roles have identical properties (excluding name).
+func (r *RoleInfo) PropertiesMatch(other SchemaObject) bool {
+	otherRole, ok := other.(*RoleInfo)
+	if !ok {
+		return false
+	}
+
+	if r.Cluster != otherRole.Cluster {
+		return false
+	}
+
+	// Compare settings
+	if len(r.Settings) != len(otherRole.Settings) {
+		return false
+	}
+
+	for k, v := range r.Settings {
+		if otherRole.Settings[k] != v {
+			return false
+		}
+	}
+
+	return true
+}
 
 // compareRoles compares current and target role schemas and returns migration diffs.
 // It analyzes both schemas to identify differences and generates appropriate migration operations.
@@ -88,9 +118,27 @@ func compareRoles(current, target *parser.SQL) []*RoleDiff {
 	// Pre-allocate diffs slice with estimated capacity
 	diffs := make([]*RoleDiff, 0, len(currentRoles)+len(targetRoles)+len(currentGrants)+len(targetGrants))
 
-	// Detect renames first to avoid treating them as drop+create
-	renameDiffs, processedCurrent, processedTarget := detectRoleRenames(currentRoles, targetRoles)
-	diffs = append(diffs, renameDiffs...)
+	// Detect renames using generic algorithm
+	renames, processedCurrent, processedTarget := DetectRenames(currentRoles, targetRoles)
+
+	// Create rename diffs
+	for _, rename := range renames {
+		currentRole := currentRoles[rename.OldName]
+		targetRole := targetRoles[rename.NewName]
+		diff := &RoleDiff{
+			DiffBase: DiffBase{
+				Type:        string(RoleDiffRename),
+				Name:        rename.OldName,
+				NewName:     rename.NewName,
+				Description: fmt.Sprintf("Rename role '%s' to '%s'", rename.OldName, rename.NewName),
+				UpSQL:       generateRenameRoleSQL(currentRole, rename.NewName),
+				DownSQL:     generateRenameRoleSQL(targetRole, rename.OldName),
+			},
+			Current: currentRole,
+			Target:  targetRole,
+		}
+		diffs = append(diffs, diff)
+	}
 
 	// Find roles to create or modify (sorted for deterministic order)
 	targetNames := make([]string, 0, len(processedTarget))
@@ -106,25 +154,29 @@ func compareRoles(current, target *parser.SQL) []*RoleDiff {
 		if !exists {
 			// Role doesn't exist - create it
 			diff := &RoleDiff{
-				Type:        RoleDiffCreate,
-				RoleName:    name,
-				Description: fmt.Sprintf("Create role '%s'", name),
-				Target:      targetRole,
+				DiffBase: DiffBase{
+					Type:        string(RoleDiffCreate),
+					Name:        name,
+					Description: fmt.Sprintf("Create role '%s'", name),
+					UpSQL:       generateCreateRoleSQL(targetRole),
+					DownSQL:     generateDropRoleSQL(targetRole),
+				},
+				Target: targetRole,
 			}
-			diff.UpSQL = generateCreateRoleSQL(targetRole)
-			diff.DownSQL = generateDropRoleSQL(targetRole)
 			diffs = append(diffs, diff)
 		} else if needsAlter := compareRoleSettings(currentRole, targetRole); needsAlter {
 			// Role exists but needs modification
 			diff := &RoleDiff{
-				Type:        RoleDiffAlter,
-				RoleName:    name,
-				Description: fmt.Sprintf("Alter role '%s'", name),
-				Current:     currentRole,
-				Target:      targetRole,
+				DiffBase: DiffBase{
+					Type:        string(RoleDiffAlter),
+					Name:        name,
+					Description: fmt.Sprintf("Alter role '%s'", name),
+					UpSQL:       generateAlterRoleSQL(currentRole, targetRole),
+					DownSQL:     generateAlterRoleSQL(targetRole, currentRole),
+				},
+				Current: currentRole,
+				Target:  targetRole,
 			}
-			diff.UpSQL = generateAlterRoleSQL(currentRole, targetRole)
-			diff.DownSQL = generateAlterRoleSQL(targetRole, currentRole)
 			diffs = append(diffs, diff)
 		}
 	}
@@ -140,13 +192,15 @@ func compareRoles(current, target *parser.SQL) []*RoleDiff {
 		if _, exists := processedTarget[name]; !exists {
 			currentRole := processedCurrent[name]
 			diff := &RoleDiff{
-				Type:        RoleDiffDrop,
-				RoleName:    name,
-				Description: fmt.Sprintf("Drop role '%s'", name),
-				Current:     currentRole,
+				DiffBase: DiffBase{
+					Type:        string(RoleDiffDrop),
+					Name:        name,
+					Description: fmt.Sprintf("Drop role '%s'", name),
+					UpSQL:       generateDropRoleSQL(currentRole),
+					DownSQL:     generateCreateRoleSQL(currentRole),
+				},
+				Current: currentRole,
 			}
-			diff.UpSQL = generateDropRoleSQL(currentRole)
-			diff.DownSQL = generateCreateRoleSQL(currentRole)
 			diffs = append(diffs, diff)
 		}
 	}
@@ -262,73 +316,6 @@ func formatGrantTarget(target *parser.GrantTarget) string {
 	return ""
 }
 
-// detectRoleRenames detects roles that have been renamed
-func detectRoleRenames(current, target map[string]*RoleInfo) ([]*RoleDiff, map[string]*RoleInfo, map[string]*RoleInfo) {
-	var diffs []*RoleDiff
-	processedCurrent := make(map[string]*RoleInfo)
-	processedTarget := make(map[string]*RoleInfo)
-
-	// Copy all to processed maps initially
-	maps.Copy(processedCurrent, current)
-	maps.Copy(processedTarget, target)
-
-	// Look for potential renames
-	for currentName, currentRole := range current {
-		if _, exists := target[currentName]; exists {
-			continue // Not a rename
-		}
-
-		// Look for a matching role with different name
-		for targetName, targetRole := range target {
-			if _, exists := current[targetName]; exists {
-				continue // Not a rename
-			}
-
-			// Check if roles are identical except for name
-			if rolesMatchExceptName(currentRole, targetRole) {
-				diff := &RoleDiff{
-					Type:        RoleDiffRename,
-					RoleName:    currentName,
-					NewRoleName: targetName,
-					Description: fmt.Sprintf("Rename role '%s' to '%s'", currentName, targetName),
-					Current:     currentRole,
-					Target:      targetRole,
-				}
-				diff.UpSQL = generateRenameRoleSQL(currentRole, targetName)
-				diff.DownSQL = generateRenameRoleSQL(targetRole, currentName)
-				diffs = append(diffs, diff)
-
-				// Remove from processed maps
-				delete(processedCurrent, currentName)
-				delete(processedTarget, targetName)
-				break
-			}
-		}
-	}
-
-	return diffs, processedCurrent, processedTarget
-}
-
-// rolesMatchExceptName checks if two roles are identical except for their names
-func rolesMatchExceptName(r1, r2 *RoleInfo) bool {
-	if r1.Cluster != r2.Cluster {
-		return false
-	}
-
-	// Compare settings
-	if len(r1.Settings) != len(r2.Settings) {
-		return false
-	}
-
-	for k, v := range r1.Settings {
-		if r2.Settings[k] != v {
-			return false
-		}
-	}
-
-	return true
-}
-
 // compareRoleSettings checks if role settings need to be updated
 func compareRoleSettings(current, target *RoleInfo) bool {
 	// Compare settings count
@@ -373,11 +360,13 @@ func compareGrants(current, target []*GrantInfo) []*RoleDiff {
 	for key, targetGrant := range targetMap {
 		if _, exists := currentMap[key]; !exists {
 			diff := &RoleDiff{
-				Type:        RoleDiffGrant,
-				Description: fmt.Sprintf("Grant %s to %s", strings.Join(targetGrant.Privileges, ", "), targetGrant.Grantee),
+				DiffBase: DiffBase{
+					Type:        string(RoleDiffGrant),
+					Description: fmt.Sprintf("Grant %s to %s", strings.Join(targetGrant.Privileges, ", "), targetGrant.Grantee),
+					UpSQL:       generateGrantSQL(targetGrant),
+					DownSQL:     generateRevokeSQL(targetGrant),
+				},
 			}
-			diff.UpSQL = generateGrantSQL(targetGrant)
-			diff.DownSQL = generateRevokeSQL(targetGrant)
 			diffs = append(diffs, diff)
 		}
 	}
@@ -386,11 +375,13 @@ func compareGrants(current, target []*GrantInfo) []*RoleDiff {
 	for key, currentGrant := range currentMap {
 		if _, exists := targetMap[key]; !exists {
 			diff := &RoleDiff{
-				Type:        RoleDiffRevoke,
-				Description: fmt.Sprintf("Revoke %s from %s", strings.Join(currentGrant.Privileges, ", "), currentGrant.Grantee),
+				DiffBase: DiffBase{
+					Type:        string(RoleDiffRevoke),
+					Description: fmt.Sprintf("Revoke %s from %s", strings.Join(currentGrant.Privileges, ", "), currentGrant.Grantee),
+					UpSQL:       generateRevokeSQL(currentGrant),
+					DownSQL:     generateGrantSQL(currentGrant),
+				},
 			}
-			diff.UpSQL = generateRevokeSQL(currentGrant)
-			diff.DownSQL = generateGrantSQL(currentGrant)
 			diffs = append(diffs, diff)
 		}
 	}
@@ -506,14 +497,4 @@ func formatSettings(settings map[string]string) string {
 	}
 	sort.Strings(parts) // For deterministic output
 	return strings.Join(parts, ", ")
-}
-
-// GetDiffType returns the diff type for RoleDiff (implements diffProcessor interface)
-func (d *RoleDiff) GetDiffType() string {
-	return string(d.Type)
-}
-
-// GetUpSQL returns the up SQL for RoleDiff (implements diffProcessor interface)
-func (d *RoleDiff) GetUpSQL() string {
-	return d.UpSQL
 }

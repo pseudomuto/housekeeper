@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"maps"
 	"regexp"
 	"sort"
 	"strings"
@@ -27,14 +26,9 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// dictionary operations including CREATE, DROP, REPLACE, and RENAME.
 	DictionaryDiff struct {
-		Type              DictionaryDiffType // Type of operation (CREATE, DROP, REPLACE, RENAME)
-		DictionaryName    string             // Full name of the dictionary (database.name)
-		Description       string             // Human-readable description of the change
-		UpSQL             string             // SQL to apply the change (forward migration)
-		DownSQL           string             // SQL to rollback the change (reverse migration)
-		Current           *DictionaryInfo    // Current state (nil if dictionary doesn't exist)
-		Target            *DictionaryInfo    // Target state (nil if dictionary should be dropped)
-		NewDictionaryName string             // For rename operations - the new full name
+		DiffBase                 // Embeds Type, Name, NewName, Description, UpSQL, DownSQL
+		Current  *DictionaryInfo // Current state (nil if dictionary doesn't exist)
+		Target   *DictionaryInfo // Target state (nil if dictionary should be dropped)
 	}
 
 	// DictionaryDiffType represents the type of dictionary difference
@@ -51,6 +45,30 @@ type (
 		Statement *parser.CreateDictionaryStmt // Full parsed CREATE DICTIONARY statement for deep comparison
 	}
 )
+
+// GetName implements SchemaObject interface.
+// Returns the fully-qualified name (database.name or just name).
+func (d *DictionaryInfo) GetName() string {
+	if d.Database != "" {
+		return d.Database + "." + d.Name
+	}
+	return d.Name
+}
+
+// GetCluster implements SchemaObject interface
+func (d *DictionaryInfo) GetCluster() string {
+	return d.Cluster
+}
+
+// PropertiesMatch implements SchemaObject interface.
+// Returns true if the two dictionaries have identical properties (excluding name).
+func (d *DictionaryInfo) PropertiesMatch(other SchemaObject) bool {
+	otherDict, ok := other.(*DictionaryInfo)
+	if !ok {
+		return false
+	}
+	return dictionaryPropertiesMatch(d, otherDict)
+}
 
 // compareDictionaries compares current and target dictionary schemas and returns migration diffs.
 // It analyzes both schemas to identify differences and generates appropriate migration operations.
@@ -76,9 +94,27 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 	// Pre-allocate diffs slice with estimated capacity
 	diffs := make([]*DictionaryDiff, 0, len(currentDicts)+len(targetDicts))
 
-	// Detect renames first to avoid treating them as drop+create
-	renameDiffs, processedCurrent, processedTarget := detectDictionaryRenames(currentDicts, targetDicts)
-	diffs = append(diffs, renameDiffs...)
+	// Detect renames using generic algorithm
+	renames, processedCurrent, processedTarget := DetectRenames(currentDicts, targetDicts)
+
+	// Create rename diffs
+	for _, rename := range renames {
+		currentDict := currentDicts[rename.OldName]
+		targetDict := targetDicts[rename.NewName]
+		diff := &DictionaryDiff{
+			DiffBase: DiffBase{
+				Type:        string(DictionaryDiffRename),
+				Name:        rename.OldName,
+				NewName:     rename.NewName,
+				Description: fmt.Sprintf("Rename dictionary '%s' to '%s'", rename.OldName, rename.NewName),
+				UpSQL:       generateRenameDictionarySQL(rename.OldName, rename.NewName, currentDict.Cluster),
+				DownSQL:     generateRenameDictionarySQL(rename.NewName, rename.OldName, currentDict.Cluster),
+			},
+			Current: currentDict,
+			Target:  targetDict,
+		}
+		diffs = append(diffs, diff)
+	}
 
 	// Find dictionaries to create or replace - sorted for deterministic order
 	targetNames := make([]string, 0, len(processedTarget))
@@ -99,12 +135,14 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 		if !exists {
 			// Dictionary needs to be created
 			diff := &DictionaryDiff{
-				Type:           DictionaryDiffCreate,
-				DictionaryName: name,
-				Description:    fmt.Sprintf("Create dictionary '%s'", name),
-				Target:         targetDict,
-				UpSQL:          generateCreateDictionarySQL(targetDict),
-				DownSQL:        generateDropDictionarySQL(targetDict),
+				DiffBase: DiffBase{
+					Type:        string(DictionaryDiffCreate),
+					Name:        name,
+					Description: fmt.Sprintf("Create dictionary '%s'", name),
+					UpSQL:       generateCreateDictionarySQL(targetDict),
+					DownSQL:     generateDropDictionarySQL(targetDict),
+				},
+				Target: targetDict,
 			}
 			diffs = append(diffs, diff)
 		} else {
@@ -112,13 +150,15 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 			if needsDictionaryModification(currentDict, targetDict) {
 				// Since dictionaries can't be altered, use CREATE OR REPLACE
 				diff := &DictionaryDiff{
-					Type:           DictionaryDiffReplace,
-					DictionaryName: name,
-					Description:    fmt.Sprintf("Replace dictionary '%s'", name),
-					Current:        currentDict,
-					Target:         targetDict,
-					UpSQL:          generateReplaceDictionarySQL(targetDict),
-					DownSQL:        generateReplaceDictionarySQL(currentDict),
+					DiffBase: DiffBase{
+						Type:        string(DictionaryDiffReplace),
+						Name:        name,
+						Description: fmt.Sprintf("Replace dictionary '%s'", name),
+						UpSQL:       generateReplaceDictionarySQL(targetDict),
+						DownSQL:     generateReplaceDictionarySQL(currentDict),
+					},
+					Current: currentDict,
+					Target:  targetDict,
 				}
 				diffs = append(diffs, diff)
 			}
@@ -143,12 +183,14 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 
 		// Dictionary should be dropped
 		diff := &DictionaryDiff{
-			Type:           DictionaryDiffDrop,
-			DictionaryName: name,
-			Description:    fmt.Sprintf("Drop dictionary '%s'", name),
-			Current:        currentDict,
-			UpSQL:          generateDropDictionarySQL(currentDict),
-			DownSQL:        generateCreateDictionarySQL(currentDict),
+			DiffBase: DiffBase{
+				Type:        string(DictionaryDiffDrop),
+				Name:        name,
+				Description: fmt.Sprintf("Drop dictionary '%s'", name),
+				UpSQL:       generateDropDictionarySQL(currentDict),
+				DownSQL:     generateCreateDictionarySQL(currentDict),
+			},
+			Current: currentDict,
 		}
 		diffs = append(diffs, diff)
 	}
@@ -191,55 +233,6 @@ func extractDictionaryInfo(sql *parser.SQL) map[string]*DictionaryInfo {
 	}
 
 	return dictionaries
-}
-
-// detectDictionaryRenames identifies potential rename operations between current and target states.
-// It returns rename diffs and filtered maps with renamed dictionaries removed.
-func detectDictionaryRenames(currentDicts, targetDicts map[string]*DictionaryInfo) ([]*DictionaryDiff, map[string]*DictionaryInfo, map[string]*DictionaryInfo) {
-	var renameDiffs []*DictionaryDiff
-	processedCurrent := make(map[string]*DictionaryInfo)
-	processedTarget := make(map[string]*DictionaryInfo)
-
-	// Copy all dictionaries to processed maps initially
-	maps.Copy(processedCurrent, currentDicts)
-	maps.Copy(processedTarget, targetDicts)
-
-	// Look for potential renames: dictionaries that don't exist by name but have identical properties
-	for currentName, currentDict := range currentDicts {
-		if _, exists := targetDicts[currentName]; exists {
-			continue // Dictionary exists in both, not a rename
-		}
-
-		// Look for a dictionary in target with identical properties but different name
-		for targetName, targetDict := range targetDicts {
-			if _, exists := currentDicts[targetName]; exists {
-				continue // Target dictionary exists in current, not a rename target
-			}
-
-			// Check if properties match (everything except name)
-			if dictionaryPropertiesMatch(currentDict, targetDict) {
-				// This is a rename operation
-				diff := &DictionaryDiff{
-					Type:              DictionaryDiffRename,
-					DictionaryName:    currentName,
-					NewDictionaryName: targetName,
-					Description:       fmt.Sprintf("Rename dictionary '%s' to '%s'", currentName, targetName),
-					Current:           currentDict,
-					Target:            targetDict,
-					UpSQL:             generateRenameDictionarySQL(currentName, targetName, currentDict.Cluster),
-					DownSQL:           generateRenameDictionarySQL(targetName, currentName, currentDict.Cluster),
-				}
-				renameDiffs = append(renameDiffs, diff)
-
-				// Remove from processed maps so they're not treated as drop+create
-				delete(processedCurrent, currentName)
-				delete(processedTarget, targetName)
-				break // Found the rename target, move to next current dictionary
-			}
-		}
-	}
-
-	return renameDiffs, processedCurrent, processedTarget
 }
 
 // dictionaryPropertiesMatch checks if two dictionaries have identical properties (excluding name)
@@ -923,14 +916,4 @@ func normalizeComment(comment string) string {
 	}
 
 	return result
-}
-
-// GetDiffType returns the diff type for DictionaryDiff (implements diffProcessor interface)
-func (d *DictionaryDiff) GetDiffType() string {
-	return string(d.Type)
-}
-
-// GetUpSQL returns the up SQL for DictionaryDiff (implements diffProcessor interface)
-func (d *DictionaryDiff) GetUpSQL() string {
-	return d.UpSQL
 }

@@ -28,15 +28,10 @@ type (
 	// It handles both regular views and materialized views, with special handling
 	// for materialized views which can only be altered using ALTER TABLE MODIFY QUERY.
 	ViewDiff struct {
-		Type           ViewDiffType // Type of operation (CREATE, DROP, ALTER, RENAME)
-		ViewName       string       // Full name of the view (database.name)
-		Description    string       // Human-readable description of the change
-		UpSQL          string       // SQL to apply the change (forward migration)
-		DownSQL        string       // SQL to rollback the change (reverse migration)
-		Current        *ViewInfo    // Current state (nil if view doesn't exist)
-		Target         *ViewInfo    // Target state (nil if view should be dropped)
-		NewViewName    string       // For rename operations - the new full name
-		IsMaterialized bool         // True if this is a materialized view
+		DiffBase                 // Embeds Type, Name, NewName, Description, UpSQL, DownSQL
+		Current        *ViewInfo // Current state (nil if view doesn't exist)
+		Target         *ViewInfo // Target state (nil if view should be dropped)
+		IsMaterialized bool      // True if this is a materialized view
 	}
 
 	// ViewDiffType represents the type of view difference
@@ -55,6 +50,30 @@ type (
 		Statement      *parser.CreateViewStmt // Full parsed CREATE VIEW statement for deep comparison
 	}
 )
+
+// GetName implements SchemaObject interface.
+// Returns the full view name (database.name or just name).
+func (v *ViewInfo) GetName() string {
+	if v.Database != "" {
+		return v.Database + "." + v.Name
+	}
+	return v.Name
+}
+
+// GetCluster implements SchemaObject interface.
+func (v *ViewInfo) GetCluster() string {
+	return v.Cluster
+}
+
+// PropertiesMatch implements SchemaObject interface.
+// Returns true if the two views have identical properties (excluding name).
+func (v *ViewInfo) PropertiesMatch(other SchemaObject) bool {
+	otherView, ok := other.(*ViewInfo)
+	if !ok {
+		return false
+	}
+	return viewsHaveSameProperties(v, otherView)
+}
 
 // compareViews compares current and target schemas to find view differences.
 // It analyzes CREATE VIEW statements from both schemas and generates appropriate
@@ -127,14 +146,16 @@ func findViewsToCreate(targetViews, currentViews map[string]*ViewInfo) ([]*ViewD
 		}
 
 		diff := &ViewDiff{
-			Type:           ViewDiffCreate,
-			ViewName:       name,
-			Description:    fmt.Sprintf("Create %s %s", getViewType(targetView), name),
+			DiffBase: DiffBase{
+				Type:        string(ViewDiffCreate),
+				Name:        name,
+				Description: fmt.Sprintf("Create %s %s", getViewType(targetView), name),
+				UpSQL:       generateCreateViewSQL(targetView),
+				DownSQL:     generateDropViewSQL(targetView),
+			},
 			Target:         targetView,
 			IsMaterialized: targetView.IsMaterialized,
 		}
-		diff.UpSQL = generateCreateViewSQL(targetView)
-		diff.DownSQL = generateDropViewSQL(targetView)
 		diffs = append(diffs, diff)
 	}
 
@@ -170,14 +191,16 @@ func findViewsToDrop(currentViews, targetViews map[string]*ViewInfo) ([]*ViewDif
 		}
 
 		diff := &ViewDiff{
-			Type:           ViewDiffDrop,
-			ViewName:       name,
-			Description:    fmt.Sprintf("Drop %s %s", getViewType(currentView), name),
+			DiffBase: DiffBase{
+				Type:        string(ViewDiffDrop),
+				Name:        name,
+				Description: fmt.Sprintf("Drop %s %s", getViewType(currentView), name),
+				UpSQL:       generateDropViewSQL(currentView),
+				DownSQL:     generateCreateViewSQL(currentView),
+			},
 			Current:        currentView,
 			IsMaterialized: currentView.IsMaterialized,
 		}
-		diff.UpSQL = generateDropViewSQL(currentView)
-		diff.DownSQL = generateCreateViewSQL(currentView)
 		diffs = append(diffs, diff)
 	}
 
@@ -188,17 +211,13 @@ func findViewsToDrop(currentViews, targetViews map[string]*ViewInfo) ([]*ViewDif
 func findViewsToAlterOrRename(currentViews, targetViews map[string]*ViewInfo) ([]*ViewDiff, error) {
 	diffs := make([]*ViewDiff, 0, len(currentViews))
 
-	// First, detect all potential renames using a proper algorithm that prevents circular renames
-	renamePairs := detectViewRenames(currentViews, targetViews)
+	// Use generic rename detection algorithm
+	renames, processedCurrent, processedTarget := DetectRenames(currentViews, targetViews)
 
-	// Create a set of views involved in renames to skip them in the alter check
-	renamedViews := make(map[string]bool)
-	for currentName, targetName := range renamePairs {
-		renamedViews[currentName] = true
-		renamedViews[targetName] = true
-
-		currentView := currentViews[currentName]
-		targetView := targetViews[targetName]
+	// Create rename diffs
+	for _, rename := range renames {
+		currentView := currentViews[rename.OldName]
+		targetView := targetViews[rename.NewName]
 
 		// Validate rename operation
 		if err := validateViewOperation(currentView, targetView); err != nil {
@@ -206,31 +225,33 @@ func findViewsToAlterOrRename(currentViews, targetViews map[string]*ViewInfo) ([
 		}
 
 		diff := &ViewDiff{
-			Type:           ViewDiffRename,
-			ViewName:       currentName,
-			NewViewName:    targetName,
-			Description:    fmt.Sprintf("Rename %s %s to %s", getViewType(currentView), currentName, targetName),
+			DiffBase: DiffBase{
+				Type:        string(ViewDiffRename),
+				Name:        rename.OldName,
+				NewName:     rename.NewName,
+				Description: fmt.Sprintf("Rename %s %s to %s", getViewType(currentView), rename.OldName, rename.NewName),
+				UpSQL:       generateRenameViewSQL(currentView, targetView),
+				DownSQL:     generateRenameViewSQL(targetView, currentView),
+			},
 			Current:        currentView,
 			Target:         targetView,
 			IsMaterialized: currentView.IsMaterialized,
 		}
-		diff.UpSQL = generateRenameViewSQL(currentView, targetView)
-		diff.DownSQL = generateRenameViewSQL(targetView, currentView)
 		diffs = append(diffs, diff)
 	}
 
-	// Now check for alterations, excluding views involved in renames
+	// Now check for alterations using processed maps (excludes renamed views)
 	var currentNames []string
-	for name := range currentViews {
-		if _, exists := targetViews[name]; exists && !renamedViews[name] {
+	for name := range processedCurrent {
+		if _, exists := processedTarget[name]; exists {
 			currentNames = append(currentNames, name)
 		}
 	}
 	sort.Strings(currentNames)
 
 	for _, name := range currentNames {
-		currentView := currentViews[name]
-		targetView := targetViews[name]
+		currentView := processedCurrent[name]
+		targetView := processedTarget[name]
 
 		// Validate operation before proceeding
 		if err := validateViewOperation(currentView, targetView); err != nil {
@@ -239,23 +260,29 @@ func findViewsToAlterOrRename(currentViews, targetViews map[string]*ViewInfo) ([
 
 		if !viewsAreEqual(currentView, targetView) {
 			// View needs to be altered
-			diff := &ViewDiff{
-				Type:           ViewDiffAlter,
-				ViewName:       name,
-				Description:    fmt.Sprintf("Alter %s %s", getViewType(currentView), name),
-				Current:        currentView,
-				Target:         targetView,
-				IsMaterialized: currentView.IsMaterialized,
-			}
+			var upSQL, downSQL string
 
 			// For materialized views, use DROP+CREATE (more reliable than ALTER TABLE MODIFY QUERY)
 			// For regular views, use CREATE OR REPLACE
 			if currentView.IsMaterialized {
-				diff.UpSQL = generateDropViewSQL(currentView) + "\n\n" + generateCreateViewSQL(targetView)
-				diff.DownSQL = generateDropViewSQL(targetView) + "\n\n" + generateCreateViewSQL(currentView)
+				upSQL = generateDropViewSQL(currentView) + "\n\n" + generateCreateViewSQL(targetView)
+				downSQL = generateDropViewSQL(targetView) + "\n\n" + generateCreateViewSQL(currentView)
 			} else {
-				diff.UpSQL = generateCreateOrReplaceViewSQL(targetView)
-				diff.DownSQL = generateCreateOrReplaceViewSQL(currentView)
+				upSQL = generateCreateOrReplaceViewSQL(targetView)
+				downSQL = generateCreateOrReplaceViewSQL(currentView)
+			}
+
+			diff := &ViewDiff{
+				DiffBase: DiffBase{
+					Type:        string(ViewDiffAlter),
+					Name:        name,
+					Description: fmt.Sprintf("Alter %s %s", getViewType(currentView), name),
+					UpSQL:       upSQL,
+					DownSQL:     downSQL,
+				},
+				Current:        currentView,
+				Target:         targetView,
+				IsMaterialized: currentView.IsMaterialized,
 			}
 
 			diffs = append(diffs, diff)
@@ -344,65 +371,6 @@ func viewsHaveSameProperties(view1, view2 *ViewInfo) bool {
 
 	// Compare statements ignoring names
 	return viewStatementsHaveSameProperties(view1.Statement, view2.Statement)
-}
-
-// detectViewRenames finds rename pairs using a proper algorithm that prevents circular renames.
-// Returns a map of currentName -> targetName for all detected renames.
-func detectViewRenames(currentViews, targetViews map[string]*ViewInfo) map[string]string {
-	renamePairs := make(map[string]string)
-	usedTargets := make(map[string]bool)
-
-	// Build a map of possible rename candidates
-	renameCandidates := make(map[string][]string) // currentName -> []possibleTargetNames
-
-	for currentName, currentView := range currentViews {
-		// Skip if current view still exists with same name in target
-		if _, exists := targetViews[currentName]; exists {
-			continue
-		}
-
-		// Find all target views that have the same properties as this current view
-		var candidates []string
-		for targetName, targetView := range targetViews {
-			// Skip if target already exists in current (no rename needed)
-			if _, exists := currentViews[targetName]; exists {
-				continue
-			}
-
-			// Check if properties match (indicating potential rename)
-			if viewsHaveSameProperties(currentView, targetView) {
-				candidates = append(candidates, targetName)
-			}
-		}
-
-		if len(candidates) > 0 {
-			sort.Strings(candidates) // For deterministic ordering
-			renameCandidates[currentName] = candidates
-		}
-	}
-
-	// Now assign renames ensuring no target is used twice
-	// Sort current names for deterministic processing order
-	sortedCurrentNames := make([]string, 0, len(renameCandidates))
-	for currentName := range renameCandidates {
-		sortedCurrentNames = append(sortedCurrentNames, currentName)
-	}
-	sort.Strings(sortedCurrentNames)
-
-	for _, currentName := range sortedCurrentNames {
-		candidates := renameCandidates[currentName]
-
-		// Find the first unused target candidate
-		for _, targetName := range candidates {
-			if !usedTargets[targetName] {
-				renamePairs[currentName] = targetName
-				usedTargets[targetName] = true
-				break
-			}
-		}
-	}
-
-	return renamePairs
 }
 
 // viewStatementsAreEqual compares two CREATE VIEW statements for complete equality
@@ -1168,14 +1136,4 @@ func generateRenameViewSQL(from, to *ViewInfo) string {
 		QualifiedTo(toDB, to.Name).
 		OnCluster(to.Cluster).
 		String()
-}
-
-// GetDiffType returns the diff type for ViewDiff (implements diffProcessor interface)
-func (d *ViewDiff) GetDiffType() string {
-	return string(d.Type)
-}
-
-// GetUpSQL returns the up SQL for ViewDiff (implements diffProcessor interface)
-func (d *ViewDiff) GetUpSQL() string {
-	return d.UpSQL
 }
