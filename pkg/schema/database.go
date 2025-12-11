@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"maps"
 	"sort"
 	"strings"
 
@@ -27,14 +26,9 @@ type (
 	// It contains all information needed to generate migration SQL statements for
 	// database operations including CREATE, ALTER, DROP, and RENAME.
 	DatabaseDiff struct {
-		Type            DatabaseDiffType // Type of operation (CREATE, ALTER, DROP, RENAME)
-		DatabaseName    string           // Name of the database being modified
-		Description     string           // Human-readable description of the change
-		UpSQL           string           // SQL to apply the change (forward migration)
-		DownSQL         string           // SQL to rollback the change (reverse migration)
-		Current         *DatabaseInfo    // Current state (nil if database doesn't exist)
-		Target          *DatabaseInfo    // Target state (nil if database should be dropped)
-		NewDatabaseName string           // For rename operations - the new name
+		DiffBase               // Embeds Type, Name, NewName, Description, UpSQL, DownSQL
+		Current  *DatabaseInfo // Current state (nil if database doesn't exist)
+		Target   *DatabaseInfo // Target state (nil if database should be dropped)
 	}
 
 	// DatabaseDiffType represents the type of database difference
@@ -50,6 +44,28 @@ type (
 		Cluster string // Cluster name if specified (empty if not clustered)
 	}
 )
+
+// GetName implements SchemaObject interface
+func (d *DatabaseInfo) GetName() string {
+	return d.Name
+}
+
+// GetCluster implements SchemaObject interface
+func (d *DatabaseInfo) GetCluster() string {
+	return d.Cluster
+}
+
+// PropertiesMatch implements SchemaObject interface.
+// Returns true if the two databases have identical properties (excluding name).
+func (d *DatabaseInfo) PropertiesMatch(other SchemaObject) bool {
+	otherDB, ok := other.(*DatabaseInfo)
+	if !ok {
+		return false
+	}
+	return d.Engine == otherDB.Engine &&
+		d.Comment == otherDB.Comment &&
+		d.Cluster == otherDB.Cluster
+}
 
 // compareDatabases compares current and target database schemas and returns migration diffs.
 // It analyzes both schemas to identify differences and generates appropriate migration operations.
@@ -72,9 +88,27 @@ func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 	// Pre-allocate diffs slice with estimated capacity
 	diffs := make([]*DatabaseDiff, 0, len(currentDBs)+len(targetDBs))
 
-	// Detect renames first to avoid treating them as drop+create
-	renameDiffs, processedCurrent, processedTarget := detectDatabaseRenames(currentDBs, targetDBs)
-	diffs = append(diffs, renameDiffs...)
+	// Detect renames using generic algorithm
+	renames, processedCurrent, processedTarget := DetectRenames(currentDBs, targetDBs)
+
+	// Create rename diffs
+	for _, rename := range renames {
+		currentDB := currentDBs[rename.OldName]
+		targetDB := targetDBs[rename.NewName]
+		diff := &DatabaseDiff{
+			DiffBase: DiffBase{
+				Type:        string(DatabaseDiffRename),
+				Name:        rename.OldName,
+				NewName:     rename.NewName,
+				Description: fmt.Sprintf("Rename database '%s' to '%s'", rename.OldName, rename.NewName),
+				UpSQL:       generateRenameDatabaseSQL(rename.OldName, rename.NewName, currentDB.Cluster),
+				DownSQL:     generateRenameDatabaseSQL(rename.NewName, rename.OldName, currentDB.Cluster),
+			},
+			Current: currentDB,
+			Target:  targetDB,
+		}
+		diffs = append(diffs, diff)
+	}
 
 	// Find databases to create or modify (sorted for deterministic order)
 	targetNames := make([]string, 0, len(processedTarget))
@@ -108,12 +142,14 @@ func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 		currentDB := processedCurrent[name]
 		// Database should be dropped
 		diff := &DatabaseDiff{
-			Type:         DatabaseDiffDrop,
-			DatabaseName: name,
-			Description:  fmt.Sprintf("Drop database '%s'", name),
-			Current:      currentDB,
-			UpSQL:        generateDropDatabaseSQL(currentDB),
-			DownSQL:      generateCreateDatabaseSQL(currentDB),
+			DiffBase: DiffBase{
+				Type:        string(DatabaseDiffDrop),
+				Name:        name,
+				Description: fmt.Sprintf("Drop database '%s'", name),
+				UpSQL:       generateDropDatabaseSQL(currentDB),
+				DownSQL:     generateCreateDatabaseSQL(currentDB),
+			},
+			Current: currentDB,
 		}
 		diffs = append(diffs, diff)
 	}
@@ -149,62 +185,6 @@ func extractDatabaseInfo(sql *parser.SQL) map[string]*DatabaseInfo {
 	}
 
 	return databases
-}
-
-// detectDatabaseRenames identifies potential rename operations between current and target states.
-// It returns rename diffs and filtered maps with renamed databases removed.
-func detectDatabaseRenames(currentDBs, targetDBs map[string]*DatabaseInfo) ([]*DatabaseDiff, map[string]*DatabaseInfo, map[string]*DatabaseInfo) {
-	var renameDiffs []*DatabaseDiff
-	processedCurrent := make(map[string]*DatabaseInfo)
-	processedTarget := make(map[string]*DatabaseInfo)
-
-	// Copy all databases to processed maps initially
-	maps.Copy(processedCurrent, currentDBs)
-	maps.Copy(processedTarget, targetDBs)
-
-	// Look for potential renames: databases that don't exist by name but have identical properties
-	for currentName, currentDB := range currentDBs {
-		if _, exists := targetDBs[currentName]; exists {
-			continue // Database exists in both, not a rename
-		}
-
-		// Look for a database in target with identical properties but different name
-		for targetName, targetDB := range targetDBs {
-			if _, exists := currentDBs[targetName]; exists {
-				continue // Target database exists in current, not a rename target
-			}
-
-			// Check if properties match (everything except name)
-			if databasePropertiesMatch(currentDB, targetDB) {
-				// This is a rename operation
-				diff := &DatabaseDiff{
-					Type:            DatabaseDiffRename,
-					DatabaseName:    currentName,
-					NewDatabaseName: targetName,
-					Description:     fmt.Sprintf("Rename database '%s' to '%s'", currentName, targetName),
-					Current:         currentDB,
-					Target:          targetDB,
-					UpSQL:           generateRenameDatabaseSQL(currentName, targetName, currentDB.Cluster),
-					DownSQL:         generateRenameDatabaseSQL(targetName, currentName, currentDB.Cluster),
-				}
-				renameDiffs = append(renameDiffs, diff)
-
-				// Remove from processed maps so they're not treated as drop+create
-				delete(processedCurrent, currentName)
-				delete(processedTarget, targetName)
-				break // Found the rename target, move to next current database
-			}
-		}
-	}
-
-	return renameDiffs, processedCurrent, processedTarget
-}
-
-// databasePropertiesMatch checks if two databases have identical properties (excluding name)
-func databasePropertiesMatch(db1, db2 *DatabaseInfo) bool {
-	return db1.Engine == db2.Engine &&
-		db1.Comment == db2.Comment &&
-		db1.Cluster == db2.Cluster
 }
 
 // generateRenameDatabaseSQL generates RENAME DATABASE SQL
@@ -286,12 +266,14 @@ func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists b
 	if !exists {
 		// Database needs to be created
 		return &DatabaseDiff{
-			Type:         DatabaseDiffCreate,
-			DatabaseName: name,
-			Description:  fmt.Sprintf("Create database '%s'", name),
-			Target:       targetDB,
-			UpSQL:        generateCreateDatabaseSQL(targetDB),
-			DownSQL:      generateDropDatabaseSQL(targetDB),
+			DiffBase: DiffBase{
+				Type:        string(DatabaseDiffCreate),
+				Name:        name,
+				Description: fmt.Sprintf("Create database '%s'", name),
+				UpSQL:       generateCreateDatabaseSQL(targetDB),
+				DownSQL:     generateDropDatabaseSQL(targetDB),
+			},
+			Target: targetDB,
 		}, nil
 	}
 
@@ -311,22 +293,14 @@ func createDatabaseDiff(name string, currentDB, targetDB *DatabaseInfo, exists b
 	}
 
 	return &DatabaseDiff{
-		Type:         DatabaseDiffAlter,
-		DatabaseName: name,
-		Description:  fmt.Sprintf("Alter database '%s'", name),
-		Current:      currentDB,
-		Target:       targetDB,
-		UpSQL:        upSQL,
-		DownSQL:      downSQL,
+		DiffBase: DiffBase{
+			Type:        string(DatabaseDiffAlter),
+			Name:        name,
+			Description: fmt.Sprintf("Alter database '%s'", name),
+			UpSQL:       upSQL,
+			DownSQL:     downSQL,
+		},
+		Current: currentDB,
+		Target:  targetDB,
 	}, nil
-}
-
-// GetDiffType returns the diff type for DatabaseDiff (implements diffProcessor interface)
-func (d *DatabaseDiff) GetDiffType() string {
-	return string(d.Type)
-}
-
-// GetUpSQL returns the up SQL for DatabaseDiff (implements diffProcessor interface)
-func (d *DatabaseDiff) GetUpSQL() string {
-	return d.UpSQL
 }
