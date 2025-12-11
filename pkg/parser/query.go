@@ -128,16 +128,34 @@ type (
 
 	// SelectOrderByClause represents ORDER BY clause in SELECT statements
 	SelectOrderByClause struct {
-		OrderBy string          `parser:"'ORDER' 'BY'"`
-		Columns []OrderByColumn `parser:"@@ (',' @@)*"`
+		OrderBy     string             `parser:"'ORDER' 'BY'"`
+		Columns     []OrderByColumn    `parser:"@@ (',' @@)*"`
+		Interpolate *InterpolateClause `parser:"@@?"`
+	}
+
+	// InterpolateClause represents INTERPOLATE clause for WITH FILL
+	InterpolateClause struct {
+		Interpolate string              `parser:"'INTERPOLATE'"`
+		Columns     []InterpolateColumn `parser:"('(' (@@ (',' @@)*)? ')')?"`
+	}
+
+	// InterpolateColumn represents a column in INTERPOLATE clause
+	InterpolateColumn struct {
+		Name       string      `parser:"@(Ident | BacktickIdent)"`
+		Expression *Expression `parser:"('AS' @@)?"`
 	}
 
 	// OrderByColumn represents a single column in ORDER BY
 	OrderByColumn struct {
-		Expression Expression `parser:"@@"`
-		Direction  *string    `parser:"@('ASC' | 'DESC')?"`
-		Nulls      *string    `parser:"('NULLS' @('FIRST' | 'LAST'))?"`
-		Collate    *string    `parser:"('COLLATE' @String)?"`
+		Expression    Expression  `parser:"@@"`
+		Direction     *string     `parser:"@('ASC' | 'DESC')?"`
+		Nulls         *string     `parser:"('NULLS' @('FIRST' | 'LAST'))?"`
+		Collate       *string     `parser:"('COLLATE' @String)?"`
+		WithFill      bool        `parser:"@('WITH' 'FILL')?"`
+		FillFrom      *Expression `parser:"('FROM' @@)?"`
+		FillTo        *Expression `parser:"('TO' @@)?"`
+		FillStep      *Expression `parser:"('STEP' @@)?"`
+		FillStaleness *Expression `parser:"('STALENESS' @@)?"`
 	}
 
 	// LimitClause represents LIMIT clause
