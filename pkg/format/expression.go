@@ -536,60 +536,9 @@ func (f *Formatter) formatDataType(dataType *parser.DataType) string {
 		return "LowCardinality(" + f.formatDataType(dataType.LowCardinality.Type) + ")"
 	}
 	if dataType.Simple != nil {
-		return f.formatSimpleDataType(dataType.Simple)
+		return dataType.Simple.String()
 	}
 	return ""
-}
-
-// formatSimpleDataType formats a simple data type
-func (f *Formatter) formatSimpleDataType(simple *parser.SimpleType) string {
-	if simple == nil {
-		return ""
-	}
-
-	result := simple.Name
-	if len(simple.Parameters) > 0 {
-		result += "("
-		var params []string
-		for _, param := range simple.Parameters {
-			if param.Function != nil {
-				params = append(params, f.formatParametricFunction(param.Function))
-			} else if param.String != nil {
-				params = append(params, *param.String)
-			} else if param.Number != nil {
-				params = append(params, *param.Number)
-			} else if param.Ident != nil {
-				params = append(params, *param.Ident)
-			}
-		}
-		result += strings.Join(params, ", ")
-		result += ")"
-	}
-	return result
-}
-
-// formatParametricFunction formats a function call within type parameters
-func (f *Formatter) formatParametricFunction(fn *parser.ParametricFunction) string {
-	if fn == nil {
-		return ""
-	}
-
-	result := fn.Name + "("
-	var params []string
-	for _, param := range fn.Parameters {
-		if param.Function != nil {
-			params = append(params, f.formatParametricFunction(param.Function))
-		} else if param.String != nil {
-			params = append(params, *param.String)
-		} else if param.Number != nil {
-			params = append(params, *param.Number)
-		} else if param.Ident != nil {
-			params = append(params, *param.Ident)
-		}
-	}
-	result += strings.Join(params, ", ")
-	result += ")"
-	return result
 }
 
 // formatTupleDataType formats a tuple data type

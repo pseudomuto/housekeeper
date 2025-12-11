@@ -713,7 +713,7 @@ func formatColumnDefinition(col ColumnInfo) string {
 	sql.WriteString("`")
 	sql.WriteString(col.Name)
 	sql.WriteString("` ")
-	sql.WriteString(formatColumnDataType(col.DataType))
+	sql.WriteString(col.DataType.String())
 
 	if col.DefaultType != "" && col.Default != nil {
 		sql.WriteString(" ")
@@ -912,79 +912,6 @@ func formatTableEngine(engine *parser.TableEngine) string {
 		result += ")"
 	}
 	return result
-}
-
-func formatColumnDataType(dataType *parser.DataType) string {
-	if dataType == nil {
-		return ""
-	}
-
-	if dataType.Nullable != nil {
-		return "Nullable(" + formatColumnDataType(dataType.Nullable.Type) + ")"
-	}
-	if dataType.Array != nil {
-		return "Array(" + formatColumnDataType(dataType.Array.Type) + ")"
-	}
-	if dataType.Tuple != nil {
-		result := "Tuple("
-		var resultSb905 strings.Builder
-		for i, element := range dataType.Tuple.Elements {
-			if i > 0 {
-				resultSb905.WriteString(", ")
-			}
-			if element.Name != nil {
-				resultSb905.WriteString(*element.Name + " " + formatColumnDataType(element.Type))
-			} else {
-				resultSb905.WriteString(formatColumnDataType(element.UnnamedType))
-			}
-		}
-		result += resultSb905.String()
-		return result + ")"
-	}
-	if dataType.Nested != nil {
-		result := "Nested("
-		var resultSb919 strings.Builder
-		for i, col := range dataType.Nested.Columns {
-			if i > 0 {
-				resultSb919.WriteString(", ")
-			}
-			resultSb919.WriteString(col.Name + " " + formatColumnDataType(col.Type))
-		}
-		result += resultSb919.String()
-		return result + ")"
-	}
-	if dataType.Map != nil {
-		return "Map(" + formatColumnDataType(dataType.Map.KeyType) + ", " + formatColumnDataType(dataType.Map.ValueType) + ")"
-	}
-	if dataType.LowCardinality != nil {
-		return "LowCardinality(" + formatColumnDataType(dataType.LowCardinality.Type) + ")"
-	}
-	//nolint:nestif // Complex nested logic needed for data type formatting
-	if dataType.Simple != nil {
-		var results strings.Builder
-		results.WriteString(dataType.Simple.Name)
-
-		if len(dataType.Simple.Parameters) > 0 {
-			results.WriteString("(")
-			for i, param := range dataType.Simple.Parameters {
-				if i > 0 {
-					results.WriteString(", ")
-				}
-				if param.String != nil {
-					results.WriteString(*param.String)
-				} else if param.Number != nil {
-					results.WriteString(*param.Number)
-				} else if param.Ident != nil {
-					results.WriteString(*param.Ident)
-				}
-			}
-
-			results.WriteString(")")
-		}
-
-		return results.String()
-	}
-	return ""
 }
 
 func formatColumnCodec(codec *parser.CodecClause) string {
