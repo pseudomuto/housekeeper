@@ -16,20 +16,6 @@ func removeQuotes(s string) string {
 	return s
 }
 
-// formatEngine formats a database engine with its parameters
-func formatEngine(engine *parser.DatabaseEngine) string {
-	if len(engine.Parameters) == 0 {
-		return engine.Name
-	}
-
-	params := make([]string, len(engine.Parameters))
-	for i, param := range engine.Parameters {
-		params[i] = param.Value
-	}
-
-	return engine.Name + "(" + strings.Join(params, ", ") + ")"
-}
-
 // getStringValue safely gets a string value from a string pointer
 func getStringValue(s *string) string {
 	if s == nil {

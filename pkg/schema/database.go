@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -111,13 +110,7 @@ func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 	}
 
 	// Find databases to create or modify (sorted for deterministic order)
-	targetNames := make([]string, 0, len(processedTarget))
-	for name := range processedTarget {
-		targetNames = append(targetNames, name)
-	}
-	sort.Strings(targetNames)
-
-	for _, name := range targetNames {
+	for _, name := range SortedKeys(processedTarget) {
 		targetDB := processedTarget[name]
 		currentDB, exists := processedCurrent[name]
 		diff, err := createDatabaseDiff(name, currentDB, targetDB, exists)
@@ -130,15 +123,7 @@ func compareDatabases(current, target *parser.SQL) ([]*DatabaseDiff, error) {
 	}
 
 	// Find databases to drop (sorted for deterministic order)
-	currentNames := make([]string, 0, len(processedCurrent))
-	for name := range processedCurrent {
-		if _, exists := processedTarget[name]; !exists {
-			currentNames = append(currentNames, name)
-		}
-	}
-	sort.Strings(currentNames)
-
-	for _, name := range currentNames {
+	for _, name := range FilterExcluding(processedCurrent, processedTarget) {
 		currentDB := processedCurrent[name]
 		// Database should be dropped
 		diff := &DatabaseDiff{
@@ -173,7 +158,7 @@ func extractDatabaseInfo(sql *parser.SQL) map[string]*DatabaseInfo {
 			}
 
 			if db.Engine != nil {
-				info.Engine = formatEngine(db.Engine)
+				info.Engine = db.Engine.String()
 			}
 
 			if db.Comment != nil {

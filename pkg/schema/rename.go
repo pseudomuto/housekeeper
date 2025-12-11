@@ -100,3 +100,28 @@ func DetectRenames[T SchemaObject](current, target map[string]T) (
 
 	return renames, remainingCurrent, remainingTarget
 }
+
+// SortedKeys returns sorted keys from a SchemaObject map.
+// This provides deterministic iteration order for comparison operations.
+func SortedKeys[T SchemaObject](m map[string]T) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// FilterExcluding returns sorted keys from 'from' that don't exist in 'exclude'.
+// Useful for finding objects to drop (exist in current but not in target).
+func FilterExcluding[T SchemaObject](from, exclude map[string]T) []string {
+	result := make([]string, 0)
+	for k := range from {
+		if _, exists := exclude[k]; !exists {
+			result = append(result, k)
+		}
+	}
+
+	sort.Strings(result)
+	return result
+}
