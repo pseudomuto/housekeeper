@@ -1,6 +1,10 @@
 package parser
 
-import "github.com/pseudomuto/housekeeper/pkg/compare"
+import (
+	"strings"
+
+	"github.com/pseudomuto/housekeeper/pkg/compare"
+)
 
 type (
 	// TableReference represents a reference to a table in AS clause
@@ -677,6 +681,24 @@ func (p *EngineParameter) Value() string {
 		return *p.Ident
 	}
 	return ""
+}
+
+// String returns the SQL representation of a table engine.
+func (e *TableEngine) String() string {
+	if e == nil {
+		return ""
+	}
+
+	if len(e.Parameters) == 0 {
+		return e.Name
+	}
+
+	params := make([]string, 0, len(e.Parameters))
+	for _, param := range e.Parameters {
+		params = append(params, param.Value())
+	}
+
+	return e.Name + "(" + strings.Join(params, ", ") + ")"
 }
 
 // Equal compares two OrderByClause instances for equality

@@ -1,5 +1,7 @@
 package parser
 
+import "strings"
+
 type (
 	// CreateDatabaseStmt represents CREATE DATABASE statements
 	// Syntax: CREATE DATABASE [IF NOT EXISTS] db_name [ON CLUSTER cluster] [ENGINE = engine(...)] [COMMENT 'Comment'];
@@ -106,3 +108,21 @@ type (
 		To   string `parser:"'TO' @(Ident | BacktickIdent)"`
 	}
 )
+
+// String returns the SQL representation of a database engine.
+func (e *DatabaseEngine) String() string {
+	if e == nil {
+		return ""
+	}
+
+	if len(e.Parameters) == 0 {
+		return e.Name
+	}
+
+	params := make([]string, len(e.Parameters))
+	for i, param := range e.Parameters {
+		params[i] = param.Value
+	}
+
+	return e.Name + "(" + strings.Join(params, ", ") + ")"
+}

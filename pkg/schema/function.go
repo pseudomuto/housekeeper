@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -112,13 +111,7 @@ func compareFunctions(current, target *parser.SQL) []*FunctionDiff {
 	}
 
 	// Find functions to create or modify (sorted for deterministic order)
-	targetNames := make([]string, 0, len(processedTarget))
-	for name := range processedTarget {
-		targetNames = append(targetNames, name)
-	}
-	sort.Strings(targetNames)
-
-	for _, name := range targetNames {
+	for _, name := range SortedKeys(processedTarget) {
 		targetFn := processedTarget[name]
 		currentFn, exists := processedCurrent[name]
 
@@ -153,15 +146,7 @@ func compareFunctions(current, target *parser.SQL) []*FunctionDiff {
 	}
 
 	// Find functions to drop (sorted for deterministic order)
-	currentNames := make([]string, 0, len(processedCurrent))
-	for name := range processedCurrent {
-		if _, exists := processedTarget[name]; !exists {
-			currentNames = append(currentNames, name)
-		}
-	}
-	sort.Strings(currentNames)
-
-	for _, name := range currentNames {
+	for _, name := range FilterExcluding(processedCurrent, processedTarget) {
 		currentFn := processedCurrent[name]
 		diff := &FunctionDiff{
 			DiffBase: DiffBase{

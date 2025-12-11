@@ -736,3 +736,31 @@ func (p *ParametricFunction) String() string {
 
 	return p.Name + "(" + strings.Join(params, ", ") + ")"
 }
+
+// String returns the SQL representation of a codec clause.
+func (c *CodecClause) String() string {
+	if c == nil || len(c.Codecs) == 0 {
+		return ""
+	}
+
+	specs := make([]string, 0, len(c.Codecs))
+	for _, spec := range c.Codecs {
+		specs = append(specs, spec.String())
+	}
+
+	return "CODEC(" + strings.Join(specs, ", ") + ")"
+}
+
+// String returns the SQL representation of a codec spec.
+func (c *CodecSpec) String() string {
+	if len(c.Parameters) == 0 {
+		return c.Name
+	}
+
+	params := make([]string, 0, len(c.Parameters))
+	for _, param := range c.Parameters {
+		params = append(params, formatTypeParameter(&param))
+	}
+
+	return c.Name + "(" + strings.Join(params, ", ") + ")"
+}

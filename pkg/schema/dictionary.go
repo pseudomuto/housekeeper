@@ -3,7 +3,6 @@ package schema
 import (
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -117,13 +116,7 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 	}
 
 	// Find dictionaries to create or replace - sorted for deterministic order
-	targetNames := make([]string, 0, len(processedTarget))
-	for name := range processedTarget {
-		targetNames = append(targetNames, name)
-	}
-	sort.Strings(targetNames)
-
-	for _, name := range targetNames {
+	for _, name := range SortedKeys(processedTarget) {
 		targetDict := processedTarget[name]
 		currentDict, exists := processedCurrent[name]
 
@@ -166,15 +159,7 @@ func compareDictionaries(current, target *parser.SQL) ([]*DictionaryDiff, error)
 	}
 
 	// Find dictionaries to drop - sorted for deterministic order
-	currentNames := make([]string, 0, len(processedCurrent))
-	for name := range processedCurrent {
-		if _, exists := processedTarget[name]; !exists {
-			currentNames = append(currentNames, name)
-		}
-	}
-	sort.Strings(currentNames)
-
-	for _, name := range currentNames {
+	for _, name := range FilterExcluding(processedCurrent, processedTarget) {
 		currentDict := processedCurrent[name]
 		// Validate drop operation
 		if err := validateDictionaryOperation(currentDict, nil); err != nil {

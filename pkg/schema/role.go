@@ -141,13 +141,7 @@ func compareRoles(current, target *parser.SQL) []*RoleDiff {
 	}
 
 	// Find roles to create or modify (sorted for deterministic order)
-	targetNames := make([]string, 0, len(processedTarget))
-	for name := range processedTarget {
-		targetNames = append(targetNames, name)
-	}
-	sort.Strings(targetNames)
-
-	for _, name := range targetNames {
+	for _, name := range SortedKeys(processedTarget) {
 		targetRole := processedTarget[name]
 		currentRole, exists := processedCurrent[name]
 
@@ -182,27 +176,19 @@ func compareRoles(current, target *parser.SQL) []*RoleDiff {
 	}
 
 	// Find roles to drop (sorted for deterministic order)
-	currentNames := make([]string, 0, len(processedCurrent))
-	for name := range processedCurrent {
-		currentNames = append(currentNames, name)
-	}
-	sort.Strings(currentNames)
-
-	for _, name := range currentNames {
-		if _, exists := processedTarget[name]; !exists {
-			currentRole := processedCurrent[name]
-			diff := &RoleDiff{
-				DiffBase: DiffBase{
-					Type:        string(RoleDiffDrop),
-					Name:        name,
-					Description: fmt.Sprintf("Drop role '%s'", name),
-					UpSQL:       generateDropRoleSQL(currentRole),
-					DownSQL:     generateCreateRoleSQL(currentRole),
-				},
-				Current: currentRole,
-			}
-			diffs = append(diffs, diff)
+	for _, name := range FilterExcluding(processedCurrent, processedTarget) {
+		currentRole := processedCurrent[name]
+		diff := &RoleDiff{
+			DiffBase: DiffBase{
+				Type:        string(RoleDiffDrop),
+				Name:        name,
+				Description: fmt.Sprintf("Drop role '%s'", name),
+				UpSQL:       generateDropRoleSQL(currentRole),
+				DownSQL:     generateCreateRoleSQL(currentRole),
+			},
+			Current: currentRole,
 		}
+		diffs = append(diffs, diff)
 	}
 
 	// Compare grants and generate GRANT/REVOKE operations

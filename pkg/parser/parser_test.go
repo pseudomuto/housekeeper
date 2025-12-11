@@ -170,19 +170,6 @@ type ExpectedFunction struct {
 
 var updateFlag = flag.Bool("update", false, "update YAML test files")
 
-// formatEngine formats a database engine with optional parameters
-func formatEngine(engine *DatabaseEngine) string {
-	if len(engine.Parameters) == 0 {
-		return engine.Name
-	}
-
-	params := make([]string, len(engine.Parameters))
-	for i, param := range engine.Parameters {
-		params[i] = param.Value
-	}
-	return engine.Name + "(" + strings.Join(params, ", ") + ")"
-}
-
 // removeQuotes removes surrounding single quotes from a string
 func removeQuotes(s string) string {
 	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
@@ -266,7 +253,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				expectedDB.Cluster = *db.OnCluster
 			}
 			if db.Engine != nil {
-				expectedDB.Engine = formatEngine(db.Engine)
+				expectedDB.Engine = db.Engine.String()
 			}
 			if db.Comment != nil {
 				expectedDB.Comment = removeQuotes(*db.Comment)
@@ -295,7 +282,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				expectedDB.Cluster = *db.OnCluster
 			}
 			if db.Engine != nil {
-				expectedDB.Engine = formatEngine(db.Engine)
+				expectedDB.Engine = db.Engine.String()
 			}
 			expectedDatabases = append(expectedDatabases, expectedDB)
 
@@ -615,7 +602,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				expectedTable.Cluster = *table.OnCluster
 			}
 			if table.Engine != nil {
-				expectedTable.Engine = formatTableEngine(table.Engine)
+				expectedTable.Engine = table.Engine.String()
 			}
 			if table.Comment != nil {
 				expectedTable.Comment = removeQuotes(*table.Comment)
@@ -682,7 +669,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 					expectedCol.Default = defaultClause.Type + " expression"
 				}
 				if codecClause := col.GetCodec(); codecClause != nil {
-					expectedCol.Codec = formatCodec(codecClause)
+					expectedCol.Codec = codecClause.String()
 				}
 				if ttlClause := col.GetTTL(); ttlClause != nil {
 					expectedCol.TTL = "expression"
@@ -1319,68 +1306,6 @@ func verifySQL(t *testing.T, actualSQL *SQL, expected TestCase, sqlFile string) 
 				"Wrong overridable flag in named collection %s at index %d from %s", expectedCollection.Name, i, sqlFile)
 		}
 	}
-}
-
-// formatTableEngine formats a table ENGINE clause with parameters
-func formatTableEngine(engine *TableEngine) string {
-	if engine == nil {
-		return ""
-	}
-
-	var results strings.Builder
-	results.WriteString(engine.Name)
-
-	if len(engine.Parameters) > 0 {
-		results.WriteString("(")
-		for i, param := range engine.Parameters {
-			if i > 0 {
-				results.WriteString(", ")
-			}
-			results.WriteString(param.Value())
-		}
-
-		results.WriteString(")")
-	}
-
-	return results.String()
-}
-
-// formatCodec formats a codec clause
-func formatCodec(codec *CodecClause) string {
-	if codec == nil {
-		return ""
-	}
-
-	var results strings.Builder
-	results.WriteString("CODEC(")
-
-	for i, codecSpec := range codec.Codecs {
-		if i > 0 {
-			results.WriteString(", ")
-		}
-
-		results.WriteString(codecSpec.Name)
-		if len(codecSpec.Parameters) > 0 {
-			results.WriteString("(")
-			for j, param := range codecSpec.Parameters {
-				if j > 0 {
-					results.WriteString(", ")
-				}
-				if param.String != nil {
-					results.WriteString(*param.String)
-				} else if param.Number != nil {
-					results.WriteString(*param.Number)
-				} else if param.Ident != nil {
-					results.WriteString(*param.Ident)
-				}
-			}
-
-			results.WriteString(")")
-		}
-	}
-
-	results.WriteString(")")
-	return results.String()
 }
 
 func TestParse(t *testing.T) {

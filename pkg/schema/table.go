@@ -3,7 +3,6 @@ package schema
 import (
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/compare"
@@ -201,13 +200,7 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	diffs := make([]*TableDiff, 0, len(currentTables)+len(targetTables))
 
 	// Find tables to create or modify (exist in target but not in current) - sorted for deterministic order
-	targetTableNames := make([]string, 0, len(targetTables))
-	for tableName := range targetTables {
-		targetTableNames = append(targetTableNames, tableName)
-	}
-	sort.Strings(targetTableNames)
-
-	for _, tableName := range targetTableNames {
+	for _, tableName := range SortedKeys(targetTables) {
 		targetTable := targetTables[tableName]
 		currentTable, exists := currentTables[tableName]
 		diff, err := createTableDiff(tableName, currentTable, targetTable, currentTables, targetTables, exists)
@@ -235,15 +228,7 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	}
 
 	// Find tables to drop (exist in current but not in target) - sorted for deterministic order
-	currentTableNames := make([]string, 0, len(currentTables))
-	for tableName := range currentTables {
-		if _, exists := targetTables[tableName]; !exists {
-			currentTableNames = append(currentTableNames, tableName)
-		}
-	}
-	sort.Strings(currentTableNames)
-
-	for _, tableName := range currentTableNames {
+	for _, tableName := range FilterExcluding(currentTables, targetTables) {
 		currentTable := currentTables[tableName]
 		diff := &TableDiff{
 			DiffBase: DiffBase{
@@ -723,7 +708,7 @@ func formatColumnDefinition(col ColumnInfo) string {
 	}
 	if col.Codec != nil {
 		sql.WriteString(" ")
-		sql.WriteString(formatColumnCodec(col.Codec))
+		sql.WriteString(col.Codec.String())
 	}
 	if col.TTL != nil {
 		sql.WriteString(" TTL ")
@@ -778,7 +763,7 @@ func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 	// Engine
 	if table.Engine != nil {
 		sql.WriteString("\nENGINE = ")
-		sql.WriteString(formatTableEngine(table.Engine))
+		sql.WriteString(table.Engine.String())
 	}
 
 	// Table options
@@ -889,65 +874,6 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 	}
 
 	return sql.String()
-}
-
-// Helper functions for formatting
-
-func formatTableEngine(engine *parser.TableEngine) string {
-	if engine == nil {
-		return ""
-	}
-
-	result := engine.Name
-	if len(engine.Parameters) > 0 {
-		result += "("
-		var resultSb881 strings.Builder
-		for i, param := range engine.Parameters {
-			if i > 0 {
-				resultSb881.WriteString(", ")
-			}
-			resultSb881.WriteString(param.Value())
-		}
-		result += resultSb881.String()
-		result += ")"
-	}
-	return result
-}
-
-func formatColumnCodec(codec *parser.CodecClause) string {
-	if codec == nil {
-		return ""
-	}
-
-	var results strings.Builder
-	results.WriteString("CODEC(")
-
-	for i, codecSpec := range codec.Codecs {
-		if i > 0 {
-			results.WriteString(", ")
-		}
-		results.WriteString(codecSpec.Name)
-		if len(codecSpec.Parameters) > 0 {
-			results.WriteString("(")
-			for j, param := range codecSpec.Parameters {
-				if j > 0 {
-					results.WriteString(", ")
-				}
-				if param.String != nil {
-					results.WriteString(*param.String)
-				} else if param.Number != nil {
-					results.WriteString(*param.Number)
-				} else if param.Ident != nil {
-					results.WriteString(*param.Ident)
-				}
-			}
-
-			results.WriteString(")")
-		}
-	}
-
-	results.WriteString(")")
-	return results.String()
 }
 
 func createTableDiff(tableName string, currentTable, targetTable *TableInfo, currentTables, targetTables map[string]*TableInfo, exists bool) (*TableDiff, error) {
