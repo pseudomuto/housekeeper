@@ -49,6 +49,13 @@ func DetectRenames[T SchemaObject](current, target map[string]T) (
 	}
 	sort.Strings(currentNames)
 
+	// Sort target names for deterministic ordering (done once, not per iteration)
+	targetNames := make([]string, 0, len(target))
+	for name := range target {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+
 	// Look for potential renames: objects that don't exist by name but have identical properties
 	for _, currentName := range currentNames {
 		if matchedCurrent[currentName] {
@@ -59,13 +66,6 @@ func DetectRenames[T SchemaObject](current, target map[string]T) (
 		if _, exists := target[currentName]; exists {
 			continue // Object exists in both, not a rename
 		}
-
-		// Sort target names for deterministic ordering
-		targetNames := make([]string, 0, len(target))
-		for name := range target {
-			targetNames = append(targetNames, name)
-		}
-		sort.Strings(targetNames)
 
 		// Look for an object in target with identical properties but different name
 		for _, targetName := range targetNames {

@@ -19,6 +19,7 @@ type SchemaObject interface {
 	// as the other object, excluding the name. This is used for rename detection:
 	// if two objects have different names but matching properties, it's a rename.
 	//
-	// The other parameter is guaranteed to be the same concrete type as the receiver.
+	// Callers should pass the same concrete type as the receiver for the other parameter,
+	// but implementations must still perform type checking via type assertion.
 	PropertiesMatch(other SchemaObject) bool
 }
