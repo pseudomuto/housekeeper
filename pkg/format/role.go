@@ -80,30 +80,18 @@ func (f *Formatter) alterRole(w io.Writer, stmt *parser.AlterRoleStmt) error {
 // dropRole formats a DROP ROLE statement
 func (f *Formatter) dropRole(w io.Writer, stmt *parser.DropRoleStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		// DROP ROLE
-		parts = append(parts, f.keyword("DROP ROLE"))
-
-		// IF EXISTS
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		// Role names
+		// Format role names as comma-separated list
 		names := make([]string, len(stmt.Names))
 		for i, name := range stmt.Names {
 			names[i] = f.identifier(name)
 		}
-		parts = append(parts, strings.Join(names, ", "))
 
-		// ON CLUSTER
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
+		parts := ddl.buildDropStatement("ROLE", stmt.IfExists, strings.Join(names, ", "))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
 
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 

@@ -13,7 +13,7 @@ func (f *Formatter) createDatabase(w io.Writer, stmt *parser.CreateDatabaseStmt)
 		ddl := NewDDLFormatter(f)
 
 		// Build basic CREATE statement
-		parts := ddl.buildCreateStatement("DATABASE", false, stmt.IfNotExists, stmt.Name)
+		parts := ddl.buildCreateStatement("DATABASE", false, stmt.IfNotExists, f.identifier(stmt.Name))
 
 		// Add ON CLUSTER
 		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
@@ -87,36 +87,14 @@ func (f *Formatter) attachDatabase(w io.Writer, stmt *parser.AttachDatabaseStmt)
 // DetachDatabase formats a DETACH DATABASE statement
 func (f *Formatter) detachDatabase(w io.Writer, stmt *parser.DetachDatabaseStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		// DETACH DATABASE
-		parts = append(parts, f.keyword("DETACH DATABASE"))
+		parts := ddl.buildDetachStatement("DATABASE", stmt.IfExists, f.identifier(stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendPermanently(parts, stmt.Permanently)
+		parts = ddl.appendSync(parts, stmt.Sync)
 
-		// IF EXISTS
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		// Database name
-		parts = append(parts, f.identifier(stmt.Name))
-
-		// ON CLUSTER
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		// PERMANENTLY
-		if stmt.Permanently {
-			parts = append(parts, f.keyword("PERMANENTLY"))
-		}
-
-		// SYNC
-		if stmt.Sync {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
@@ -126,7 +104,7 @@ func (f *Formatter) dropDatabase(w io.Writer, stmt *parser.DropDatabaseStmt) err
 		ddl := NewDDLFormatter(f)
 
 		// Build basic DROP statement
-		parts := ddl.buildDropStatement("DATABASE", stmt.IfExists, stmt.Name)
+		parts := ddl.buildDropStatement("DATABASE", stmt.IfExists, f.identifier(stmt.Name))
 
 		// Add ON CLUSTER
 		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
@@ -141,25 +119,18 @@ func (f *Formatter) dropDatabase(w io.Writer, stmt *parser.DropDatabaseStmt) err
 // RenameDatabase formats a RENAME DATABASE statement
 func (f *Formatter) renameDatabase(w io.Writer, stmt *parser.RenameDatabaseStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		// RENAME DATABASE
-		parts = append(parts, f.keyword("RENAME DATABASE"))
-
-		// Renames
-		renameParts := make([]string, 0, len(stmt.Renames))
+		renames := make([]RenameItem, 0, len(stmt.Renames))
 		for _, rename := range stmt.Renames {
-			renameParts = append(renameParts, f.identifier(rename.From)+" "+f.keyword("TO")+" "+f.identifier(rename.To))
-		}
-		parts = append(parts, strings.Join(renameParts, ", "))
-
-		// ON CLUSTER
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			renames = append(renames, RenameItem{
+				From: f.identifier(rename.From),
+				To:   f.identifier(rename.To),
+			})
 		}
 
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		parts := ddl.buildRenameStatement("DATABASE", renames, stmt.OnCluster)
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 

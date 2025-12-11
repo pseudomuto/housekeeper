@@ -316,102 +316,57 @@ func (f *Formatter) alterTable(w io.Writer, stmt *parser.AlterTableStmt) error {
 // AttachTable formats an ATTACH TABLE statement
 func (f *Formatter) attachTable(w io.Writer, stmt *parser.AttachTableStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("ATTACH TABLE"))
+		parts := ddl.buildAttachStatement("TABLE", stmt.IfNotExists, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
 
-		if stmt.IfNotExists {
-			parts = append(parts, f.keyword("IF NOT EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // DetachTable formats a DETACH TABLE statement
 func (f *Formatter) detachTable(w io.Writer, stmt *parser.DetachTableStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("DETACH TABLE"))
+		parts := ddl.buildDetachStatement("TABLE", stmt.IfExists, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendPermanently(parts, stmt.Permanently)
+		parts = ddl.appendSync(parts, stmt.Sync)
 
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		if stmt.Permanently {
-			parts = append(parts, f.keyword("PERMANENTLY"))
-		}
-
-		if stmt.Sync {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // DropTable formats a DROP TABLE statement
 func (f *Formatter) dropTable(w io.Writer, stmt *parser.DropTableStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("DROP TABLE"))
+		parts := ddl.buildDropStatement("TABLE", stmt.IfExists, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendSync(parts, stmt.Sync)
 
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		if stmt.Sync {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // RenameTable formats a RENAME TABLE statement
 func (f *Formatter) renameTable(w io.Writer, stmt *parser.RenameTableStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("RENAME TABLE"))
-
-		renameParts := make([]string, 0, len(stmt.Renames))
+		renames := make([]RenameItem, 0, len(stmt.Renames))
 		for _, rename := range stmt.Renames {
-			fromName := f.qualifiedName(rename.FromDatabase, rename.FromName)
-			toName := f.qualifiedName(rename.ToDatabase, rename.ToName)
-			renameParts = append(renameParts, fromName+" "+f.keyword("TO")+" "+toName)
-		}
-		parts = append(parts, strings.Join(renameParts, ", "))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			renames = append(renames, RenameItem{
+				From: f.qualifiedName(rename.FromDatabase, rename.FromName),
+				To:   f.qualifiedName(rename.ToDatabase, rename.ToName),
+			})
 		}
 
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		parts := ddl.buildRenameStatement("TABLE", renames, stmt.OnCluster)
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 

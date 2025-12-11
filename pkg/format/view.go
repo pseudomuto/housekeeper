@@ -73,78 +73,39 @@ func (f *Formatter) createView(w io.Writer, stmt *parser.CreateViewStmt) error {
 // AttachView formats an ATTACH VIEW statement
 func (f *Formatter) attachView(w io.Writer, stmt *parser.AttachViewStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("ATTACH VIEW"))
+		parts := ddl.buildAttachStatement("VIEW", stmt.IfNotExists, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
 
-		if stmt.IfNotExists {
-			parts = append(parts, f.keyword("IF NOT EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // DetachView formats a DETACH VIEW statement
 func (f *Formatter) detachView(w io.Writer, stmt *parser.DetachViewStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("DETACH VIEW"))
+		parts := ddl.buildDetachStatement("VIEW", stmt.IfExists, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendPermanently(parts, stmt.Permanently)
+		parts = ddl.appendSync(parts, stmt.Sync)
 
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		if stmt.Permanently {
-			parts = append(parts, f.keyword("PERMANENTLY"))
-		}
-
-		if stmt.Sync {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // DropView formats a DROP VIEW statement
 func (f *Formatter) dropView(w io.Writer, stmt *parser.DropViewStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("DROP VIEW"))
+		parts := ddl.buildDropStatement("VIEW", stmt.IfExists, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendSync(parts, stmt.Sync)
 
-		if stmt.IfExists {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		if stmt.Sync {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 

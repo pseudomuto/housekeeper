@@ -90,102 +90,57 @@ func (f *Formatter) createDictionary(w io.Writer, stmt *parser.CreateDictionaryS
 // AttachDictionary formats an ATTACH DICTIONARY statement
 func (f *Formatter) attachDictionary(w io.Writer, stmt *parser.AttachDictionaryStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("ATTACH DICTIONARY"))
+		parts := ddl.buildAttachStatement("DICTIONARY", stmt.IfNotExists != nil, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
 
-		if stmt.IfNotExists != nil {
-			parts = append(parts, f.keyword("IF NOT EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // DetachDictionary formats a DETACH DICTIONARY statement
 func (f *Formatter) detachDictionary(w io.Writer, stmt *parser.DetachDictionaryStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("DETACH DICTIONARY"))
+		parts := ddl.buildDetachStatement("DICTIONARY", stmt.IfExists != nil, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendPermanently(parts, stmt.Permanently != nil)
+		parts = ddl.appendSync(parts, stmt.Sync != nil)
 
-		if stmt.IfExists != nil {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		if stmt.Permanently != nil {
-			parts = append(parts, f.keyword("PERMANENTLY"))
-		}
-
-		if stmt.Sync != nil {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // DropDictionary formats a DROP DICTIONARY statement
 func (f *Formatter) dropDictionary(w io.Writer, stmt *parser.DropDictionaryStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("DROP DICTIONARY"))
+		parts := ddl.buildDropStatement("DICTIONARY", stmt.IfExists != nil, f.qualifiedName(stmt.Database, stmt.Name))
+		parts = ddl.appendOnCluster(parts, stmt.OnCluster)
+		parts = ddl.appendSync(parts, stmt.Sync != nil)
 
-		if stmt.IfExists != nil {
-			parts = append(parts, f.keyword("IF EXISTS"))
-		}
-
-		parts = append(parts, f.qualifiedName(stmt.Database, stmt.Name))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
-		}
-
-		if stmt.Sync != nil {
-			parts = append(parts, f.keyword("SYNC"))
-		}
-
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
 // RenameDictionary formats a RENAME DICTIONARY statement
 func (f *Formatter) renameDictionary(w io.Writer, stmt *parser.RenameDictionaryStmt) error {
 	return f.formatWithComments(w, stmt, func(w io.Writer) error {
-		var parts []string
+		ddl := NewDDLFormatter(f)
 
-		parts = append(parts, f.keyword("RENAME DICTIONARY"))
-
-		renameParts := make([]string, 0, len(stmt.Renames))
+		renames := make([]RenameItem, 0, len(stmt.Renames))
 		for _, rename := range stmt.Renames {
-			fromName := f.qualifiedName(rename.FromDatabase, rename.FromName)
-			toName := f.qualifiedName(rename.ToDatabase, rename.ToName)
-			renameParts = append(renameParts, fromName+" "+f.keyword("TO")+" "+toName)
-		}
-		parts = append(parts, strings.Join(renameParts, ", "))
-
-		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			renames = append(renames, RenameItem{
+				From: f.qualifiedName(rename.FromDatabase, rename.FromName),
+				To:   f.qualifiedName(rename.ToDatabase, rename.ToName),
+			})
 		}
 
-		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))
-		return err
+		parts := ddl.buildRenameStatement("DICTIONARY", renames, stmt.OnCluster)
+		return ddl.formatBasicDDL(w, parts)
 	})
 }
 
