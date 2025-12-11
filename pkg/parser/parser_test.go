@@ -676,7 +676,7 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 				col := element.Column
 				expectedCol := ExpectedColumn{
 					Name:     col.Name,
-					DataType: formatDataType(col.DataType),
+					DataType: col.DataType.String(),
 				}
 				if defaultClause := col.GetDefault(); defaultClause != nil {
 					expectedCol.Default = defaultClause.Type + " expression"
@@ -1343,111 +1343,6 @@ func formatTableEngine(engine *TableEngine) string {
 	}
 
 	return results.String()
-}
-
-// formatParametricFunction formats a function call within type parameters for tests
-func formatParametricFunction(fn *ParametricFunction) string {
-	if fn == nil {
-		return ""
-	}
-
-	var results strings.Builder
-	results.WriteString(fn.Name + "(")
-
-	for i, param := range fn.Parameters {
-		if i > 0 {
-			results.WriteString(", ")
-		}
-		if param.Function != nil {
-			results.WriteString(formatParametricFunction(param.Function))
-		} else if param.String != nil {
-			results.WriteString(*param.String)
-		} else if param.Number != nil {
-			results.WriteString(*param.Number)
-		} else if param.Ident != nil {
-			results.WriteString(*param.Ident)
-		}
-	}
-
-	results.WriteString(")")
-	return results.String()
-}
-
-// formatDataType formats a data type with all its components
-func formatDataType(dataType *DataType) string {
-	if dataType == nil {
-		return ""
-	}
-
-	if dataType.Nullable != nil {
-		return "Nullable(" + formatDataType(dataType.Nullable.Type) + ")"
-	}
-	if dataType.Array != nil {
-		return "Array(" + formatDataType(dataType.Array.Type) + ")"
-	}
-	if dataType.Tuple != nil {
-		result := "Tuple("
-		var resultSb1383 strings.Builder
-		for i, element := range dataType.Tuple.Elements {
-			if i > 0 {
-				resultSb1383.WriteString(", ")
-			}
-			if element.Name != nil {
-				resultSb1383.WriteString(*element.Name + " " + formatDataType(element.Type))
-			} else {
-				resultSb1383.WriteString(formatDataType(element.UnnamedType))
-			}
-		}
-		result += resultSb1383.String()
-		return result + ")"
-	}
-	if dataType.Nested != nil {
-		result := "Nested("
-		var resultSb1397 strings.Builder
-		for i, col := range dataType.Nested.Columns {
-			if i > 0 {
-				resultSb1397.WriteString(", ")
-			}
-			resultSb1397.WriteString(col.Name + " " + formatDataType(col.Type))
-		}
-		result += resultSb1397.String()
-		return result + ")"
-	}
-	if dataType.Map != nil {
-		return "Map(" + formatDataType(dataType.Map.KeyType) + ", " + formatDataType(dataType.Map.ValueType) + ")"
-	}
-	if dataType.LowCardinality != nil {
-		return "LowCardinality(" + formatDataType(dataType.LowCardinality.Type) + ")"
-	}
-	//nolint:nestif // Complex nested logic needed for data type formatting in tests
-	if dataType.Simple != nil {
-		var results strings.Builder
-		results.WriteString(dataType.Simple.Name)
-
-		if len(dataType.Simple.Parameters) > 0 {
-			results.WriteString("(")
-
-			for i, param := range dataType.Simple.Parameters {
-				if i > 0 {
-					results.WriteString(", ")
-				}
-				if param.Function != nil {
-					results.WriteString(formatParametricFunction(param.Function))
-				} else if param.String != nil {
-					results.WriteString(*param.String)
-				} else if param.Number != nil {
-					results.WriteString(*param.Number)
-				} else if param.Ident != nil {
-					results.WriteString(*param.Ident)
-				}
-			}
-
-			results.WriteString(")")
-		}
-
-		return results.String()
-	}
-	return ""
 }
 
 // formatCodec formats a codec clause

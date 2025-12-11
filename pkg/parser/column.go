@@ -1,6 +1,10 @@
 package parser
 
-import "github.com/pseudomuto/housekeeper/pkg/compare"
+import (
+	"strings"
+
+	"github.com/pseudomuto/housekeeper/pkg/compare"
+)
 
 type (
 	// DataTypeComparable represents a data type that can be compared for equality.
@@ -570,4 +574,165 @@ func tupleElementsEqual(a, b *TupleElement) bool {
 
 func nestedColumnsEqual(a, b *NestedColumn) bool {
 	return a.Name == b.Name && a.Type.Equal(b.Type)
+}
+
+// String returns the SQL representation of the data type.
+// This is the canonical implementation used by all packages.
+func (d *DataType) String() string {
+	if d == nil {
+		return ""
+	}
+
+	if d.Nullable != nil {
+		return d.Nullable.String()
+	}
+	if d.Array != nil {
+		return d.Array.String()
+	}
+	if d.Tuple != nil {
+		return d.Tuple.String()
+	}
+	if d.Nested != nil {
+		return d.Nested.String()
+	}
+	if d.Map != nil {
+		return d.Map.String()
+	}
+	if d.LowCardinality != nil {
+		return d.LowCardinality.String()
+	}
+	if d.Simple != nil {
+		return d.Simple.String()
+	}
+	return ""
+}
+
+// String returns the SQL representation of a Nullable type.
+func (n *NullableType) String() string {
+	if n == nil {
+		return ""
+	}
+	return "Nullable(" + n.Type.String() + ")"
+}
+
+// String returns the SQL representation of an Array type.
+func (a *ArrayType) String() string {
+	if a == nil {
+		return ""
+	}
+	return "Array(" + a.Type.String() + ")"
+}
+
+// String returns the SQL representation of a Tuple type.
+func (t *TupleType) String() string {
+	if t == nil || len(t.Elements) == 0 {
+		return "Tuple()"
+	}
+
+	elements := make([]string, 0, len(t.Elements))
+	for _, element := range t.Elements {
+		elements = append(elements, element.String())
+	}
+
+	return "Tuple(" + strings.Join(elements, ", ") + ")"
+}
+
+// String returns the SQL representation of a tuple element.
+func (e *TupleElement) String() string {
+	if e.Name != nil {
+		// Named tuple element
+		return *e.Name + " " + e.Type.String()
+	}
+	// Unnamed tuple element
+	return e.UnnamedType.String()
+}
+
+// String returns the SQL representation of a Nested type.
+func (n *NestedType) String() string {
+	if n == nil || len(n.Columns) == 0 {
+		return "Nested()"
+	}
+
+	columns := make([]string, 0, len(n.Columns))
+	for _, col := range n.Columns {
+		columns = append(columns, col.String())
+	}
+
+	return "Nested(" + strings.Join(columns, ", ") + ")"
+}
+
+// String returns the SQL representation of a nested column.
+func (c *NestedColumn) String() string {
+	return c.Name + " " + c.Type.String()
+}
+
+// String returns the SQL representation of a Map type.
+func (m *MapType) String() string {
+	if m == nil {
+		return ""
+	}
+	return "Map(" + m.KeyType.String() + ", " + m.ValueType.String() + ")"
+}
+
+// String returns the SQL representation of a LowCardinality type.
+func (l *LowCardinalityType) String() string {
+	if l == nil {
+		return ""
+	}
+	return "LowCardinality(" + l.Type.String() + ")"
+}
+
+// String returns the SQL representation of a simple or parametric type.
+func (s *SimpleType) String() string {
+	if s == nil {
+		return ""
+	}
+
+	if len(s.Parameters) == 0 {
+		return s.Name
+	}
+
+	params := make([]string, 0, len(s.Parameters))
+	for _, param := range s.Parameters {
+		params = append(params, formatTypeParameter(&param))
+	}
+
+	return s.Name + "(" + strings.Join(params, ", ") + ")"
+}
+
+// formatTypeParameter formats a type parameter to its SQL representation.
+// This is a helper function rather than a method because TypeParameter
+// has a field named String which would conflict with a String() method.
+func formatTypeParameter(t *TypeParameter) string {
+	if t.Function != nil {
+		return t.Function.String()
+	}
+	if t.String != nil {
+		return *t.String
+	}
+	if t.Number != nil {
+		return *t.Number
+	}
+	if t.Ident != nil {
+		return *t.Ident
+	}
+	return ""
+}
+
+// String returns the SQL representation of a parametric function.
+func (p *ParametricFunction) String() string {
+	if p == nil {
+		return ""
+	}
+
+	if len(p.Parameters) == 0 {
+		return p.Name + "()"
+	}
+
+	params := make([]string, 0, len(p.Parameters))
+	for _, param := range p.Parameters {
+		params = append(params, formatTypeParameter(&param))
+	}
+
+	return p.Name + "(" + strings.Join(params, ", ") + ")"
 }
