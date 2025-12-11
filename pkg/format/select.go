@@ -317,9 +317,52 @@ func (f *Formatter) formatSelectOrderByClause(orderBy *parser.SelectOrderByClaus
 		if item.Collate != nil {
 			itemStr += " " + f.keyword("COLLATE") + " " + *item.Collate
 		}
+		if item.WithFill {
+			itemStr += " " + f.keyword("WITH") + " " + f.keyword("FILL")
+			if item.FillFrom != nil {
+				itemStr += " " + f.keyword("FROM") + " " + f.formatExpression(item.FillFrom)
+			}
+			if item.FillTo != nil {
+				itemStr += " " + f.keyword("TO") + " " + f.formatExpression(item.FillTo)
+			}
+			if item.FillStep != nil {
+				itemStr += " " + f.keyword("STEP") + " " + f.formatExpression(item.FillStep)
+			}
+			if item.FillStaleness != nil {
+				itemStr += " " + f.keyword("STALENESS") + " " + f.formatExpression(item.FillStaleness)
+			}
+		}
 		items = append(items, itemStr)
 	}
-	return f.keyword("ORDER BY") + " " + strings.Join(items, ", ")
+
+	result := f.keyword("ORDER BY") + " " + strings.Join(items, ", ")
+
+	if orderBy.Interpolate != nil {
+		result += " " + f.formatInterpolateClause(orderBy.Interpolate)
+	}
+
+	return result
+}
+
+// formatInterpolateClause formats INTERPOLATE clause for WITH FILL
+func (f *Formatter) formatInterpolateClause(interpolate *parser.InterpolateClause) string {
+	if interpolate == nil {
+		return ""
+	}
+
+	result := f.keyword("INTERPOLATE")
+	if len(interpolate.Columns) > 0 {
+		cols := make([]string, 0, len(interpolate.Columns))
+		for _, col := range interpolate.Columns {
+			colStr := f.identifier(col.Name)
+			if col.Expression != nil {
+				colStr += " " + f.keyword("AS") + " " + f.formatExpression(col.Expression)
+			}
+			cols = append(cols, colStr)
+		}
+		result += " (" + strings.Join(cols, ", ") + ")"
+	}
+	return result
 }
 
 // formatLimitClause formats LIMIT clause

@@ -100,7 +100,7 @@ SELECT * FROM users SETTINGS max_threads = 4;
 SELECT * FROM users SETTINGS max_threads = 4, use_index = 1;
 
 -- Complex comprehensive query
-SELECT 
+SELECT
   u.id,
   u.name,
   count(o.id) AS order_count,
@@ -112,3 +112,42 @@ GROUP BY u.id, u.name
 HAVING count(o.id) > 0
 ORDER BY total_spent DESC
 LIMIT 100;
+
+-- ORDER BY WITH FILL basic
+SELECT n FROM numbers ORDER BY n WITH FILL;
+
+-- ORDER BY WITH FILL with FROM, TO, STEP
+SELECT n FROM numbers ORDER BY n WITH FILL FROM 0 TO 10 STEP 1;
+
+-- ORDER BY WITH FILL with float values
+SELECT n, source FROM (
+ SELECT toFloat32(number % 10) AS n, 'original' AS source
+   FROM numbers WHERE number % 3 = 1
+) ORDER BY n WITH FILL FROM 0 TO 5.51 STEP 0.5;
+
+-- ORDER BY WITH FILL with INTERPOLATE (no columns)
+SELECT date, value FROM metrics ORDER BY date WITH FILL INTERPOLATE;
+
+-- ORDER BY WITH FILL with INTERPOLATE columns
+SELECT date, value FROM metrics ORDER BY date WITH FILL INTERPOLATE (value);
+
+-- ORDER BY WITH FILL with INTERPOLATE column and AS expression
+SELECT date, value FROM metrics ORDER BY date WITH FILL INTERPOLATE (value AS value);
+
+-- ORDER BY WITH FILL with INTERVAL step
+SELECT date, value FROM metrics ORDER BY date WITH FILL STEP INTERVAL 1 DAY;
+
+-- ORDER BY WITH FILL with date range and INTERVAL
+SELECT date, value FROM metrics ORDER BY date WITH FILL FROM '2024-01-01' TO '2024-12-31' STEP INTERVAL 1 DAY;
+
+-- ORDER BY WITH FILL with STALENESS
+SELECT date, value FROM metrics ORDER BY date WITH FILL STALENESS INTERVAL 1 HOUR;
+
+-- Multiple columns with mixed WITH FILL
+SELECT a, b FROM t ORDER BY a ASC WITH FILL FROM 0 TO 100, b DESC;
+
+-- Multiple columns both WITH FILL
+SELECT a, b FROM t ORDER BY a WITH FILL FROM 0 TO 100 STEP 10, b WITH FILL FROM 0 TO 50 STEP 5;
+
+-- WITH FILL with all modifiers and INTERPOLATE
+SELECT date, value, count FROM metrics ORDER BY date WITH FILL FROM '2024-01-01' TO '2024-12-31' STEP INTERVAL 1 DAY STALENESS INTERVAL 2 DAY INTERPOLATE (value AS value, count AS 0);
