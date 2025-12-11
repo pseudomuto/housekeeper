@@ -4,10 +4,9 @@ import (
 	"testing"
 
 	. "github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/utils"
 	"github.com/stretchr/testify/require"
 )
-
-func ptr(s string) *string { return &s }
 
 func TestTypeParameter(t *testing.T) {
 	t.Parallel()
@@ -23,17 +22,17 @@ func TestTypeParameter(t *testing.T) {
 		}{
 			{
 				name:     "number parameter",
-				simple:   SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: ptr("10")}}},
+				simple:   SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: utils.Ptr("10")}}},
 				expected: "Decimal(10)",
 			},
 			{
 				name:     "string parameter",
-				simple:   SimpleType{Name: "DateTime", Parameters: []TypeParameter{{String: ptr("'UTC'")}}},
+				simple:   SimpleType{Name: "DateTime", Parameters: []TypeParameter{{String: utils.Ptr("'UTC'")}}},
 				expected: "DateTime('UTC')",
 			},
 			{
 				name:     "ident parameter",
-				simple:   SimpleType{Name: "Enum8", Parameters: []TypeParameter{{Ident: ptr("active")}}},
+				simple:   SimpleType{Name: "Enum8", Parameters: []TypeParameter{{Ident: utils.Ptr("active")}}},
 				expected: "Enum8(active)",
 			},
 			{
@@ -41,7 +40,7 @@ func TestTypeParameter(t *testing.T) {
 				simple: SimpleType{
 					Name: "AggregateFunction",
 					Parameters: []TypeParameter{
-						{Function: &ParametricFunction{Name: "quantiles", Parameters: []TypeParameter{{Number: ptr("0.5")}}}},
+						{Function: &ParametricFunction{Name: "quantiles", Parameters: []TypeParameter{{Number: utils.Ptr("0.5")}}}},
 					},
 				},
 				expected: "AggregateFunction(quantiles(0.5))",
@@ -66,20 +65,20 @@ func TestTypeParameter(t *testing.T) {
 		}{
 			{
 				name:     "same number",
-				a:        TypeParameter{Number: ptr("10")},
-				b:        TypeParameter{Number: ptr("10")},
+				a:        TypeParameter{Number: utils.Ptr("10")},
+				b:        TypeParameter{Number: utils.Ptr("10")},
 				expected: true,
 			},
 			{
 				name:     "different number",
-				a:        TypeParameter{Number: ptr("10")},
-				b:        TypeParameter{Number: ptr("20")},
+				a:        TypeParameter{Number: utils.Ptr("10")},
+				b:        TypeParameter{Number: utils.Ptr("20")},
 				expected: false,
 			},
 			{
 				name:     "number vs string",
-				a:        TypeParameter{Number: ptr("10")},
-				b:        TypeParameter{String: ptr("10")},
+				a:        TypeParameter{Number: utils.Ptr("10")},
+				b:        TypeParameter{String: utils.Ptr("10")},
 				expected: false,
 			},
 		}
@@ -111,12 +110,12 @@ func TestSimpleType(t *testing.T) {
 			},
 			{
 				name:     "single parameter",
-				simple:   SimpleType{Name: "FixedString", Parameters: []TypeParameter{{Number: ptr("50")}}},
+				simple:   SimpleType{Name: "FixedString", Parameters: []TypeParameter{{Number: utils.Ptr("50")}}},
 				expected: "FixedString(50)",
 			},
 			{
 				name:     "multiple parameters",
-				simple:   SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: ptr("10")}, {Number: ptr("2")}}},
+				simple:   SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: utils.Ptr("10")}, {Number: utils.Ptr("2")}}},
 				expected: "Decimal(10, 2)",
 			},
 		}
@@ -151,14 +150,14 @@ func TestSimpleType(t *testing.T) {
 			},
 			{
 				name:     "same params",
-				a:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: ptr("10")}, {Number: ptr("2")}}},
-				b:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: ptr("10")}, {Number: ptr("2")}}},
+				a:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: utils.Ptr("10")}, {Number: utils.Ptr("2")}}},
+				b:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: utils.Ptr("10")}, {Number: utils.Ptr("2")}}},
 				expected: true,
 			},
 			{
 				name:     "different params",
-				a:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: ptr("10")}, {Number: ptr("2")}}},
-				b:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: ptr("18")}, {Number: ptr("4")}}},
+				a:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: utils.Ptr("10")}, {Number: utils.Ptr("2")}}},
+				b:        SimpleType{Name: "Decimal", Parameters: []TypeParameter{{Number: utils.Ptr("18")}, {Number: utils.Ptr("4")}}},
 				expected: false,
 			},
 		}
@@ -182,20 +181,20 @@ func TestSimpleType(t *testing.T) {
 		}{
 			{
 				name:     "same precision and timezone",
-				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: ptr("3")}, {String: ptr("'UTC'")}}},
-				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: ptr("3")}, {String: ptr("'UTC'")}}},
+				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}, {String: utils.Ptr("'UTC'")}}},
+				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}, {String: utils.Ptr("'UTC'")}}},
 				expected: true,
 			},
 			{
 				name:     "precision only vs precision with timezone",
-				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: ptr("3")}}},
-				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: ptr("3")}, {String: ptr("'UTC'")}}},
+				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}},
+				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}, {String: utils.Ptr("'UTC'")}}},
 				expected: true, // timezone normalization
 			},
 			{
 				name:     "different precisions",
-				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: ptr("3")}}},
-				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: ptr("6")}}},
+				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}},
+				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("6")}}},
 				expected: false,
 			},
 		}
@@ -325,8 +324,8 @@ func TestTupleType(t *testing.T) {
 				name: "named tuple",
 				tuple: TupleType{
 					Elements: []TupleElement{
-						{Name: ptr("lat"), Type: simpleFloat64},
-						{Name: ptr("lon"), Type: simpleFloat64},
+						{Name: utils.Ptr("lat"), Type: simpleFloat64},
+						{Name: utils.Ptr("lon"), Type: simpleFloat64},
 					},
 				},
 				expected: "Tuple(lat Float64, lon Float64)",
@@ -344,10 +343,10 @@ func TestTupleType(t *testing.T) {
 	t.Run("Equal", func(t *testing.T) {
 		t.Parallel()
 
-		a := TupleType{Elements: []TupleElement{{Name: ptr("x"), Type: simpleFloat64}}}
-		b := TupleType{Elements: []TupleElement{{Name: ptr("x"), Type: simpleFloat64}}}
-		c := TupleType{Elements: []TupleElement{{Name: ptr("y"), Type: simpleFloat64}}}
-		d := TupleType{Elements: []TupleElement{{Name: ptr("x"), Type: simpleString}}}
+		a := TupleType{Elements: []TupleElement{{Name: utils.Ptr("x"), Type: simpleFloat64}}}
+		b := TupleType{Elements: []TupleElement{{Name: utils.Ptr("x"), Type: simpleFloat64}}}
+		c := TupleType{Elements: []TupleElement{{Name: utils.Ptr("y"), Type: simpleFloat64}}}
+		d := TupleType{Elements: []TupleElement{{Name: utils.Ptr("x"), Type: simpleString}}}
 
 		require.True(t, a.Equal(&b))
 		require.False(t, a.Equal(&c)) // different name
@@ -452,25 +451,25 @@ func TestNormalizeDataType(t *testing.T) {
 	}{
 		{
 			name:           "Decimal32",
-			input:          &DataType{Simple: &SimpleType{Name: "Decimal32", Parameters: []TypeParameter{{Number: ptr("3")}}}},
+			input:          &DataType{Simple: &SimpleType{Name: "Decimal32", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}}},
 			expectedName:   "Decimal",
 			expectedParams: []string{"9", "3"},
 		},
 		{
 			name:           "Decimal64",
-			input:          &DataType{Simple: &SimpleType{Name: "Decimal64", Parameters: []TypeParameter{{Number: ptr("5")}}}},
+			input:          &DataType{Simple: &SimpleType{Name: "Decimal64", Parameters: []TypeParameter{{Number: utils.Ptr("5")}}}},
 			expectedName:   "Decimal",
 			expectedParams: []string{"18", "5"},
 		},
 		{
 			name:           "Decimal128",
-			input:          &DataType{Simple: &SimpleType{Name: "Decimal128", Parameters: []TypeParameter{{Number: ptr("10")}}}},
+			input:          &DataType{Simple: &SimpleType{Name: "Decimal128", Parameters: []TypeParameter{{Number: utils.Ptr("10")}}}},
 			expectedName:   "Decimal",
 			expectedParams: []string{"38", "10"},
 		},
 		{
 			name:           "Decimal256",
-			input:          &DataType{Simple: &SimpleType{Name: "Decimal256", Parameters: []TypeParameter{{Number: ptr("20")}}}},
+			input:          &DataType{Simple: &SimpleType{Name: "Decimal256", Parameters: []TypeParameter{{Number: utils.Ptr("20")}}}},
 			expectedName:   "Decimal",
 			expectedParams: []string{"76", "20"},
 		},
