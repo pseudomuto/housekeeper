@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -223,19 +222,6 @@ func TestSemicolonRequirement(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestQueryFixtures validates that query.sql/yaml testdata works correctly
-func TestQueryFixtures(t *testing.T) {
-	// This test validates that our SELECT queries are covered by the standard testdata framework
-	// The actual parsing is tested by TestParserWithTestdata which includes query.sql
-
-	// Verify that query.sql and query.yaml exist
-	_, err := os.Stat("testdata/query.sql")
-	require.NoError(t, err)
-
-	_, err = os.Stat("testdata/query.yaml")
-	require.NoError(t, err)
 }
 
 func TestParseSelectStatement(t *testing.T) {

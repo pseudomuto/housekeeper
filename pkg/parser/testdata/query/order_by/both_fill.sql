@@ -1,0 +1,5 @@
+SELECT
+    `a`,
+    `b`
+FROM `t`
+ORDER BY `a` WITH FILL FROM 0 TO 100 STEP 10, `b` WITH FILL FROM 0 TO 50 STEP 5;

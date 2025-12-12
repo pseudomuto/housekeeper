@@ -1,5 +1,0 @@
-databases:
-    - name: basic_drop_db
-    - name: cluster_drop_db
-      cluster: production
-    - name: sync_drop_db

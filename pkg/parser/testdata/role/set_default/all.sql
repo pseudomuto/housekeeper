@@ -1,0 +1,1 @@
+SET DEFAULT ROLE ALL TO `alice`;

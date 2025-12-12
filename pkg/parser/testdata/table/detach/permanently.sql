@@ -1,0 +1,1 @@
+DETACH TABLE `old_data` PERMANENTLY;

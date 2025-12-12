@@ -1,3 +1,0 @@
-named_collections:
-    - name: kafka_config
-      operation: ALTER

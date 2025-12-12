@@ -1,5 +1,0 @@
-tables:
-    - name: test
-      operation: CREATE
-      as_table: numbers(100)
-      engine: Memory

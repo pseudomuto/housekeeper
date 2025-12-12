@@ -1,0 +1,1 @@
+GRANT `admin` TO `john`;

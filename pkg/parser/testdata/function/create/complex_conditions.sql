@@ -1,0 +1,1 @@
+CREATE FUNCTION `is_valid_date_range` ON CLUSTER `staging` AS (`start_date`, `end_date`) -> and(and(lessOrEquals(`start_date`, `end_date`), greaterOrEquals(`start_date`, '1900-01-01')), lessOrEquals(`end_date`, '2100-12-31'));

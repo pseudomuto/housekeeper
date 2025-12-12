@@ -1,3 +1,0 @@
-roles:
-    - name: admin
-      operation: CREATE

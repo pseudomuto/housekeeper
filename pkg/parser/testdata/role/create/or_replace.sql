@@ -1,0 +1,1 @@
+CREATE OR REPLACE ROLE `analyst`;

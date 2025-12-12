@@ -1,1 +1,0 @@
-DROP NAMED COLLECTION IF EXISTS old_s3_config;

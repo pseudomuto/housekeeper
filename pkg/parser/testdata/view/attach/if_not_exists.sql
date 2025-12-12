@@ -1,0 +1,1 @@
+ATTACH VIEW IF NOT EXISTS `users_view`;
