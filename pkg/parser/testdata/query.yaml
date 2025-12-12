@@ -209,3 +209,14 @@ queries:
         - non_wildcard
       from: metrics
       has_order_by: true
+    - columns:
+        - '*'
+    - columns:
+        - non_wildcard
+      has_where: true
+    - columns:
+        - '*'
+    - columns:
+        - '*'
+    - columns:
+        - '*'

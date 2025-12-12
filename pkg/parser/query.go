@@ -53,12 +53,12 @@ type (
 
 	// TableRef represents a table reference (table, subquery, or function)
 	TableRef struct {
-		// Table reference with optional alias
-		TableName *TableNameWithAlias `parser:"@@"`
+		// Try table function first (has parentheses to distinguish it)
+		Function *FunctionWithAlias `parser:"@@"`
 		// OR subquery with optional alias
 		Subquery *SubqueryWithAlias `parser:"| @@"`
-		// OR table function with optional alias
-		Function *FunctionWithAlias `parser:"| @@"`
+		// Fall back to table reference if no function call syntax found
+		TableName *TableNameWithAlias `parser:"| @@"`
 	}
 
 	// TableNameWithAlias represents a table name with optional alias

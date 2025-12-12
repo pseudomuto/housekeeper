@@ -151,3 +151,14 @@ SELECT a, b FROM t ORDER BY a WITH FILL FROM 0 TO 100 STEP 10, b WITH FILL FROM 
 
 -- WITH FILL with all modifiers and INTERPOLATE
 SELECT date, value, count FROM metrics ORDER BY date WITH FILL FROM '2024-01-01' TO '2024-12-31' STEP INTERVAL 1 DAY STALENESS INTERVAL 2 DAY INTERPOLATE (value AS value, count AS 0);
+
+-- Table functions in FROM clause
+SELECT * FROM numbers(10);
+
+SELECT toFloat32(number % 10) AS n FROM numbers(10) WHERE number % 3 = 1;
+
+SELECT * FROM numbers(100) AS n;
+
+SELECT * FROM remote('localhost:9000', 'db', 'table');
+
+SELECT * FROM cluster('my_cluster', 'db', 'table') AS t;
