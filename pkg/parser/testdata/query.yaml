@@ -209,3 +209,19 @@ queries:
         - non_wildcard
       from: metrics
       has_order_by: true
+    - columns:
+        - '*'
+      from: numbers
+    - columns:
+        - non_wildcard
+      from: numbers
+      has_where: true
+    - columns:
+        - '*'
+      from: numbers
+    - columns:
+        - '*'
+      from: remote
+    - columns:
+        - '*'
+      from: cluster

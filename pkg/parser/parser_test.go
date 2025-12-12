@@ -1074,6 +1074,9 @@ func generateTestCaseFromSQL(sql *SQL) TestCase {
 					} else {
 						expectedQuery.From = table.Table
 					}
+				} else if sel.From.Table.Function != nil {
+					// Table function like numbers(10), remote('host', 'db', 'table'), etc.
+					expectedQuery.From = sel.From.Table.Function.Function.Name
 				}
 
 				// Count JOINs
