@@ -1,6 +1,0 @@
-databases:
-    - name: basic_detach_db
-    - name: cluster_detach_db
-      cluster: production
-    - name: permanent_detach_db
-    - name: sync_detach_db

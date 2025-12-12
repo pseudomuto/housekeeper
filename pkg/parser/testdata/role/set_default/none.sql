@@ -1,0 +1,1 @@
+SET DEFAULT ROLE NONE TO `john`;

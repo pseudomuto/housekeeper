@@ -1,0 +1,1 @@
+ATTACH TABLE `users`;

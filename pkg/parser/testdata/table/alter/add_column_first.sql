@@ -1,0 +1,2 @@
+ALTER TABLE `users`
+    ADD COLUMN `id` UInt64 FIRST;

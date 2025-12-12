@@ -1,0 +1,4 @@
+SELECT
+    `id`,
+    `name`,
+    `email`;

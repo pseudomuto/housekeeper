@@ -1,1 +1,0 @@
-CREATE TABLE test AS numbers(100) ENGINE = Memory();

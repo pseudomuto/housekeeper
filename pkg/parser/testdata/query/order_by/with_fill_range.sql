@@ -1,0 +1,3 @@
+SELECT `n`
+FROM `numbers`
+ORDER BY `n` WITH FILL FROM 0 TO 10 STEP 1;

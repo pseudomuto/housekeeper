@@ -1,0 +1,1 @@
+REVOKE `admin` FROM `john`;

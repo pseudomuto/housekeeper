@@ -1,5 +1,0 @@
-dictionaries:
-    - name: users_dict
-      operation: CREATE
-    - name: complex_dict
-      operation: CREATE

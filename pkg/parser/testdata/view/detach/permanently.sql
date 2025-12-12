@@ -1,0 +1,1 @@
+DETACH VIEW `db`.`my_view` PERMANENTLY;

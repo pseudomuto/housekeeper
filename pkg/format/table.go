@@ -598,6 +598,42 @@ func (f *Formatter) formatAlterOperation(op *parser.AlterTableOperation) string 
 		return f.formatAddConstraint(op.AddConstraint)
 	case op.DropConstraint != nil:
 		return f.formatDropConstraint(op.DropConstraint)
+	case op.ModifyTTL != nil:
+		return f.formatModifyTTL(op.ModifyTTL)
+	case op.DeleteTTL != nil:
+		return f.formatDeleteTTL(op.DeleteTTL)
+	case op.Update != nil:
+		return f.formatUpdate(op.Update)
+	case op.Delete != nil:
+		return f.formatDeleteOp(op.Delete)
+	case op.Freeze != nil:
+		return f.formatFreeze(op.Freeze)
+	case op.AttachPartition != nil:
+		return f.formatAttachPartition(op.AttachPartition)
+	case op.DetachPartition != nil:
+		return f.formatDetachPartition(op.DetachPartition)
+	case op.DropPartition != nil:
+		return f.formatDropPartition(op.DropPartition)
+	case op.MovePartition != nil:
+		return f.formatMovePartition(op.MovePartition)
+	case op.ReplacePartition != nil:
+		return f.formatReplacePartition(op.ReplacePartition)
+	case op.FetchPartition != nil:
+		return f.formatFetchPartition(op.FetchPartition)
+	case op.ModifyOrderBy != nil:
+		return f.formatModifyOrderBy(op.ModifyOrderBy)
+	case op.ModifySampleBy != nil:
+		return f.formatModifySampleBy(op.ModifySampleBy)
+	case op.RemoveSampleBy != nil:
+		return f.formatRemoveSampleBy(op.RemoveSampleBy)
+	case op.ModifySetting != nil:
+		return f.formatModifySetting(op.ModifySetting)
+	case op.ResetSetting != nil:
+		return f.formatResetSetting(op.ResetSetting)
+	case op.AddProjection != nil:
+		return f.formatAddProjection(op.AddProjection)
+	case op.DropProjection != nil:
+		return f.formatDropProjection(op.DropProjection)
 	default:
 		return ""
 	}
@@ -785,6 +821,301 @@ func (f *Formatter) formatDropConstraint(op *parser.DropConstraintOperation) str
 
 	var parts []string
 	parts = append(parts, f.keyword("DROP CONSTRAINT"))
+
+	if op.IfExists {
+		parts = append(parts, f.keyword("IF EXISTS"))
+	}
+
+	parts = append(parts, f.identifier(op.Name))
+
+	return strings.Join(parts, " ")
+}
+
+// formatModifyTTL formats MODIFY TTL operations
+func (f *Formatter) formatModifyTTL(op *parser.ModifyTTLOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("MODIFY TTL"))
+	parts = append(parts, f.formatExpression(&op.Expression))
+
+	if op.Delete != nil {
+		parts = append(parts, f.keyword("DELETE"))
+		if op.Delete.Where != nil {
+			parts = append(parts, f.keyword("WHERE"))
+			parts = append(parts, f.formatExpression(op.Delete.Where))
+		}
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatDeleteTTL formats DELETE TTL operations
+func (f *Formatter) formatDeleteTTL(op *parser.DeleteTTLOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	return f.keyword("DELETE TTL")
+}
+
+// formatUpdate formats UPDATE operations
+func (f *Formatter) formatUpdate(op *parser.UpdateOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("UPDATE"))
+	parts = append(parts, f.identifier(op.Column))
+	parts = append(parts, "=")
+	parts = append(parts, f.formatExpression(&op.Expression))
+
+	if op.Where != nil {
+		parts = append(parts, f.keyword("WHERE"))
+		parts = append(parts, f.formatExpression(op.Where))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatDeleteOp formats DELETE operations
+func (f *Formatter) formatDeleteOp(op *parser.DeleteOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("DELETE"))
+	parts = append(parts, f.keyword("WHERE"))
+	parts = append(parts, f.formatExpression(&op.Where))
+
+	return strings.Join(parts, " ")
+}
+
+// formatFreeze formats FREEZE operations
+func (f *Formatter) formatFreeze(op *parser.FreezeOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("FREEZE"))
+
+	if op.Partition != nil {
+		parts = append(parts, f.keyword("PARTITION"))
+		parts = append(parts, f.formatPartitionValue(*op.Partition))
+	}
+
+	if op.With != nil {
+		parts = append(parts, f.keyword("WITH NAME"))
+		parts = append(parts, *op.With)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatPartitionValue formats a partition value (string literal or identifier)
+func (f *Formatter) formatPartitionValue(val string) string {
+	// If it starts with a quote, it's a string literal - keep as-is
+	if strings.HasPrefix(val, "'") {
+		return val
+	}
+	// Otherwise treat as identifier
+	return f.identifier(val)
+}
+
+// formatAttachPartition formats ATTACH PARTITION operations
+func (f *Formatter) formatAttachPartition(op *parser.AttachPartitionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("ATTACH PARTITION"))
+	parts = append(parts, f.formatPartitionValue(op.Partition))
+
+	if op.From != nil {
+		parts = append(parts, f.keyword("FROM"))
+		parts = append(parts, f.qualifiedName(op.From.Database, op.From.Table))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatDetachPartition formats DETACH PARTITION operations
+func (f *Formatter) formatDetachPartition(op *parser.DetachPartitionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("DETACH PARTITION"))
+	parts = append(parts, f.formatPartitionValue(op.Partition))
+
+	return strings.Join(parts, " ")
+}
+
+// formatDropPartition formats DROP PARTITION operations
+func (f *Formatter) formatDropPartition(op *parser.DropPartitionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("DROP PARTITION"))
+	parts = append(parts, f.formatPartitionValue(op.Partition))
+
+	return strings.Join(parts, " ")
+}
+
+// formatMovePartition formats MOVE PARTITION operations
+func (f *Formatter) formatMovePartition(op *parser.MovePartitionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("MOVE PARTITION"))
+	parts = append(parts, f.formatPartitionValue(op.Partition))
+	parts = append(parts, f.keyword("TO"))
+
+	if op.Disk != nil {
+		parts = append(parts, f.keyword("DISK"))
+		parts = append(parts, *op.Disk)
+	} else if op.Volume != nil {
+		parts = append(parts, f.keyword("VOLUME"))
+		parts = append(parts, *op.Volume)
+	} else if op.Table != nil {
+		parts = append(parts, f.keyword("TABLE"))
+		parts = append(parts, f.qualifiedName(op.Table.Database, op.Table.Name))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatReplacePartition formats REPLACE PARTITION operations
+func (f *Formatter) formatReplacePartition(op *parser.ReplacePartitionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("REPLACE PARTITION"))
+	parts = append(parts, f.formatPartitionValue(op.Partition))
+	parts = append(parts, f.keyword("FROM"))
+	parts = append(parts, f.qualifiedName(op.Database, op.Table))
+
+	return strings.Join(parts, " ")
+}
+
+// formatFetchPartition formats FETCH PARTITION operations
+func (f *Formatter) formatFetchPartition(op *parser.FetchPartitionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("FETCH PARTITION"))
+	parts = append(parts, f.formatPartitionValue(op.Partition))
+	parts = append(parts, f.keyword("FROM"))
+	parts = append(parts, op.From)
+
+	return strings.Join(parts, " ")
+}
+
+// formatModifyOrderBy formats MODIFY ORDER BY operations
+func (f *Formatter) formatModifyOrderBy(op *parser.ModifyOrderByOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("MODIFY ORDER BY"))
+	parts = append(parts, f.formatExpression(&op.Expression))
+
+	return strings.Join(parts, " ")
+}
+
+// formatModifySampleBy formats MODIFY SAMPLE BY operations
+func (f *Formatter) formatModifySampleBy(op *parser.ModifySampleByOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("MODIFY SAMPLE BY"))
+	parts = append(parts, f.formatExpression(&op.Expression))
+
+	return strings.Join(parts, " ")
+}
+
+// formatRemoveSampleBy formats REMOVE SAMPLE BY operations
+func (f *Formatter) formatRemoveSampleBy(op *parser.RemoveSampleByOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	return f.keyword("REMOVE SAMPLE BY")
+}
+
+// formatModifySetting formats MODIFY SETTING operations
+func (f *Formatter) formatModifySetting(op *parser.ModifySettingOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("MODIFY SETTING"))
+	parts = append(parts, f.identifier(op.Setting.Name))
+	parts = append(parts, "=")
+	parts = append(parts, op.Setting.Value)
+
+	return strings.Join(parts, " ")
+}
+
+// formatResetSetting formats RESET SETTING operations
+func (f *Formatter) formatResetSetting(op *parser.ResetSettingOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("RESET SETTING"))
+	parts = append(parts, f.identifier(op.Name))
+
+	return strings.Join(parts, " ")
+}
+
+// formatAddProjection formats ADD PROJECTION operations
+func (f *Formatter) formatAddProjection(op *parser.AddProjectionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("ADD PROJECTION"))
+
+	if op.IfNotExists {
+		parts = append(parts, f.keyword("IF NOT EXISTS"))
+	}
+
+	parts = append(parts, f.identifier(op.Name))
+	parts = append(parts, "("+f.formatSelectStatement(&op.SelectClause.SelectStmt)+")")
+
+	return strings.Join(parts, " ")
+}
+
+// formatDropProjection formats DROP PROJECTION operations
+func (f *Formatter) formatDropProjection(op *parser.DropProjectionOperation) string {
+	if op == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("DROP PROJECTION"))
 
 	if op.IfExists {
 		parts = append(parts, f.keyword("IF EXISTS"))

@@ -1,1 +1,0 @@
-CREATE MATERIALIZED VIEW mv_to_remotesecure TO remoteSecure('secure.example.com:9440', 'analytics', 'events_target', 'username', 'password') AS SELECT id, timestamp, event_type FROM local_events;

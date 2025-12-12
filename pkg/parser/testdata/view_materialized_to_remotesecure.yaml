@@ -1,5 +1,0 @@
-views:
-    - name: mv_to_remotesecure
-      materialized: true
-      operation: CREATE
-      to: remoteSecure('secure.example.com:9440', 'analytics', 'events_target', 'username', 'password')

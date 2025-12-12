@@ -1,0 +1,1 @@
+DETACH DATABASE IF EXISTS `full_detach_db` ON CLUSTER `production` PERMANENTLY SYNC;
