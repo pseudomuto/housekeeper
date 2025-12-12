@@ -246,7 +246,7 @@ type (
 	IntervalExpr struct {
 		Interval string `parser:"'INTERVAL'"`
 		Value    string `parser:"@Number"`
-		Unit     string `parser:"@('SECOND' | 'MINUTE' | 'HOUR' | 'DAY' | 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR')"`
+		Unit     string `parser:"@('NANOSECOND' | 'MICROSECOND' | 'MILLISECOND' | 'SECOND' | 'MINUTE' | 'HOUR' | 'DAY' | 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR')"`
 	}
 
 	// ExtractExpression represents EXTRACT expressions

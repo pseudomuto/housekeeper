@@ -97,6 +97,7 @@ func TestSelectOrderBy(t *testing.T) {
 		{name: "with_fill_interpolate_columns", sql: `SELECT date, value FROM metrics ORDER BY date WITH FILL INTERPOLATE (value);`},
 		{name: "with_fill_interpolate_as", sql: `SELECT date, value FROM metrics ORDER BY date WITH FILL INTERPOLATE (value AS value);`},
 		{name: "with_fill_interval", sql: `SELECT date, value FROM metrics ORDER BY date WITH FILL STEP INTERVAL 1 DAY;`},
+		{name: "with_fill_interval_millisecond", sql: `SELECT ts, value FROM metrics ORDER BY ts WITH FILL FROM toDateTime64(ts, 3) TO toDateTime64(ts, 3) + INTERVAL 1 MILLISECOND STEP toIntervalMillisecond(100);`},
 		{name: "with_fill_date_range", sql: `SELECT date, value FROM metrics ORDER BY date WITH FILL FROM '2024-01-01' TO '2024-12-31' STEP INTERVAL 1 DAY;`},
 		{name: "with_fill_staleness", sql: `SELECT date, value FROM metrics ORDER BY date WITH FILL STALENESS INTERVAL 1 HOUR;`},
 		{name: "mixed_fill", sql: `SELECT a, b FROM t ORDER BY a ASC WITH FILL FROM 0 TO 100, b DESC;`},
