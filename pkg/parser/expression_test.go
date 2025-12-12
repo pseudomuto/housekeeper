@@ -112,6 +112,10 @@ func TestExpressionParsing(t *testing.T) {
 		// INTERVAL - now working!
 		{"INTERVAL", "INTERVAL 1 DAY", true},
 		{"INTERVAL in expression", "timestamp > now() - INTERVAL 7 DAY", true},
+		{"INTERVAL MILLISECOND", "INTERVAL 100 MILLISECOND", true},
+		{"INTERVAL MICROSECOND", "INTERVAL 500 MICROSECOND", true},
+		{"INTERVAL NANOSECOND", "INTERVAL 1000 NANOSECOND", true},
+		{"INTERVAL sub-second in expression", "timestamp + INTERVAL 1 MILLISECOND", true},
 
 		// Complex expressions from ALTER TABLE
 		{"CHECK constraint", "id > 0", true},
