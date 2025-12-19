@@ -160,10 +160,20 @@ type (
 		Over              *OverClause   `parser:"@@?"`
 	}
 
-	// FunctionArg represents arguments in function calls (can be * or expression)
+	// FunctionArg represents arguments in function calls (can be *, lambda, or expression)
 	FunctionArg struct {
 		Star       *string     `parser:"@'*'"`
+		Lambda     *LambdaExpr `parser:"| @@"`
 		Expression *Expression `parser:"| @@"`
+	}
+
+	// LambdaExpr represents a lambda expression: x -> expr or (x, y) -> expr
+	LambdaExpr struct {
+		// Single parameter without parentheses: x -> expr
+		SingleParam *string `parser:"( @(Ident | BacktickIdent) '->'"`
+		// Multiple parameters with parentheses: (x, y) -> expr
+		Params []string   `parser:"| '(' @(Ident | BacktickIdent) (',' @(Ident | BacktickIdent))* ')' '->' )"`
+		Body   Expression `parser:"@@"`
 	}
 
 	// OverClause for window functions
@@ -531,10 +541,29 @@ func (a *FunctionArg) String() string {
 	if a.Star != nil {
 		return "*"
 	}
+	if a.Lambda != nil {
+		return a.Lambda.String()
+	}
 	if a.Expression != nil {
 		return a.Expression.String()
 	}
 	return ""
+}
+
+// String returns the string representation of a lambda expression
+func (l *LambdaExpr) String() string {
+	if l == nil {
+		return ""
+	}
+
+	var params string
+	if l.SingleParam != nil {
+		params = *l.SingleParam
+	} else if len(l.Params) > 0 {
+		params = "(" + strings.Join(l.Params, ", ") + ")"
+	}
+
+	return params + " -> " + l.Body.String()
 }
 
 // String returns the string representation of an OverClause for window functions
@@ -1050,6 +1079,14 @@ func (f *FunctionArg) Equal(other *FunctionArg) bool {
 		return false
 	}
 
+	// Compare Lambda
+	if (f.Lambda != nil) != (other.Lambda != nil) {
+		return false
+	}
+	if f.Lambda != nil && !f.Lambda.Equal(other.Lambda) {
+		return false
+	}
+
 	// Compare Expression
 	if (f.Expression != nil) != (other.Expression != nil) {
 		return false
@@ -1059,6 +1096,37 @@ func (f *FunctionArg) Equal(other *FunctionArg) bool {
 	}
 
 	return true
+}
+
+// Equal compares two LambdaExpr
+func (l *LambdaExpr) Equal(other *LambdaExpr) bool {
+	if l == nil && other == nil {
+		return true
+	}
+	if l == nil || other == nil {
+		return false
+	}
+
+	// Compare single param
+	if (l.SingleParam != nil) != (other.SingleParam != nil) {
+		return false
+	}
+	if l.SingleParam != nil && *l.SingleParam != *other.SingleParam {
+		return false
+	}
+
+	// Compare params list
+	if len(l.Params) != len(other.Params) {
+		return false
+	}
+	for i, p := range l.Params {
+		if p != other.Params[i] {
+			return false
+		}
+	}
+
+	// Compare body
+	return l.Body.Equal(&other.Body)
 }
 
 func (i InExpression) String() string {
