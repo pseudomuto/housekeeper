@@ -282,11 +282,13 @@ type (
 		High AdditionExpression `parser:"@@"`
 	}
 
-	// InExpression handles IN operations with lists, arrays, or subqueries
+	// InExpression handles IN operations with lists, arrays, subqueries, or CTE references
 	InExpression struct {
 		List     []Expression     `parser:"'(' @@ (',' @@)* ')'"`
 		Array    *ArrayExpression `parser:"| @@"`
 		Subquery *Subquery        `parser:"| @@"`
+		// Identifier for CTE references like "IN pending_session_finalization"
+		Ident *string `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// IsNullExpr handles IS NULL and IS NOT NULL expressions as postfix operators
@@ -1151,6 +1153,10 @@ func (i InExpression) String() string {
 
 	if i.Subquery != nil {
 		return i.Subquery.String()
+	}
+
+	if i.Ident != nil {
+		return *i.Ident
 	}
 
 	return "()"

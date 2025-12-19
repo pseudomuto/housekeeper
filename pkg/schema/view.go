@@ -378,6 +378,16 @@ func viewStatementsAreEqual(stmt1, stmt2 *parser.CreateViewStmt) bool {
 	// Note: IfNotExists is ignored because it's a creation-time directive
 	// that's not preserved in ClickHouse's stored object definitions
 
+	// Compare REFRESH clauses (for refreshable materialized views)
+	if !refreshClausesAreEqual(stmt1.Refresh, stmt2.Refresh) {
+		return false
+	}
+
+	// Compare APPEND flag (for refreshable materialized views)
+	if stmt1.Append != stmt2.Append {
+		return false
+	}
+
 	// Compare TO clauses (materialized views only)
 	if getViewTableTargetValue(stmt1.To) != getViewTableTargetValue(stmt2.To) {
 		return false
@@ -396,6 +406,45 @@ func viewStatementsAreEqual(stmt1, stmt2 *parser.CreateViewStmt) bool {
 
 	// Compare SELECT clauses with formatting tolerance
 	if !selectClausesAreEqualWithTolerance(stmt1.AsSelect, stmt2.AsSelect) {
+		return false
+	}
+
+	return true
+}
+
+// refreshClausesAreEqual compares REFRESH clauses for equality
+func refreshClausesAreEqual(refresh1, refresh2 *parser.RefreshClause) bool {
+	if refresh1 == nil && refresh2 == nil {
+		return true
+	}
+	if refresh1 == nil || refresh2 == nil {
+		return false
+	}
+
+	// Compare EVERY vs AFTER
+	if refresh1.Every != refresh2.Every || refresh1.After != refresh2.After {
+		return false
+	}
+
+	// Compare interval and unit
+	if refresh1.Interval != refresh2.Interval {
+		return false
+	}
+	if !strings.EqualFold(refresh1.Unit, refresh2.Unit) {
+		return false
+	}
+
+	// Compare OFFSET if present
+	if (refresh1.OffsetInterval == nil) != (refresh2.OffsetInterval == nil) {
+		return false
+	}
+	if refresh1.OffsetInterval != nil && *refresh1.OffsetInterval != *refresh2.OffsetInterval {
+		return false
+	}
+	if (refresh1.OffsetUnit == nil) != (refresh2.OffsetUnit == nil) {
+		return false
+	}
+	if refresh1.OffsetUnit != nil && !strings.EqualFold(*refresh1.OffsetUnit, *refresh2.OffsetUnit) {
 		return false
 	}
 
@@ -1064,9 +1113,19 @@ func generateCreateViewSQL(view *ViewInfo) string {
 		sql += " ON CLUSTER " + view.Cluster
 	}
 
+	// Add REFRESH clause for refreshable materialized views
+	if view.Statement.Refresh != nil {
+		sql += " " + formatRefreshClause(view.Statement.Refresh)
+	}
+
+	// Add APPEND TO or TO clause
 	toValue := getViewTableTargetValue(view.Statement.To)
 	if toValue != "" {
-		sql += " TO " + toValue
+		if view.Statement.Append {
+			sql += " APPEND TO " + toValue
+		} else {
+			sql += " TO " + toValue
+		}
 	}
 
 	if view.Statement.Engine != nil {
@@ -1082,6 +1141,29 @@ func generateCreateViewSQL(view *ViewInfo) string {
 	}
 
 	return sql + ";"
+}
+
+// formatRefreshClause formats a REFRESH clause for SQL generation
+func formatRefreshClause(refresh *parser.RefreshClause) string {
+	if refresh == nil {
+		return ""
+	}
+
+	result := "REFRESH"
+
+	if refresh.Every {
+		result += " EVERY"
+	} else if refresh.After {
+		result += " AFTER"
+	}
+
+	result += fmt.Sprintf(" %d %s", refresh.Interval, strings.ToUpper(refresh.Unit))
+
+	if refresh.OffsetInterval != nil && refresh.OffsetUnit != nil {
+		result += fmt.Sprintf(" OFFSET %d %s", *refresh.OffsetInterval, strings.ToUpper(*refresh.OffsetUnit))
+	}
+
+	return result
 }
 
 // generateDropViewSQL generates DROP VIEW/TABLE SQL from ViewInfo
