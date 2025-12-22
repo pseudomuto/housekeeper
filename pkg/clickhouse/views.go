@@ -3,11 +3,47 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
+
+// cleanViewStatement cleans up a CREATE VIEW/MATERIALIZED VIEW statement from ClickHouse
+// to make it parseable by our parser. This handles:
+// - Column definitions that ClickHouse adds after TO/APPEND TO table_name
+// - DEFINER clause that ClickHouse adds
+// - Ensuring proper semicolon termination
+func cleanViewStatement(createQuery string) string {
+	cleaned := strings.TrimSpace(createQuery)
+	if !strings.HasSuffix(cleaned, ";") {
+		cleaned += ";"
+	}
+
+	// Remove DEFINER clause: "DEFINER = username SQL SECURITY DEFINER"
+	// This appears before AS in ClickHouse output
+	definerPattern := regexp.MustCompile(`\s+DEFINER\s*=\s*\S+\s+SQL\s+SECURITY\s+DEFINER`)
+	cleaned = definerPattern.ReplaceAllString(cleaned, "")
+
+	// ClickHouse may return CREATE VIEW name (col1 Type1, ...) AS SELECT
+	// or CREATE MATERIALIZED VIEW name ... APPEND TO table_name (col1 Type1, ...) AS SELECT
+	// We need to remove the column definitions if they exist
+	// Find the first ( that appears after the view name and before AS
+	asPos := strings.Index(cleaned, " AS ")
+	if asPos > 0 {
+		// Find the first ( before AS
+		prefixPart := cleaned[:asPos]
+		parenPos := strings.Index(prefixPart, "(")
+		if parenPos > 0 {
+			// There are column definitions between the opening paren and AS
+			// Remove them by taking everything before the opening paren and after AS
+			cleaned = cleaned[:parenPos] + cleaned[asPos:]
+		}
+	}
+
+	return cleaned
+}
 
 // extractViews retrieves all view definitions (both regular and materialized) from the ClickHouse instance.
 // This function queries the system.tables table to get complete view information and returns them
@@ -69,23 +105,8 @@ func extractViews(ctx context.Context, client *Client) (*parser.SQL, error) {
 			return nil, errors.Wrap(err, "failed to scan view row")
 		}
 
-		// Clean up the CREATE statement
-		cleanedQuery := cleanCreateStatement(createQuery)
-
-		// ClickHouse may return CREATE VIEW name (col1 Type1, ...) AS SELECT
-		// but our parser expects CREATE VIEW name AS SELECT
-		// We need to remove the column definitions if they exist
-
-		// Find the positions safely
-		viewNameEnd := strings.Index(cleanedQuery, "(")
-		asPos := strings.Index(cleanedQuery, " AS ")
-
-		if viewNameEnd > 0 && asPos > viewNameEnd {
-			// There are column definitions between the view name and AS
-			// Remove them by taking everything before the opening paren and after AS
-			cleanedQuery = cleanedQuery[:viewNameEnd] + cleanedQuery[asPos:]
-		}
-		// Otherwise, the query is already in the correct format
+		// Clean up the CREATE statement - first remove ClickHouse-specific clauses
+		cleanedQuery := cleanViewStatement(createQuery)
 
 		// Validate the statement using our parser
 		if err := validateDDLStatement(cleanedQuery); err != nil {

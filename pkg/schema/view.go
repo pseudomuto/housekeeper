@@ -339,9 +339,9 @@ func viewsAreEqual(current, target *ViewInfo) bool {
 	// Note: OrReplace is ignored because it's a creation-time directive
 	// that's not preserved in ClickHouse's stored object definitions
 
-	if current.Cluster != target.Cluster {
-		return false
-	}
+	// Note: Cluster is ignored because ClickHouse doesn't return ON CLUSTER
+	// in the create_table_query column from system.tables. The cluster info
+	// is managed separately by housekeeper when generating DDL statements.
 
 	// Compare the full statements for deep equality
 	// This includes comparing the SELECT clause and all other properties
@@ -412,6 +412,43 @@ func viewStatementsAreEqual(stmt1, stmt2 *parser.CreateViewStmt) bool {
 	return true
 }
 
+// timeUnitsAreEqual compares time units, treating singular and plural as equal
+// (e.g., SECOND == SECONDS, MINUTE == MINUTES)
+func timeUnitsAreEqual(unit1, unit2 string) bool {
+	normalize := func(unit string) string {
+		u := strings.ToUpper(strings.TrimSpace(unit))
+		// Remove trailing 'S' to normalize SECONDS->SECOND, MINUTES->MINUTE, etc.
+		if strings.HasSuffix(u, "S") && len(u) > 1 {
+			return u[:len(u)-1]
+		}
+		return u
+	}
+	return normalize(unit1) == normalize(unit2)
+}
+
+// normalizeRefreshInterval converts a refresh interval to seconds for comparison
+// This handles cases like "60 SECOND" vs "1 MINUTE" which are equivalent
+func normalizeRefreshIntervalToSeconds(interval int, unit string) int {
+	u := strings.ToUpper(strings.TrimSpace(unit))
+	// Remove trailing 'S' for singular/plural normalization
+	if strings.HasSuffix(u, "S") && len(u) > 1 {
+		u = u[:len(u)-1]
+	}
+
+	switch u {
+	case "SECOND":
+		return interval
+	case "MINUTE":
+		return interval * 60
+	case "HOUR":
+		return interval * 3600
+	case "DAY":
+		return interval * 86400
+	default:
+		return interval
+	}
+}
+
 // refreshClausesAreEqual compares REFRESH clauses for equality
 func refreshClausesAreEqual(refresh1, refresh2 *parser.RefreshClause) bool {
 	if refresh1 == nil && refresh2 == nil {
@@ -427,10 +464,11 @@ func refreshClausesAreEqual(refresh1, refresh2 *parser.RefreshClause) bool {
 	}
 
 	// Compare interval and unit
-	if refresh1.Interval != refresh2.Interval {
-		return false
-	}
-	if !strings.EqualFold(refresh1.Unit, refresh2.Unit) {
+	// Normalize intervals to seconds for comparison
+	// This handles cases like "60 SECOND" vs "1 MINUTE" which are equivalent
+	interval1 := normalizeRefreshIntervalToSeconds(refresh1.Interval, refresh1.Unit)
+	interval2 := normalizeRefreshIntervalToSeconds(refresh2.Interval, refresh2.Unit)
+	if interval1 != interval2 {
 		return false
 	}
 
@@ -770,7 +808,7 @@ func selectColumnsAreEqual(cols1, cols2 []parser.SelectColumn) bool {
 		if !expressionsAreEqual(col1.Expression, col2.Expression) {
 			return false
 		}
-		// Compare aliases (normalize case and handle nil)
+		// Compare aliases (normalize backticks and compare case-insensitively)
 		alias1 := ""
 		if col1.Alias != nil {
 			alias1 = normalizeIdentifier(*col1.Alias)
@@ -779,7 +817,7 @@ func selectColumnsAreEqual(cols1, cols2 []parser.SelectColumn) bool {
 		if col2.Alias != nil {
 			alias2 = normalizeIdentifier(*col2.Alias)
 		}
-		if alias1 != alias2 {
+		if !strings.EqualFold(alias1, alias2) {
 			return false
 		}
 	}
