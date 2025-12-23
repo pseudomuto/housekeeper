@@ -80,6 +80,86 @@ func (f *Formatter) formatSelectStatement(stmt *parser.SelectStatement) string {
 		lines = append(lines, f.formatSettingsClause(stmt.Settings))
 	}
 
+	// UNION clauses
+	for _, union := range stmt.Unions {
+		lines = append(lines, f.formatUnionClause(&union))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// formatUnionClause formats a UNION clause
+func (f *Formatter) formatUnionClause(union *parser.UnionClause) string {
+	if union == nil {
+		return ""
+	}
+
+	result := f.keyword("UNION")
+	if union.All {
+		result += " " + f.keyword("ALL")
+	} else if union.Distinct {
+		result += " " + f.keyword("DISTINCT")
+	}
+
+	if union.Select != nil {
+		result += "\n" + f.formatSimpleSelectClause(union.Select)
+	}
+
+	return result
+}
+
+// formatSimpleSelectClause formats a SimpleSelectClause (used in UNION chains)
+func (f *Formatter) formatSimpleSelectClause(stmt *parser.SimpleSelectClause) string {
+	if stmt == nil {
+		return ""
+	}
+
+	var lines []string
+
+	// SELECT clause with columns
+	selectLine := f.keyword("SELECT")
+	if stmt.Distinct {
+		selectLine += " " + f.keyword("DISTINCT")
+	}
+
+	// Format columns
+	lines = f.appendSelectColumns(lines, selectLine, stmt.Columns)
+
+	// FROM clause
+	if stmt.From != nil {
+		lines = append(lines, f.formatFromClause(stmt.From))
+	}
+
+	// WHERE clause
+	if stmt.Where != nil {
+		lines = append(lines, f.formatWhereClause(stmt.Where))
+	}
+
+	// GROUP BY clause
+	if stmt.GroupBy != nil {
+		lines = append(lines, f.formatGroupByClause(stmt.GroupBy))
+	}
+
+	// HAVING clause
+	if stmt.Having != nil {
+		lines = append(lines, f.formatHavingClause(stmt.Having))
+	}
+
+	// ORDER BY clause
+	if stmt.OrderBy != nil {
+		lines = append(lines, f.formatSelectOrderByClause(stmt.OrderBy))
+	}
+
+	// LIMIT clause
+	if stmt.Limit != nil {
+		lines = append(lines, f.formatLimitClause(stmt.Limit))
+	}
+
+	// SETTINGS clause
+	if stmt.Settings != nil {
+		lines = append(lines, f.formatSettingsClause(stmt.Settings))
+	}
+
 	return strings.Join(lines, "\n")
 }
 

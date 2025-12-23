@@ -36,6 +36,17 @@ func TestTypeParameter(t *testing.T) {
 				expected: "Enum8(active)",
 			},
 			{
+				name: "enum value parameter",
+				simple: SimpleType{
+					Name: "Enum8",
+					Parameters: []TypeParameter{
+						{EnumValue: &EnumValue{Name: "'active'", Value: "1"}},
+						{EnumValue: &EnumValue{Name: "'inactive'", Value: "0"}},
+					},
+				},
+				expected: "Enum8('active' = 1, 'inactive' = 0)",
+			},
+			{
 				name: "function parameter",
 				simple: SimpleType{
 					Name: "AggregateFunction",
@@ -80,6 +91,36 @@ func TestTypeParameter(t *testing.T) {
 				a:        TypeParameter{Number: utils.Ptr("10")},
 				b:        TypeParameter{String: utils.Ptr("10")},
 				expected: false,
+			},
+			{
+				name:     "quoted string vs unquoted ident - same value",
+				a:        TypeParameter{String: utils.Ptr("'UTC'")},
+				b:        TypeParameter{Ident: utils.Ptr("UTC")},
+				expected: true, // ClickHouse outputs 'UTC' but user may write UTC
+			},
+			{
+				name:     "unquoted ident vs quoted string - same value",
+				a:        TypeParameter{Ident: utils.Ptr("UTC")},
+				b:        TypeParameter{String: utils.Ptr("'UTC'")},
+				expected: true, // Symmetric with above
+			},
+			{
+				name:     "quoted string vs unquoted ident - different value",
+				a:        TypeParameter{String: utils.Ptr("'UTC'")},
+				b:        TypeParameter{Ident: utils.Ptr("America/New_York")},
+				expected: false,
+			},
+			{
+				name:     "same ident",
+				a:        TypeParameter{Ident: utils.Ptr("UTC")},
+				b:        TypeParameter{Ident: utils.Ptr("UTC")},
+				expected: true,
+			},
+			{
+				name:     "same quoted string",
+				a:        TypeParameter{String: utils.Ptr("'UTC'")},
+				b:        TypeParameter{String: utils.Ptr("'UTC'")},
+				expected: true,
 			},
 		}
 
@@ -196,6 +237,30 @@ func TestSimpleType(t *testing.T) {
 				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}},
 				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("6")}}},
 				expected: false,
+			},
+			{
+				name:     "DateTime with precision vs DateTime64 - ClickHouse normalization",
+				a:        SimpleType{Name: "DateTime", Parameters: []TypeParameter{{Number: utils.Ptr("3")}, {Ident: utils.Ptr("UTC")}}},
+				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}},
+				expected: true, // ClickHouse normalizes DateTime(3, UTC) to DateTime64(3)
+			},
+			{
+				name:     "DateTime64 vs DateTime with precision - symmetric",
+				a:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}},
+				b:        SimpleType{Name: "DateTime", Parameters: []TypeParameter{{Number: utils.Ptr("3")}, {Ident: utils.Ptr("UTC")}}},
+				expected: true, // symmetric with above
+			},
+			{
+				name:     "DateTime vs DateTime64 different precision",
+				a:        SimpleType{Name: "DateTime", Parameters: []TypeParameter{{Number: utils.Ptr("3")}, {Ident: utils.Ptr("UTC")}}},
+				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("6")}}},
+				expected: false, // different precision
+			},
+			{
+				name:     "plain DateTime without precision - not compatible",
+				a:        SimpleType{Name: "DateTime"},
+				b:        SimpleType{Name: "DateTime64", Parameters: []TypeParameter{{Number: utils.Ptr("3")}}},
+				expected: false, // plain DateTime is not the same as DateTime64
 			},
 		}
 
