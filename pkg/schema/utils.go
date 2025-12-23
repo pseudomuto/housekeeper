@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/compare"
@@ -66,14 +68,166 @@ func normalizeIdentifier(s string) string {
 // AST-based expression comparison functions
 
 // expressionsAreEqual compares expressions using AST-based structural comparison
+// with normalization for ClickHouse-specific formatting differences (e.g., INTERVAL vs toInterval)
 func expressionsAreEqual(expr1, expr2 *parser.Expression) bool {
 	if eq, needsMoreChecks := compare.NilCheck(expr1, expr2); !needsMoreChecks {
 		return eq
 	}
 
-	// Compare AST structure directly
-	return compare.PointersWithEqual(expr1.Case, expr2.Case, caseExpressionsEqual) &&
-		compare.PointersWithEqual(expr1.Or, expr2.Or, orExpressionsEqual)
+	// First try AST structure directly
+	if compare.PointersWithEqual(expr1.Case, expr2.Case, caseExpressionsEqual) &&
+		compare.PointersWithEqual(expr1.Or, expr2.Or, orExpressionsEqual) {
+		return true
+	}
+
+	// If AST comparison fails, try string-based comparison with interval normalization
+	// This handles ClickHouse converting "INTERVAL X DAY" to "toIntervalDay(X)"
+	return normalizedExpressionsEqual(expr1, expr2)
+}
+
+// normalizedExpressionsEqual compares expressions using normalized string representation
+// to handle ClickHouse formatting differences
+func normalizedExpressionsEqual(expr1, expr2 *parser.Expression) bool {
+	if expr1 == nil && expr2 == nil {
+		return true
+	}
+	if expr1 == nil || expr2 == nil {
+		return false
+	}
+
+	str1 := normalizeExpressionString(expr1.String())
+	str2 := normalizeExpressionString(expr2.String())
+	return str1 == str2
+}
+
+// normalizeExpressionString normalizes an expression string for comparison
+// It handles:
+// 1. INTERVAL X UNIT -> toIntervalUnit(X)
+// 2. Extra parentheses around expressions
+// 3. Whitespace normalization
+func normalizeExpressionString(expr string) string {
+	result := expr
+
+	// Normalize INTERVAL to toInterval function format
+	intervalUnits := map[string]string{
+		"SECOND":  "Second",
+		"MINUTE":  "Minute",
+		"HOUR":    "Hour",
+		"DAY":     "Day",
+		"WEEK":    "Week",
+		"MONTH":   "Month",
+		"QUARTER": "Quarter",
+		"YEAR":    "Year",
+	}
+
+	for unit, funcSuffix := range intervalUnits {
+		// Match "INTERVAL <number> <UNIT>" pattern (case insensitive)
+		pattern := fmt.Sprintf("(?i)INTERVAL\\s+(\\d+)\\s+%s", unit)
+		re := regexp.MustCompile(pattern)
+		result = re.ReplaceAllString(result, fmt.Sprintf("toInterval%s($1)", funcSuffix))
+	}
+
+	// Normalize whitespace
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	result = strings.TrimSpace(result)
+
+	// Remove redundant parentheses around simple expressions
+	// Pattern: match expressions like "(now() - toIntervalDay(1))" and keep the inner part
+	// But be careful not to remove parentheses that are part of function calls or tuples
+	result = removeRedundantParens(result)
+
+	return result
+}
+
+// removeRedundantParens removes redundant parentheses from expressions
+// This handles cases like "expr1 > (expr2 - expr3)" where ClickHouse adds extra parens
+func removeRedundantParens(s string) string {
+	result := s
+
+	// Find patterns like "op (balanced_content)" after comparison operators
+	// and remove the outer parens if they don't affect precedence
+	compOps := []string{">=", "<=", "!=", ">", "<", "="}
+
+	for {
+		changed := false
+		for _, op := range compOps {
+			// Find "op (" and then find the matching ")"
+			opParen := op + " ("
+			idx := strings.Index(result, opParen)
+			if idx == -1 {
+				opParen = op + "("
+				idx = strings.Index(result, opParen)
+			}
+			if idx == -1 {
+				continue
+			}
+
+			// Find the start of the paren content
+			parenStart := idx + len(opParen) - 1 // position of (
+			if parenStart >= len(result) {
+				continue
+			}
+
+			// Find the matching closing paren
+			depth := 1
+			parenEnd := -1
+			for i := parenStart + 1; i < len(result); i++ {
+				if result[i] == '(' {
+					depth++
+				} else if result[i] == ')' {
+					depth--
+					if depth == 0 {
+						parenEnd = i
+						break
+					}
+				}
+			}
+
+			if parenEnd == -1 {
+				continue
+			}
+
+			// Get the content inside parens
+			inner := result[parenStart+1 : parenEnd]
+
+			// Check if removing these parens is safe (no top-level comparison ops)
+			hasTopLevelCompOp := false
+			innerDepth := 0
+			for i := 0; i < len(inner); i++ {
+				if inner[i] == '(' {
+					innerDepth++
+				} else if inner[i] == ')' {
+					innerDepth--
+				} else if innerDepth == 0 {
+					// Check for comparison ops at top level
+					for _, cop := range compOps {
+						if i+len(cop) <= len(inner) && inner[i:i+len(cop)] == cop {
+							hasTopLevelCompOp = true
+							break
+						}
+					}
+				}
+				if hasTopLevelCompOp {
+					break
+				}
+			}
+
+			if !hasTopLevelCompOp {
+				// Safe to remove parens
+				// Replace "op (...)" with "op ..."
+				result = result[:parenStart] + " " + inner + result[parenEnd+1:]
+				changed = true
+				break // Start over after modification
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
+	// Clean up any double spaces
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	return strings.TrimSpace(result)
 }
 
 // caseExpressionsEqual compares CASE expressions structurally

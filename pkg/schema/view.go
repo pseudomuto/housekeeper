@@ -665,6 +665,11 @@ func selectStatementsAreEqualNormalized(stmt1, stmt2 *parser.SelectStatement) bo
 	if (stmt1.With == nil) != (stmt2.With == nil) {
 		return false // Different WITH clause presence
 	}
+
+	// IMPORTANT: Always check WITH clause contents - CTE changes are meaningful
+	if !withClausesAreEqual(stmt1.With, stmt2.With) {
+		return false
+	}
 	if len(stmt1.Columns) != len(stmt2.Columns) {
 		return false // Different number of columns
 	}
@@ -675,10 +680,102 @@ func selectStatementsAreEqualNormalized(stmt1, stmt2 *parser.SelectStatement) bo
 		return false // Different ORDER BY presence
 	}
 
+	// IMPORTANT: Always check LIMIT clauses exactly - these are meaningful changes
+	if !limitClausesAreEqual(stmt1.Limit, stmt2.Limit) {
+		return false
+	}
+
+	// IMPORTANT: Always check SETTINGS clauses exactly - these are meaningful changes
+	if !settingsClausesAreEqual(stmt1.Settings, stmt2.Settings) {
+		return false
+	}
+
+	// IMPORTANT: Always check UNION clauses - these are meaningful changes
+	if !unionClausesAreEqual(stmt1.Unions, stmt2.Unions) {
+		return false
+	}
+
+	// IMPORTANT: Check WHERE clause presence (structure changes)
+	if (stmt1.Where == nil) != (stmt2.Where == nil) {
+		return false
+	}
+
+	// IMPORTANT: Check GROUP BY clause presence (structure changes)
+	if (stmt1.GroupBy == nil) != (stmt2.GroupBy == nil) {
+		return false
+	}
+
+	// IMPORTANT: Check HAVING clause presence (structure changes)
+	if (stmt1.Having == nil) != (stmt2.Having == nil) {
+		return false
+	}
+
+	// IMPORTANT: Check if FROM clause structure is significantly different
+	// (table vs subquery vs function)
+	if stmt1.From != nil && stmt2.From != nil {
+		if !fromClauseStructureSimilar(&stmt1.From.Table, &stmt2.From.Table) {
+			return false
+		}
+	}
+
 	// If we get here, the basic structure is similar
 	// For ClickHouse formatting tolerance, we'll be optimistic and assume they're equivalent
 	// This is a temporary measure to address the recreation issue
 	// TODO: Implement proper normalization comparison once format package has public methods
+	return true
+}
+
+// fromClauseStructureSimilar checks if two FROM clauses have similar structure
+// (both use table names, both use subqueries, or both use functions)
+func fromClauseStructureSimilar(table1, table2 *parser.TableRef) bool {
+	if table1 == nil && table2 == nil {
+		return true
+	}
+	if table1 == nil || table2 == nil {
+		return false
+	}
+
+	// Check if both use table names
+	if (table1.TableName != nil) != (table2.TableName != nil) {
+		return false
+	}
+
+	// Check if both use subqueries
+	if (table1.Subquery != nil) != (table2.Subquery != nil) {
+		return false
+	}
+
+	// Check if both use functions
+	if (table1.Function != nil) != (table2.Function != nil) {
+		return false
+	}
+
+	// If both use subqueries, recursively check their structure
+	if table1.Subquery != nil && table2.Subquery != nil {
+		return selectStatementsStructureSimilar(&table1.Subquery.Subquery, &table2.Subquery.Subquery)
+	}
+
+	return true
+}
+
+// selectStatementsStructureSimilar checks if two select statements have similar structure
+func selectStatementsStructureSimilar(stmt1, stmt2 *parser.SelectStatement) bool {
+	// Check UNION presence
+	if len(stmt1.Unions) != len(stmt2.Unions) {
+		return false
+	}
+
+	// Check FROM clause presence and type
+	if (stmt1.From == nil) != (stmt2.From == nil) {
+		return false
+	}
+
+	if stmt1.From != nil && stmt2.From != nil {
+		if !fromClauseStructureSimilar(&stmt1.From.Table, &stmt2.From.Table) {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -726,6 +823,11 @@ func selectStatementsAreEqualAST(stmt1, stmt2 *parser.SelectStatement) bool {
 
 	// Compare SETTINGS clauses
 	if !settingsClausesAreEqual(stmt1.Settings, stmt2.Settings) {
+		return false
+	}
+
+	// Compare UNION clauses
+	if !unionClausesAreEqual(stmt1.Unions, stmt2.Unions) {
 		return false
 	}
 
@@ -1072,6 +1174,111 @@ func settingsClausesAreEqual(settings1, settings2 *parser.SettingsClause) bool {
 	}
 
 	return true
+}
+
+// unionClausesAreEqual compares UNION clauses
+func unionClausesAreEqual(unions1, unions2 []parser.UnionClause) bool {
+	if len(unions1) != len(unions2) {
+		return false
+	}
+	for i, union1 := range unions1 {
+		union2 := unions2[i]
+		if union1.All != union2.All || union1.Distinct != union2.Distinct {
+			return false
+		}
+		if union1.Select == nil && union2.Select == nil {
+			continue
+		}
+		if union1.Select == nil || union2.Select == nil {
+			return false
+		}
+		// Compare the SELECT clauses in the union
+		if !simpleSelectClausesAreEqual(union1.Select, union2.Select) {
+			return false
+		}
+	}
+	return true
+}
+
+// simpleSelectClausesAreEqual compares two SimpleSelectClause structures
+func simpleSelectClausesAreEqual(sel1, sel2 *parser.SimpleSelectClause) bool {
+	if sel1 == nil && sel2 == nil {
+		return true
+	}
+	if sel1 == nil || sel2 == nil {
+		return false
+	}
+
+	// Compare SELECT DISTINCT
+	if sel1.Distinct != sel2.Distinct {
+		return false
+	}
+
+	// Compare columns count
+	if len(sel1.Columns) != len(sel2.Columns) {
+		return false
+	}
+
+	// Compare FROM presence
+	if (sel1.From == nil) != (sel2.From == nil) {
+		return false
+	}
+
+	// Compare WHERE presence
+	if (sel1.Where == nil) != (sel2.Where == nil) {
+		return false
+	}
+
+	// Compare GROUP BY presence
+	if (sel1.GroupBy == nil) != (sel2.GroupBy == nil) {
+		return false
+	}
+
+	// Compare HAVING presence
+	if (sel1.Having == nil) != (sel2.Having == nil) {
+		return false
+	}
+
+	// Compare ORDER BY presence
+	if (sel1.OrderBy == nil) != (sel2.OrderBy == nil) {
+		return false
+	}
+
+	// Compare LIMIT
+	if !simpleSelectLimitClausesAreEqual(sel1.Limit, sel2.Limit) {
+		return false
+	}
+
+	// Compare SETTINGS
+	if !settingsClausesAreEqual(sel1.Settings, sel2.Settings) {
+		return false
+	}
+
+	return true
+}
+
+// simpleSelectLimitClausesAreEqual compares LIMIT clauses from SimpleSelectClause
+func simpleSelectLimitClausesAreEqual(limit1, limit2 *parser.LimitClause) bool {
+	if limit1 == nil && limit2 == nil {
+		return true
+	}
+	if limit1 == nil || limit2 == nil {
+		return false
+	}
+
+	// Compare count expressions
+	if !expressionsAreEqual(&limit1.Count, &limit2.Count) {
+		return false
+	}
+
+	// Compare offset expressions
+	if limit1.Offset == nil && limit2.Offset == nil {
+		return true
+	}
+	if limit1.Offset == nil || limit2.Offset == nil {
+		return false
+	}
+	return expressionsAreEqual(&limit1.Offset.Value, &limit2.Offset.Value)
 }
 
 // selectStatementToString converts a SelectStatement to a properly formatted string representation

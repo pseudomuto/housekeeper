@@ -3,9 +3,34 @@ package parser
 // This file contains comprehensive ClickHouse query parsing structures including SELECT statements
 
 type (
-	// SelectStatement represents a SELECT statement (for subqueries, no semicolon)
+	// SelectStatement represents a SELECT statement that may include UNION/UNION ALL
+	// It contains a primary select and optional union clauses
 	SelectStatement struct {
 		With     *WithClause          `parser:"@@?"`
+		Select   string               `parser:"'SELECT'"`
+		Distinct bool                 `parser:"@'DISTINCT'?"`
+		Columns  []SelectColumn       `parser:"@@ (',' @@)*"`
+		From     *FromClause          `parser:"@@?"`
+		Where    *WhereClause         `parser:"@@?"`
+		GroupBy  *GroupByClause       `parser:"@@?"`
+		Having   *HavingClause        `parser:"@@?"`
+		OrderBy  *SelectOrderByClause `parser:"@@?"`
+		Limit    *LimitClause         `parser:"@@?"`
+		Settings *SettingsClause      `parser:"@@?"`
+		// Union clauses for UNION/UNION ALL/UNION DISTINCT
+		Unions []UnionClause `parser:"@@*"`
+	}
+
+	// UnionClause represents a UNION [ALL|DISTINCT] SELECT clause
+	UnionClause struct {
+		Union    string              `parser:"'UNION'"`
+		All      bool                `parser:"@'ALL'?"`
+		Distinct bool                `parser:"@'DISTINCT'?"`
+		Select   *SimpleSelectClause `parser:"@@"`
+	}
+
+	// SimpleSelectClause represents a SELECT without UNION (used in union chains)
+	SimpleSelectClause struct {
 		Select   string               `parser:"'SELECT'"`
 		Distinct bool                 `parser:"@'DISTINCT'?"`
 		Columns  []SelectColumn       `parser:"@@ (',' @@)*"`

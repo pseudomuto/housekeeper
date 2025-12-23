@@ -2,11 +2,13 @@ package schema
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
@@ -40,22 +42,22 @@ type (
 	// This structure contains all the properties needed for table comparison and
 	// migration generation, including columns, engine, and other table options.
 	TableInfo struct {
-		Name          string              // Table name (without database prefix)
-		Database      string              // Database name (empty if not specified)
-		Engine        *parser.TableEngine // Engine AST
-		Cluster       string              // Cluster name for distributed tables
-		Comment       string              // Table comment
-		OrderBy       *parser.Expression  // ORDER BY expression AST
-		PartitionBy   *parser.Expression  // PARTITION BY expression AST
-		PrimaryKey    *parser.Expression  // PRIMARY KEY expression AST
-		SampleBy      *parser.Expression  // SAMPLE BY expression AST
-		TTL           *parser.Expression  // Table-level TTL expression AST
-		Settings      map[string]string   // Table settings
-		Columns       []ColumnInfo        // Column definitions
-		OrReplace     bool                // Whether CREATE OR REPLACE was used
-		IfNotExists   bool                // Whether IF NOT EXISTS was used
-		AsSourceTable *string             // If this table uses AS, the source table name (qualified)
-		AsDependents  map[string]bool     // Tables that use AS to reference this table
+		Name          string                 // Table name (without database prefix)
+		Database      string                 // Database name (empty if not specified)
+		Engine        *parser.TableEngine    // Engine AST
+		Cluster       string                 // Cluster name for distributed tables
+		Comment       string                 // Table comment
+		OrderBy       *parser.Expression     // ORDER BY expression AST
+		PartitionBy   *parser.Expression     // PARTITION BY expression AST
+		PrimaryKey    *parser.Expression     // PRIMARY KEY expression AST
+		SampleBy      *parser.Expression     // SAMPLE BY expression AST
+		TTL           *parser.TableTTLClause // Table-level TTL clause AST (includes DELETE keyword)
+		Settings      map[string]string      // Table settings
+		Columns       []ColumnInfo           // Column definitions
+		OrReplace     bool                   // Whether CREATE OR REPLACE was used
+		IfNotExists   bool                   // Whether IF NOT EXISTS was used
+		AsSourceTable *string                // If this table uses AS, the source table name (qualified)
+		AsDependents  map[string]bool        // Tables that use AS to reference this table
 	}
 
 	// ColumnInfo represents a single column definition
@@ -133,7 +135,7 @@ func (t *TableInfo) Equal(other *TableInfo) bool {
 		!equalAST(t.PartitionBy, other.PartitionBy) ||
 		!equalAST(t.PrimaryKey, other.PrimaryKey) ||
 		!equalAST(t.SampleBy, other.SampleBy) ||
-		!equalAST(t.TTL, other.TTL) {
+		!ttlClausesEqual(t.TTL, other.TTL) {
 		return false
 	}
 
@@ -142,6 +144,92 @@ func (t *TableInfo) Equal(other *TableInfo) bool {
 		compare.Slices(t.Columns, other.Columns, func(a, b ColumnInfo) bool {
 			return a.Equal(b)
 		})
+}
+
+// ttlClausesEqual compares two TTL clauses for semantic equality.
+// This handles:
+// 1. The equivalence between INTERVAL X UNIT and toIntervalUnit(X) syntax
+// 2. The DELETE keyword being the default action (TTL expr DELETE == TTL expr)
+func ttlClausesEqual(a, b *parser.TableTTLClause) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	// Compare expressions with interval normalization
+	if !expressionsEqualWithIntervalNormalization(&a.Expression, &b.Expression) {
+		return false
+	}
+	// Compare Delete clauses with special handling for default DELETE action
+	// DELETE without WHERE is the default action, so:
+	// - nil Delete == Delete{Where: nil}
+	// - Both are considered equal
+	return ttlDeleteClausesEqual(a.Delete, b.Delete)
+}
+
+// ttlDeleteClausesEqual compares TTL Delete clauses, treating DELETE without WHERE as the default
+func ttlDeleteClausesEqual(a, b *parser.TTLDelete) bool {
+	// DELETE without WHERE is the default action
+	// So nil and &TTLDelete{Where: nil} are equivalent
+	aIsDefault := a == nil || a.Where == nil
+	bIsDefault := b == nil || b.Where == nil
+
+	if aIsDefault && bIsDefault {
+		return true
+	}
+	if aIsDefault != bIsDefault {
+		return false
+	}
+	// Both have WHERE clauses - compare them
+	return a.Where.Equal(b.Where)
+}
+
+// expressionsEqualWithIntervalNormalization compares two expressions for equality,
+// treating INTERVAL X UNIT and toIntervalUnit(X) as equivalent.
+func expressionsEqualWithIntervalNormalization(a, b *parser.Expression) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	// First try standard equality
+	if a.Equal(b) {
+		return true
+	}
+	// If not equal, try normalizing interval expressions
+	// Normalize both to string representation and compare
+	aNorm := normalizeIntervalExpr(a.String())
+	bNorm := normalizeIntervalExpr(b.String())
+	return aNorm == bNorm
+}
+
+// normalizeIntervalExpr converts INTERVAL X UNIT to toIntervalUnit(X) format
+// for consistent comparison. It handles the common interval units.
+func normalizeIntervalExpr(expr string) string {
+	// Replace INTERVAL X UNIT patterns with toIntervalUnit(X)
+	// Handle: INTERVAL 7 DAY -> toIntervalDay(7)
+	intervalUnits := map[string]string{
+		"SECOND":  "Second",
+		"MINUTE":  "Minute",
+		"HOUR":    "Hour",
+		"DAY":     "Day",
+		"WEEK":    "Week",
+		"MONTH":   "Month",
+		"QUARTER": "Quarter",
+		"YEAR":    "Year",
+	}
+
+	result := expr
+	for unit, funcSuffix := range intervalUnits {
+		// Match "INTERVAL <number> <UNIT>" pattern (case insensitive)
+		// Replace with toInterval<Unit>(<number>)
+		pattern := fmt.Sprintf("(?i)INTERVAL\\s+(\\d+)\\s+%s", unit)
+		re := regexp.MustCompile(pattern)
+		result = re.ReplaceAllString(result, fmt.Sprintf("toInterval%s($1)", funcSuffix))
+	}
+	return result
 }
 
 // Equal compares two ColumnInfo instances for equality using AST comparison
@@ -291,9 +379,10 @@ func propagateColumnChangesToDependents(
 				generateCreateTableSQL(currentDep)
 		} else {
 			// For MergeTree, etc.: Use ALTER to preserve data
+			// Note: For propagated changes from AS dependencies, we only propagate column changes (no TTL changes)
 			propDiff.UpSQL = fmt.Sprintf("-- Propagated from %s (AS dependency)\n", sourceDiff.Name) +
-				generateAlterTableSQL(targetDep, sourceDiff.ColumnChanges)
-			propDiff.DownSQL = generateAlterTableSQL(currentDep, reverseColumnChanges(sourceDiff.ColumnChanges))
+				generateAlterTableSQL(currentDep, targetDep, sourceDiff.ColumnChanges)
+			propDiff.DownSQL = generateAlterTableSQL(targetDep, currentDep, reverseColumnChanges(sourceDiff.ColumnChanges))
 		}
 
 		propagatedDiffs = append(propagatedDiffs, propDiff)
@@ -483,7 +572,7 @@ func extractTablesFromSQL(sql *parser.SQL) (map[string]*TableInfo, error) {
 				tableInfo.SampleBy = &sampleBy.Expression
 			}
 			if ttl := table.GetTTL(); ttl != nil {
-				tableInfo.TTL = &ttl.Expression
+				tableInfo.TTL = ttl
 			}
 			if settings := table.GetSettings(); settings != nil {
 				settingMap := make(map[string]string)
@@ -785,7 +874,14 @@ func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 	}
 	if table.TTL != nil {
 		sql.WriteString("\nTTL ")
-		sql.WriteString(table.TTL.String())
+		sql.WriteString(table.TTL.Expression.String())
+		if table.TTL.Delete != nil {
+			sql.WriteString(" DELETE")
+			if table.TTL.Delete.Where != nil {
+				sql.WriteString(" WHERE ")
+				sql.WriteString(table.TTL.Delete.Where.String())
+			}
+		}
 	}
 
 	// Settings
@@ -840,8 +936,11 @@ func generateRenameTableSQL(from, to *TableInfo, fromName, toName string) string
 		String()
 }
 
-func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string {
-	if len(columnChanges) == 0 {
+func generateAlterTableSQL(current, target *TableInfo, columnChanges []ColumnDiff) string {
+	// Check if there are TTL changes (using ttlClausesEqual for interval normalization)
+	ttlChanged := !ttlClausesEqual(current.TTL, target.TTL)
+
+	if len(columnChanges) == 0 && !ttlChanged {
 		return ""
 	}
 
@@ -850,12 +949,15 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 	sql.WriteString(formatQualifiedTableName(target.Database, target.Name))
 	writeOnClusterClause(&sql, target.Cluster)
 
+	needsComma := false
+
 	// Generate column modifications
-	for i, change := range columnChanges {
-		if i > 0 {
+	for _, change := range columnChanges {
+		if needsComma {
 			sql.WriteString(",")
 		}
 		sql.WriteString("\n    ")
+		needsComma = true
 
 		switch change.Type {
 		case ColumnDiffAdd:
@@ -870,6 +972,20 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 		case ColumnDiffModify:
 			sql.WriteString("MODIFY COLUMN ")
 			sql.WriteString(formatColumnDefinition(*change.Target))
+		}
+	}
+
+	// Generate TTL modification if changed
+	if ttlChanged {
+		if needsComma {
+			sql.WriteString(",")
+		}
+		sql.WriteString("\n    ")
+		if target.TTL == nil {
+			sql.WriteString("REMOVE TTL")
+		} else {
+			sql.WriteString("MODIFY TTL ")
+			sql.WriteString(format.FormatTTLClause(target.TTL))
 		}
 	}
 
@@ -1004,8 +1120,8 @@ func createAlterDiff(tableName string, currentTable, targetTable *TableInfo, col
 			Type:        string(TableDiffAlter),
 			Name:        tableName,
 			Description: "Alter table " + tableName,
-			UpSQL:       generateAlterTableSQL(targetTable, columnChanges),
-			DownSQL:     generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges)),
+			UpSQL:       generateAlterTableSQL(currentTable, targetTable, columnChanges),
+			DownSQL:     generateAlterTableSQL(targetTable, currentTable, reverseColumnChanges(columnChanges)),
 		},
 		Current:       currentTable,
 		Target:        targetTable,
