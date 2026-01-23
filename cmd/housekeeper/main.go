@@ -45,6 +45,8 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/client"
@@ -55,6 +57,12 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/project"
 	"go.uber.org/fx"
 )
+
+// newSignalContext creates a context that is cancelled when SIGINT or SIGTERM is received.
+// This allows graceful shutdown of long-running operations like container startup.
+func newSignalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+}
 
 // Build-time variables set by GoReleaser during release builds.
 var (
@@ -81,6 +89,9 @@ func main() {
 	pwd, _ := os.Getwd()
 
 	app := fx.New(
+		// Extend fx's automatic startup timeout - if you see an exit code of (1) very possibly its fx killing the
+		// process as it hasnt gotten past the 'onstart' process.
+		fx.StartTimeout(10*time.Minute),
 		fx.Supply(
 			args,
 			Params{
@@ -93,7 +104,12 @@ func main() {
 			},
 		),
 		fx.Provide(
-			context.Background,
+			// Use signal-aware context instead of context.Background
+			// This context is cancelled on SIGINT/SIGTERM for graceful shutdown
+			func() context.Context {
+				ctx, _ := newSignalContext()
+				return ctx
+			},
 			project.New,
 			newDockerClient,
 		),
