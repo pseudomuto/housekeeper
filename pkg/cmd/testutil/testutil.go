@@ -27,6 +27,7 @@ type TestConfig struct {
 	Cluster   string
 	Version   string
 	ConfigDir string
+	UsersDir  string
 }
 
 // MigrationFile represents a test migration
@@ -81,6 +82,9 @@ func (p *ProjectFixture) WithConfig(cfg TestConfig) *ProjectFixture {
 	}
 	if cfg.ConfigDir != "" {
 		p.Config.ClickHouse.ConfigDir = cfg.ConfigDir
+	}
+	if cfg.UsersDir != "" {
+		p.Config.ClickHouse.UsersDir = cfg.UsersDir
 	}
 
 	// Write updated config back to file
@@ -220,12 +224,24 @@ func (p *ProjectFixture) WithClickHouseConfigDir(configDir string) *ProjectFixtu
 	return p
 }
 
+// WithClickHouseUsersDir sets the ClickHouse users directory in the config
+func (p *ProjectFixture) WithClickHouseUsersDir(usersDir string) *ProjectFixture {
+	p.t.Helper()
+
+	if p.Config == nil {
+		p.Config = DefaultConfig()
+	}
+	p.Config.ClickHouse.UsersDir = usersDir
+	return p
+}
+
 // DefaultConfig returns a default configuration for testing
 func DefaultConfig() *config.Config {
 	return &config.Config{
 		ClickHouse: config.ClickHouse{
 			Version:   "25.7",
 			ConfigDir: "db/config.d",
+			UsersDir:  "db/users.d",
 			Cluster:   "",
 		},
 		Entrypoint: "db/main.sql",

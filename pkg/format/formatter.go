@@ -214,6 +214,23 @@ func FormatSQL(w io.Writer, opts FormatterOptions, sql *parser.SQL) error {
 	return Format(w, opts, sql.Statements...)
 }
 
+// FormatTTLClause formats a TableTTLClause to a string suitable for use in ALTER TABLE statements.
+// This returns the TTL expression and optional DELETE clause without the "TTL" keyword.
+func FormatTTLClause(ttl *parser.TableTTLClause) string {
+	if ttl == nil {
+		return ""
+	}
+	f := New(Defaults)
+	result := f.formatExpression(&ttl.Expression)
+	if ttl.Delete != nil {
+		result += " DELETE"
+		if ttl.Delete.Where != nil {
+			result += " WHERE " + f.formatExpression(ttl.Delete.Where)
+		}
+	}
+	return result
+}
+
 // Format writes formatted SQL statements to the provided writer.
 //
 // Each statement is formatted according to the formatter's configuration and

@@ -41,6 +41,7 @@ func TestLoadConfig(t *testing.T) {
 		require.NotNil(t, config)
 		require.Equal(t, consts.DefaultClickHouseVersion, config.ClickHouse.Version)
 		require.Equal(t, consts.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, consts.DefaultClickHouseUsersDir, config.ClickHouse.UsersDir)
 		require.Equal(t, consts.DefaultClickHouseCluster, config.ClickHouse.Cluster)
 	})
 }
@@ -90,6 +91,7 @@ func validateTestConfig(t *testing.T, config *Config) {
 	require.NotNil(t, config)
 	require.Equal(t, "25.7", config.ClickHouse.Version)
 	require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
+	require.Equal(t, "db/users.d", config.ClickHouse.UsersDir)
 	require.Equal(t, "cluster", config.ClickHouse.Cluster)
 	require.Equal(t, "db/main.sql", config.Entrypoint)
 	require.Equal(t, "db/migrations", config.Dir)
@@ -101,6 +103,7 @@ func TestLoadConfig_ClickHouseDefaults(t *testing.T) {
 clickhouse:
   version: "24.8"
   config_dir: "custom/config"
+  users_dir: "custom/users"
   cluster: "production"
   ignore_databases:
     - testing_db
@@ -112,6 +115,7 @@ dir: migrations
 		require.NoError(t, err)
 		require.Equal(t, "24.8", config.ClickHouse.Version)
 		require.Equal(t, "custom/config", config.ClickHouse.ConfigDir)
+		require.Equal(t, "custom/users", config.ClickHouse.UsersDir)
 		require.Equal(t, "production", config.ClickHouse.Cluster)
 		require.Equal(t, []string{"testing_db", "temp_db"}, config.ClickHouse.IgnoreDatabases)
 	})
@@ -121,6 +125,7 @@ dir: migrations
 clickhouse:
   version: ""
   config_dir: ""
+  users_dir: ""
   cluster: ""
 entrypoint: test.sql
 dir: migrations
@@ -131,6 +136,8 @@ dir: migrations
 		require.Equal(t, "25.7", config.ClickHouse.Version)
 		require.Equal(t, consts.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
 		require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
+		require.Equal(t, consts.DefaultClickHouseUsersDir, config.ClickHouse.UsersDir)
+		require.Equal(t, "db/users.d", config.ClickHouse.UsersDir)
 		require.Equal(t, consts.DefaultClickHouseCluster, config.ClickHouse.Cluster)
 		require.Equal(t, "cluster", config.ClickHouse.Cluster)
 	})
@@ -146,6 +153,8 @@ dir: migrations
 		require.Equal(t, "25.7", config.ClickHouse.Version)
 		require.Equal(t, consts.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
 		require.Equal(t, "db/config.d", config.ClickHouse.ConfigDir)
+		require.Equal(t, consts.DefaultClickHouseUsersDir, config.ClickHouse.UsersDir)
+		require.Equal(t, "db/users.d", config.ClickHouse.UsersDir)
 		require.Equal(t, consts.DefaultClickHouseCluster, config.ClickHouse.Cluster)
 		require.Equal(t, "cluster", config.ClickHouse.Cluster)
 	})
@@ -159,6 +168,7 @@ dir: migrations
 		require.NoError(t, err)
 		require.Equal(t, consts.DefaultClickHouseVersion, config.ClickHouse.Version)
 		require.Equal(t, consts.DefaultClickHouseConfigDir, config.ClickHouse.ConfigDir)
+		require.Equal(t, consts.DefaultClickHouseUsersDir, config.ClickHouse.UsersDir)
 		require.Equal(t, consts.DefaultClickHouseCluster, config.ClickHouse.Cluster)
 	})
 }

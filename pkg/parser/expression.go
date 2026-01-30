@@ -160,10 +160,20 @@ type (
 		Over              *OverClause   `parser:"@@?"`
 	}
 
-	// FunctionArg represents arguments in function calls (can be * or expression)
+	// FunctionArg represents arguments in function calls (can be *, lambda, or expression)
 	FunctionArg struct {
 		Star       *string     `parser:"@'*'"`
+		Lambda     *LambdaExpr `parser:"| @@"`
 		Expression *Expression `parser:"| @@"`
+	}
+
+	// LambdaExpr represents a lambda expression: x -> expr or (x, y) -> expr
+	LambdaExpr struct {
+		// Single parameter without parentheses: x -> expr
+		SingleParam *string `parser:"( @(Ident | BacktickIdent) '->'"`
+		// Multiple parameters with parentheses: (x, y) -> expr
+		Params []string   `parser:"| '(' @(Ident | BacktickIdent) (',' @(Ident | BacktickIdent))* ')' '->' )"`
+		Body   Expression `parser:"@@"`
 	}
 
 	// OverClause for window functions
@@ -272,11 +282,13 @@ type (
 		High AdditionExpression `parser:"@@"`
 	}
 
-	// InExpression handles IN operations with lists, arrays, or subqueries
+	// InExpression handles IN operations with lists, arrays, subqueries, or CTE references
 	InExpression struct {
 		List     []Expression     `parser:"'(' @@ (',' @@)* ')'"`
 		Array    *ArrayExpression `parser:"| @@"`
 		Subquery *Subquery        `parser:"| @@"`
+		// Identifier for CTE references like "IN pending_session_finalization"
+		Ident *string `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// IsNullExpr handles IS NULL and IS NOT NULL expressions as postfix operators
@@ -531,10 +543,29 @@ func (a *FunctionArg) String() string {
 	if a.Star != nil {
 		return "*"
 	}
+	if a.Lambda != nil {
+		return a.Lambda.String()
+	}
 	if a.Expression != nil {
 		return a.Expression.String()
 	}
 	return ""
+}
+
+// String returns the string representation of a lambda expression
+func (l *LambdaExpr) String() string {
+	if l == nil {
+		return ""
+	}
+
+	var params string
+	if l.SingleParam != nil {
+		params = *l.SingleParam
+	} else if len(l.Params) > 0 {
+		params = "(" + strings.Join(l.Params, ", ") + ")"
+	}
+
+	return params + " -> " + l.Body.String()
 }
 
 // String returns the string representation of an OverClause for window functions
@@ -954,7 +985,47 @@ func (p *PrimaryExpression) Equal(other *PrimaryExpression) bool {
 		return false
 	}
 
-	// For other types, do basic comparison
+	// Check Interval
+	if (p.Interval != nil) != (other.Interval != nil) {
+		return false
+	}
+	if p.Interval != nil && !p.Interval.Equal(other.Interval) {
+		return false
+	}
+
+	// Check Cast
+	if (p.Cast != nil) != (other.Cast != nil) {
+		return false
+	}
+	if p.Cast != nil && !p.Cast.Equal(other.Cast) {
+		return false
+	}
+
+	// Check Extract
+	if (p.Extract != nil) != (other.Extract != nil) {
+		return false
+	}
+	if p.Extract != nil && !p.Extract.Equal(other.Extract) {
+		return false
+	}
+
+	// Check Tuple
+	if (p.Tuple != nil) != (other.Tuple != nil) {
+		return false
+	}
+	if p.Tuple != nil && !p.Tuple.Equal(other.Tuple) {
+		return false
+	}
+
+	// Check Array
+	if (p.Array != nil) != (other.Array != nil) {
+		return false
+	}
+	if p.Array != nil && !p.Array.Equal(other.Array) {
+		return false
+	}
+
+	// For any remaining types, do basic comparison
 	return true
 }
 
@@ -997,6 +1068,77 @@ func (i *IdentifierExpr) Equal(other *IdentifierExpr) bool {
 
 	// Compare Name
 	return i.Name == other.Name
+}
+
+// Equal compares two IntervalExpr
+func (i *IntervalExpr) Equal(other *IntervalExpr) bool {
+	if i == nil && other == nil {
+		return true
+	}
+	if i == nil || other == nil {
+		return false
+	}
+	return i.Value == other.Value && i.Unit == other.Unit
+}
+
+// Equal compares two CastExpression
+func (c *CastExpression) Equal(other *CastExpression) bool {
+	if c == nil && other == nil {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+	return c.Expression.Equal(&other.Expression) && c.Type.Equal(&other.Type)
+}
+
+// Equal compares two ExtractExpression
+func (e *ExtractExpression) Equal(other *ExtractExpression) bool {
+	if e == nil && other == nil {
+		return true
+	}
+	if e == nil || other == nil {
+		return false
+	}
+	return e.Part == other.Part && e.Expr.Equal(&other.Expr)
+}
+
+// Equal compares two TupleExpression
+func (t *TupleExpression) Equal(other *TupleExpression) bool {
+	if t == nil && other == nil {
+		return true
+	}
+	if t == nil || other == nil {
+		return false
+	}
+	if len(t.Elements) != len(other.Elements) {
+		return false
+	}
+	for i := range t.Elements {
+		if !t.Elements[i].Equal(&other.Elements[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Equal compares two ArrayExpression
+func (a *ArrayExpression) Equal(other *ArrayExpression) bool {
+	if a == nil && other == nil {
+		return true
+	}
+	if a == nil || other == nil {
+		return false
+	}
+	if len(a.Elements) != len(other.Elements) {
+		return false
+	}
+	for i := range a.Elements {
+		if !a.Elements[i].Equal(&other.Elements[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Equal compares two FunctionCall
@@ -1050,6 +1192,14 @@ func (f *FunctionArg) Equal(other *FunctionArg) bool {
 		return false
 	}
 
+	// Compare Lambda
+	if (f.Lambda != nil) != (other.Lambda != nil) {
+		return false
+	}
+	if f.Lambda != nil && !f.Lambda.Equal(other.Lambda) {
+		return false
+	}
+
 	// Compare Expression
 	if (f.Expression != nil) != (other.Expression != nil) {
 		return false
@@ -1059,6 +1209,37 @@ func (f *FunctionArg) Equal(other *FunctionArg) bool {
 	}
 
 	return true
+}
+
+// Equal compares two LambdaExpr
+func (l *LambdaExpr) Equal(other *LambdaExpr) bool {
+	if l == nil && other == nil {
+		return true
+	}
+	if l == nil || other == nil {
+		return false
+	}
+
+	// Compare single param
+	if (l.SingleParam != nil) != (other.SingleParam != nil) {
+		return false
+	}
+	if l.SingleParam != nil && *l.SingleParam != *other.SingleParam {
+		return false
+	}
+
+	// Compare params list
+	if len(l.Params) != len(other.Params) {
+		return false
+	}
+	for i, p := range l.Params {
+		if p != other.Params[i] {
+			return false
+		}
+	}
+
+	// Compare body
+	return l.Body.Equal(&other.Body)
 }
 
 func (i InExpression) String() string {
@@ -1083,6 +1264,10 @@ func (i InExpression) String() string {
 
 	if i.Subquery != nil {
 		return i.Subquery.String()
+	}
+
+	if i.Ident != nil {
+		return *i.Ident
 	}
 
 	return "()"

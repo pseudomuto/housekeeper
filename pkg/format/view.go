@@ -1,6 +1,7 @@
 package format
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -38,8 +39,22 @@ func (f *Formatter) createView(w io.Writer, stmt *parser.CreateViewStmt) error {
 
 		lines = append(lines, strings.Join(headerParts, " "))
 
-		// TO table (for materialized views)
-		if stmt.To != nil {
+		// REFRESH clause (for refreshable materialized views)
+		if stmt.Refresh != nil {
+			lines = append(lines, f.formatRefreshClause(stmt.Refresh))
+		}
+
+		// APPEND TO table (for refreshable materialized views)
+		if stmt.Append && stmt.To != nil {
+			toClause := f.keyword("APPEND TO") + " "
+			if stmt.To.Table != nil {
+				toClause += f.qualifiedName(stmt.To.Database, *stmt.To.Table)
+			} else if stmt.To.Function != nil {
+				toClause += f.formatViewTableFunction(stmt.To.Function)
+			}
+			lines = append(lines, toClause)
+		} else if stmt.To != nil {
+			// TO table (for materialized views without APPEND)
 			toClause := f.keyword("TO") + " "
 			// Format either table reference or table function
 			if stmt.To.Table != nil {
@@ -179,4 +194,32 @@ func (f *Formatter) formatViewTableFunction(fn *parser.TableFunction) string {
 		result += "()"
 	}
 	return result
+}
+
+// formatRefreshClause formats a REFRESH clause for refreshable materialized views
+func (f *Formatter) formatRefreshClause(refresh *parser.RefreshClause) string {
+	if refresh == nil {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, f.keyword("REFRESH"))
+
+	if refresh.Every {
+		parts = append(parts, f.keyword("EVERY"))
+	} else if refresh.After {
+		parts = append(parts, f.keyword("AFTER"))
+	}
+
+	parts = append(parts, fmt.Sprintf("%d", refresh.Interval))
+	parts = append(parts, f.keyword(refresh.Unit))
+
+	// Handle OFFSET if present
+	if refresh.OffsetInterval != nil && refresh.OffsetUnit != nil {
+		parts = append(parts, f.keyword("OFFSET"))
+		parts = append(parts, fmt.Sprintf("%d", *refresh.OffsetInterval))
+		parts = append(parts, f.keyword(*refresh.OffsetUnit))
+	}
+
+	return strings.Join(parts, " ")
 }

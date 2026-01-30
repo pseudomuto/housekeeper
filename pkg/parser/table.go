@@ -218,9 +218,11 @@ type (
 	}
 
 	// TableTTLClause represents table-level TTL expression
+	// Syntax: TTL expression [DELETE [WHERE condition]]
 	TableTTLClause struct {
 		TTL        string     `parser:"'TTL'"`
 		Expression Expression `parser:"@@"`
+		Delete     *TTLDelete `parser:"@@?"`
 	}
 
 	// TableSettingsClause represents SETTINGS clause
@@ -738,7 +740,19 @@ func (t *TableTTLClause) Equal(other *TableTTLClause) bool {
 	if eq, done := compare.NilCheck(t, other); !done {
 		return eq
 	}
-	return t.Expression.Equal(&other.Expression)
+	if !t.Expression.Equal(&other.Expression) {
+		return false
+	}
+	// Compare Delete clause
+	return compare.PointersWithEqual(t.Delete, other.Delete, (*TTLDelete).Equal)
+}
+
+// Equal compares two TTLDelete instances for equality
+func (t *TTLDelete) Equal(other *TTLDelete) bool {
+	if eq, done := compare.NilCheck(t, other); !done {
+		return eq
+	}
+	return compare.PointersWithEqual(t.Where, other.Where, (*Expression).Equal)
 }
 
 // Equal compares two TableEngine instances for equality

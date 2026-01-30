@@ -81,6 +81,9 @@ func main() {
 	pwd, _ := os.Getwd()
 
 	app := fx.New(
+		// Extend fx's automatic startup timeout - if you see an exit code of (1) very possibly its fx killing the
+		// process as it hasnt goten past the 'onstart' process.
+		fx.StartTimeout(10*time.Minute),
 		fx.Supply(
 			args,
 			Params{

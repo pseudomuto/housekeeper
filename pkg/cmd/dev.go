@@ -20,6 +20,7 @@ const devContainerName = "housekeeper-dev"
 type devConfig struct {
 	version   string
 	configDir string
+	usersDir  string
 	cluster   string
 }
 
@@ -55,6 +56,7 @@ func devUp(cfg *config.Config, client docker.DockerClient) *cli.Command {
 			container, client, err := runContainer(ctx, cmd.Writer, docker.DockerOptions{
 				Version:   config.version,
 				ConfigDir: config.configDir,
+				UsersDir:  config.usersDir,
 				Name:      devContainerName,
 			}, cfg, client)
 			if err != nil {
@@ -113,10 +115,16 @@ func loadDevConfigFromConfig(cfg *config.Config) *devConfig {
 		config.version = "25.7"
 	}
 
+	pwd, _ := os.Getwd()
+
 	if cfg.ClickHouse.ConfigDir != "" {
 		// Use absolute path since we need the full path for docker mounting
-		pwd, _ := os.Getwd()
 		config.configDir = filepath.Join(pwd, cfg.ClickHouse.ConfigDir)
+	}
+
+	if cfg.ClickHouse.UsersDir != "" {
+		// Use absolute path since we need the full path for docker mounting
+		config.usersDir = filepath.Join(pwd, cfg.ClickHouse.UsersDir)
 	}
 
 	return config

@@ -15,6 +15,9 @@ const (
 	// DefaultClickHouseConfigDir is the default directory for ClickHouse configuration files
 	DefaultClickHouseConfigDir = "db/config.d"
 
+	// DefaultClickHouseUsersDir is the default directory for ClickHouse user profile files
+	DefaultClickHouseUsersDir = "db/users.d"
+
 	// DefaultClickHouseCluster is the default cluster name used when none is specified
 	DefaultClickHouseCluster = "cluster"
 

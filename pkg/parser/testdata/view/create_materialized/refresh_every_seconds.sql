@@ -1,0 +1,4 @@
+CREATE MATERIALIZED VIEW `mv_refresh`
+REFRESH EVERY 10 SECONDS
+AS SELECT count() AS `cnt`
+FROM `events`;

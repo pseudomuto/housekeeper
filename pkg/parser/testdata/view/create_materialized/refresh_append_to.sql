@@ -1,0 +1,5 @@
+CREATE MATERIALIZED VIEW `mv_refresh_append`
+REFRESH EVERY 10 SECONDS
+APPEND TO `target_table`
+AS SELECT *
+FROM `source`;

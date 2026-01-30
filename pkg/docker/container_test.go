@@ -260,3 +260,79 @@ func TestDockerContainer_RelativeConfigDir(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, dsn, ":", "DSN should contain host:port")
 }
+
+func TestDockerContainer_WithUsersDir(t *testing.T) {
+	skipIfNoDocker(t)
+
+	tmpDir := t.TempDir()
+
+	// Create config directory structure
+	configDir := filepath.Join(tmpDir, "config.d")
+	require.NoError(t, os.MkdirAll(configDir, consts.ModeDir))
+
+	// Create users directory structure
+	usersDir := filepath.Join(tmpDir, "users.d")
+	require.NoError(t, os.MkdirAll(usersDir, consts.ModeDir))
+
+	// Create basic ClickHouse config for testing
+	configContent := `<?xml version="1.0"?>
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+    <listen_host>0.0.0.0</listen_host>
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+</clickhouse>`
+
+	configFile := filepath.Join(configDir, "config.xml")
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), consts.ModeFile))
+
+	// Create users config with flatten_nested setting
+	usersContent := `<?xml version="1.0"?>
+<clickhouse>
+    <profiles>
+        <default>
+            <flatten_nested>0</flatten_nested>
+        </default>
+    </profiles>
+</clickhouse>`
+
+	usersFile := filepath.Join(usersDir, "_users.xml")
+	require.NoError(t, os.WriteFile(usersFile, []byte(usersContent), consts.ModeFile))
+
+	// Create Docker client
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err)
+
+	// Use options with both config and users directories
+	opts := docker.DockerOptions{
+		Version:   "25.7",
+		ConfigDir: configDir,
+		UsersDir:  usersDir,
+		Name:      "test-clickhouse-users",
+	}
+	container, err := docker.NewWithOptions(dockerClient, opts)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Clean up any existing container first
+	_ = container.Stop(ctx)
+
+	// Clean up at end
+	defer func() {
+		_ = container.Stop(ctx)
+	}()
+
+	// Start the container
+	err = container.Start(ctx)
+	require.NoError(t, err, "Failed to start ClickHouse container with UsersDir")
+
+	// Verify DSN is available
+	dsn, err := container.GetDSN(ctx)
+	require.NoError(t, err)
+	require.Contains(t, dsn, ":", "DSN should contain host:port")
+}

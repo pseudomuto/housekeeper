@@ -249,7 +249,14 @@ func (f *Formatter) formatTableClauseType(clause *parser.TableClause) string {
 		return f.keyword("SAMPLE BY") + " " + f.formatExpression(&clause.SampleBy.Expression)
 	}
 	if clause.TTL != nil {
-		return f.keyword("TTL") + " " + f.formatExpression(&clause.TTL.Expression)
+		result := f.keyword("TTL") + " " + f.formatExpression(&clause.TTL.Expression)
+		if clause.TTL.Delete != nil {
+			result += " " + f.keyword("DELETE")
+			if clause.TTL.Delete.Where != nil {
+				result += " " + f.keyword("WHERE") + " " + f.formatExpression(clause.TTL.Delete.Where)
+			}
+		}
+		return result
 	}
 	if clause.Settings != nil && len(clause.Settings.Settings) > 0 {
 		return f.formatTableSettings(clause.Settings)

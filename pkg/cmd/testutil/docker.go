@@ -323,6 +323,11 @@ func WaitForClickHouse(ctx context.Context, dsn string, maxRetries int) error {
 
 // CreateTestContainer creates a test container with custom options
 func CreateTestContainer(t *testing.T, version, configDir, name string) *docker.ClickHouseContainer {
+	return CreateTestContainerWithUsersDir(t, version, configDir, "", name)
+}
+
+// CreateTestContainerWithUsersDir creates a test container with custom options including users directory
+func CreateTestContainerWithUsersDir(t *testing.T, version, configDir, usersDir, name string) *docker.ClickHouseContainer {
 	t.Helper()
 
 	SkipIfNoDocker(t)
@@ -342,6 +347,7 @@ func CreateTestContainer(t *testing.T, version, configDir, name string) *docker.
 	opts := docker.DockerOptions{
 		Version:   version,
 		ConfigDir: configDir,
+		UsersDir:  usersDir,
 		Name:      name,
 	}
 

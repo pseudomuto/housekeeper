@@ -53,6 +53,15 @@ func TestCreateTable(t *testing.T) {
 		SETTINGS index_granularity = 8192, merge_with_ttl_timeout = 3600
 		COMMENT 'User events table';`},
 
+		// TTL DELETE syntax
+		{name: "ttl_delete", sql: `CREATE TABLE logs (
+			id UInt64,
+			message String,
+			timestamp DateTime
+		) ENGINE = MergeTree()
+		ORDER BY (id, timestamp)
+		TTL timestamp + INTERVAL 30 DAY DELETE;`},
+
 		// Backticks
 		{name: "with_backticks", sql: "CREATE TABLE `user-db`.`order-table` (`user-id` UInt64, `order-id` String, `order-date` Date, `select` String, `group` LowCardinality(String)) ENGINE = MergeTree() ORDER BY (`user-id`, `order-date`);"},
 

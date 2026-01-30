@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/compare"
@@ -25,6 +27,7 @@ func getStringValue(s *string) string {
 }
 
 // getViewTableTargetValue converts ViewTableTarget to string representation
+// with normalized identifiers (backticks removed) for consistent comparison
 func getViewTableTargetValue(target *parser.ViewTableTarget) string {
 	if target == nil {
 		return ""
@@ -32,7 +35,7 @@ func getViewTableTargetValue(target *parser.ViewTableTarget) string {
 
 	if target.Function != nil {
 		// Format table function as string
-		result := target.Function.Name + "("
+		result := normalizeIdentifier(target.Function.Name) + "("
 		var args []string
 		for _, arg := range target.Function.Arguments {
 			if arg.Star != nil {
@@ -45,9 +48,9 @@ func getViewTableTargetValue(target *parser.ViewTableTarget) string {
 		return result
 	} else if target.Table != nil {
 		if target.Database != nil {
-			return *target.Database + "." + *target.Table
+			return normalizeIdentifier(*target.Database) + "." + normalizeIdentifier(*target.Table)
 		}
-		return *target.Table
+		return normalizeIdentifier(*target.Table)
 	}
 
 	return ""
@@ -65,14 +68,263 @@ func normalizeIdentifier(s string) string {
 // AST-based expression comparison functions
 
 // expressionsAreEqual compares expressions using AST-based structural comparison
+// with normalization for ClickHouse-specific formatting differences (e.g., INTERVAL vs toInterval)
 func expressionsAreEqual(expr1, expr2 *parser.Expression) bool {
 	if eq, needsMoreChecks := compare.NilCheck(expr1, expr2); !needsMoreChecks {
 		return eq
 	}
 
-	// Compare AST structure directly
-	return compare.PointersWithEqual(expr1.Case, expr2.Case, caseExpressionsEqual) &&
-		compare.PointersWithEqual(expr1.Or, expr2.Or, orExpressionsEqual)
+	// First try AST structure directly
+	if compare.PointersWithEqual(expr1.Case, expr2.Case, caseExpressionsEqual) &&
+		compare.PointersWithEqual(expr1.Or, expr2.Or, orExpressionsEqual) {
+		return true
+	}
+
+	// If AST comparison fails, try string-based comparison with interval normalization
+	// This handles ClickHouse converting "INTERVAL X DAY" to "toIntervalDay(X)"
+	return normalizedExpressionsEqual(expr1, expr2)
+}
+
+// normalizedExpressionsEqual compares expressions using normalized string representation
+// to handle ClickHouse formatting differences
+func normalizedExpressionsEqual(expr1, expr2 *parser.Expression) bool {
+	if expr1 == nil && expr2 == nil {
+		return true
+	}
+	if expr1 == nil || expr2 == nil {
+		return false
+	}
+
+	str1 := normalizeExpressionString(expr1.String())
+	str2 := normalizeExpressionString(expr2.String())
+	return str1 == str2
+}
+
+// normalizeExpressionString normalizes an expression string for comparison
+// It handles:
+// 1. INTERVAL X UNIT -> toIntervalUnit(X)
+// 2. Extra parentheses around expressions
+// 3. Whitespace normalization
+func normalizeExpressionString(expr string) string {
+	result := expr
+
+	// Normalize identifier quoting: strip backticks so dump (e.g. `r`.`ws_path`) matches schema (r.ws_path)
+	result = strings.ReplaceAll(result, "`", "")
+
+	// Normalize INTERVAL to toInterval function format
+	intervalUnits := map[string]string{
+		"SECOND":  "Second",
+		"MINUTE":  "Minute",
+		"HOUR":    "Hour",
+		"DAY":     "Day",
+		"WEEK":    "Week",
+		"MONTH":   "Month",
+		"QUARTER": "Quarter",
+		"YEAR":    "Year",
+	}
+
+	for unit, funcSuffix := range intervalUnits {
+		// Match "INTERVAL <number> <UNIT>" pattern (case insensitive)
+		pattern := fmt.Sprintf("(?i)INTERVAL\\s+(\\d+)\\s+%s", unit)
+		re := regexp.MustCompile(pattern)
+		result = re.ReplaceAllString(result, fmt.Sprintf("toInterval%s($1)", funcSuffix))
+	}
+
+	// Normalize whitespace
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	result = strings.TrimSpace(result)
+
+	// Normalize IN (single_identifier) to IN identifier (ClickHouse wraps CTE refs in parens)
+	result = regexp.MustCompile(`\s+NOT\s+IN\s+\(\s*([a-zA-Z0-9_]+)\s*\)`).ReplaceAllString(result, " NOT IN $1")
+	result = regexp.MustCompile(`\s+IN\s+\(\s*([a-zA-Z0-9_]+)\s*\)`).ReplaceAllString(result, " IN $1")
+
+	// Strip outer balanced parentheses so "(expr)" and "expr" normalize the same
+	result = removeOuterBalancedParens(result)
+
+	// Remove redundant parentheses around simple expressions
+	// Pattern: match expressions like "(now() - toIntervalDay(1))" and keep the inner part
+	// But be careful not to remove parentheses that are part of function calls or tuples
+	result = removeRedundantParens(result)
+
+	// Strip outer parens from each top-level AND/OR segment so "((id, name) NOT IN pending)" -> "(id, name) NOT IN pending"
+	result = stripOuterParensPerSegment(result)
+
+	return result
+}
+
+// stripOuterParensPerSegment splits on top-level " AND " / " OR ", strips outer balanced parens from each segment, rejoins.
+func stripOuterParensPerSegment(s string) string {
+	segments, delims := splitTopLevelAndOr(s)
+	var b strings.Builder
+	for i, seg := range segments {
+		seg = strings.TrimSpace(seg)
+		for {
+			next := removeOuterBalancedParens(seg)
+			if next == seg {
+				break
+			}
+			seg = next
+		}
+		if i > 0 {
+			b.WriteString(delims[i-1])
+		}
+		b.WriteString(seg)
+	}
+	return b.String()
+}
+
+// splitTopLevelAndOr splits s by " AND " and " OR " at paren depth 0. Returns segments and delimiters (len(delims) = len(segments)-1).
+func splitTopLevelAndOr(s string) (segments []string, delims []string) {
+	start := 0
+	depth := 0
+	i := 0
+	for i < len(s) {
+		switch s[i] {
+		case '(':
+			depth++
+			i++
+		case ')':
+			depth--
+			i++
+		case ' ':
+			if depth == 0 {
+				if i+5 <= len(s) && s[i+1:i+5] == "AND " {
+					segments = append(segments, s[start:i])
+					delims = append(delims, " AND ")
+					start = i + 5
+					i += 5
+					continue
+				}
+				if i+4 <= len(s) && s[i+1:i+4] == "OR " {
+					segments = append(segments, s[start:i])
+					delims = append(delims, " OR ")
+					start = i + 4
+					i += 4
+					continue
+				}
+			}
+			i++
+		default:
+			i++
+		}
+	}
+	segments = append(segments, s[start:])
+	return segments, delims
+}
+
+// removeOuterBalancedParens strips outermost balanced parentheses repeatedly.
+// So "( (a) AND (b) )" becomes "(a) AND (b)", and "(ts < (x - y))" becomes "ts < (x - y)".
+func removeOuterBalancedParens(s string) string {
+	for {
+		s = strings.TrimSpace(s)
+		if len(s) < 2 || s[0] != '(' || s[len(s)-1] != ')' {
+			return s
+		}
+		// Check that the closing ')' at end is the match for the opening '(' at start
+		depth := 1
+		for i := 1; i < len(s)-1; i++ {
+			if s[i] == '(' {
+				depth++
+			} else if s[i] == ')' {
+				depth--
+				if depth == 0 {
+					return s // inner ')' closed the opening '(', so outer parens are not balanced
+				}
+			}
+		}
+		s = strings.TrimSpace(s[1 : len(s)-1])
+	}
+}
+
+// removeRedundantParens removes redundant parentheses from expressions
+// This handles cases like "expr1 > (expr2 - expr3)" where ClickHouse adds extra parens
+func removeRedundantParens(s string) string {
+	result := s
+
+	// Find patterns like "op (balanced_content)" after comparison operators
+	// and remove the outer parens if they don't affect precedence
+	compOps := []string{">=", "<=", "!=", ">", "<", "="}
+
+	for {
+		changed := false
+		for _, op := range compOps {
+			// Find "op (" and then find the matching ")"
+			opParen := op + " ("
+			idx := strings.Index(result, opParen)
+			if idx == -1 {
+				opParen = op + "("
+				idx = strings.Index(result, opParen)
+			}
+			if idx == -1 {
+				continue
+			}
+
+			// Find the start of the paren content
+			parenStart := idx + len(opParen) - 1 // position of (
+			if parenStart >= len(result) {
+				continue
+			}
+
+			// Find the matching closing paren
+			depth := 1
+			parenEnd := -1
+			for i := parenStart + 1; i < len(result); i++ {
+				if result[i] == '(' {
+					depth++
+				} else if result[i] == ')' {
+					depth--
+					if depth == 0 {
+						parenEnd = i
+						break
+					}
+				}
+			}
+
+			if parenEnd == -1 {
+				continue
+			}
+
+			// Get the content inside parens
+			inner := result[parenStart+1 : parenEnd]
+
+			// Check if removing these parens is safe (no top-level comparison ops)
+			hasTopLevelCompOp := false
+			innerDepth := 0
+			for i := 0; i < len(inner); i++ {
+				if inner[i] == '(' {
+					innerDepth++
+				} else if inner[i] == ')' {
+					innerDepth--
+				} else if innerDepth == 0 {
+					// Check for comparison ops at top level
+					for _, cop := range compOps {
+						if i+len(cop) <= len(inner) && inner[i:i+len(cop)] == cop {
+							hasTopLevelCompOp = true
+							break
+						}
+					}
+				}
+				if hasTopLevelCompOp {
+					break
+				}
+			}
+
+			if !hasTopLevelCompOp {
+				// Safe to remove parens
+				// Replace "op (...)" with "op ..."
+				result = result[:parenStart] + " " + inner + result[parenEnd+1:]
+				changed = true
+				break // Start over after modification
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
+	// Clean up any double spaces
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	return strings.TrimSpace(result)
 }
 
 // caseExpressionsEqual compares CASE expressions structurally
@@ -227,8 +479,90 @@ func inComparisonsEqual(in1, in2 *parser.InComparison) bool {
 		return eq
 	}
 
-	return in1.Not == in2.Not && in1.In == in2.In
-	// Note: InExpression comparison would need to be implemented based on the actual structure
+	if in1.Not != in2.Not {
+		return false
+	}
+
+	// Compare InExpression
+	return inExpressionsEqual(in1.Expr, in2.Expr)
+}
+
+// inExpressionsEqual compares IN expressions (list, array, subquery, or identifier)
+func inExpressionsEqual(expr1, expr2 *parser.InExpression) bool {
+	if eq, needsMoreChecks := compare.NilCheck(expr1, expr2); !needsMoreChecks {
+		return eq
+	}
+
+	// Extract identifier from expression if it's a single-element list with just an identifier
+	// This handles the case where ClickHouse returns IN (cte_name) vs schema has IN cte_name
+	getIdentFromExpr := func(expr *parser.InExpression) *string {
+		if expr.Ident != nil {
+			return expr.Ident
+		}
+		// Check if it's a single-element list containing just an identifier
+		if len(expr.List) == 1 {
+			e := &expr.List[0]
+			if e.Or != nil && e.Or.And != nil && e.Or.And.Not != nil &&
+				e.Or.And.Not.Comparison != nil && e.Or.And.Not.Comparison.Addition != nil &&
+				e.Or.And.Not.Comparison.Addition.Multiplication != nil &&
+				e.Or.And.Not.Comparison.Addition.Multiplication.Unary != nil &&
+				e.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary != nil &&
+				e.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Identifier != nil &&
+				len(e.Or.Rest) == 0 && len(e.Or.And.Rest) == 0 &&
+				e.Or.And.Not.Comparison.Rest == nil &&
+				len(e.Or.And.Not.Comparison.Addition.Rest) == 0 &&
+				len(e.Or.And.Not.Comparison.Addition.Multiplication.Rest) == 0 {
+				// It's a simple identifier wrapped in parentheses
+				return &e.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Identifier.Name
+			}
+		}
+		return nil
+	}
+
+	ident1 := getIdentFromExpr(expr1)
+	ident2 := getIdentFromExpr(expr2)
+
+	// If both can be resolved to identifiers, compare them
+	if ident1 != nil && ident2 != nil {
+		return strings.EqualFold(normalizeIdentifier(*ident1), normalizeIdentifier(*ident2))
+	}
+
+	// Compare list of expressions (both must be lists)
+	if len(expr1.List) > 0 && len(expr2.List) > 0 {
+		return compare.Slices(expr1.List, expr2.List, func(a, b parser.Expression) bool {
+			return expressionsAreEqual(&a, &b)
+		})
+	}
+	if len(expr1.List) > 0 || len(expr2.List) > 0 {
+		return false
+	}
+
+	// Compare array expressions
+	if expr1.Array != nil && expr2.Array != nil {
+		return arrayExpressionsEqual(expr1.Array, expr2.Array)
+	}
+	if expr1.Array != nil || expr2.Array != nil {
+		return false
+	}
+
+	// Compare subqueries
+	if expr1.Subquery != nil && expr2.Subquery != nil {
+		return subqueriesEqual(expr1.Subquery, expr2.Subquery)
+	}
+	if expr1.Subquery != nil || expr2.Subquery != nil {
+		return false
+	}
+
+	return true
+}
+
+// subqueriesEqual compares subquery expressions
+func subqueriesEqual(sub1, sub2 *parser.Subquery) bool {
+	if eq, needsMoreChecks := compare.NilCheck(sub1, sub2); !needsMoreChecks {
+		return eq
+	}
+	// Use selectStatementsAreEqualAST from view.go (same package)
+	return selectStatementsAreEqualAST(&sub1.SelectStmt, &sub2.SelectStmt)
 }
 
 // betweenComparisonsEqual compares BETWEEN operations
@@ -322,9 +656,166 @@ func primaryExpressionsEqual(prim1, prim2 *parser.PrimaryExpression) bool {
 		return false
 	}
 
-	// For other expression types (Interval, Extract, Cast, Tuple, Array),
-	// we can add more detailed comparisons as needed
+	// Compare tuple expressions
+	if prim1.Tuple != nil && prim2.Tuple != nil {
+		return tupleExpressionsEqual(prim1.Tuple, prim2.Tuple)
+	}
+	if prim1.Tuple != nil || prim2.Tuple != nil {
+		return false
+	}
+
+	// Compare array expressions
+	if prim1.Array != nil && prim2.Array != nil {
+		return arrayExpressionsEqual(prim1.Array, prim2.Array)
+	}
+	if prim1.Array != nil || prim2.Array != nil {
+		return false
+	}
+
+	// Compare interval expressions
+	if prim1.Interval != nil && prim2.Interval != nil {
+		return intervalExpressionsEqual(prim1.Interval, prim2.Interval)
+	}
+	// Handle case where one is INTERVAL and the other is toIntervalXxx() function
+	// ClickHouse converts "INTERVAL 3 HOUR" to "toIntervalHour(3)"
+	if prim1.Interval != nil && prim2.Function != nil {
+		if valStr, unit, ok := toIntervalFunctionToInterval(prim2.Function); ok {
+			return prim1.Interval.Value == valStr && timeUnitsAreEqual(prim1.Interval.Unit, unit)
+		}
+		return false
+	}
+	if prim2.Interval != nil && prim1.Function != nil {
+		if valStr, unit, ok := toIntervalFunctionToInterval(prim1.Function); ok {
+			return prim2.Interval.Value == valStr && timeUnitsAreEqual(prim2.Interval.Unit, unit)
+		}
+		return false
+	}
+	if prim1.Interval != nil || prim2.Interval != nil {
+		return false
+	}
+
+	// Compare cast expressions
+	if prim1.Cast != nil && prim2.Cast != nil {
+		return castExpressionsEqual(prim1.Cast, prim2.Cast)
+	}
+	if prim1.Cast != nil || prim2.Cast != nil {
+		return false
+	}
+
+	// Compare extract expressions
+	if prim1.Extract != nil && prim2.Extract != nil {
+		return extractExpressionsEqual(prim1.Extract, prim2.Extract)
+	}
+	if prim1.Extract != nil || prim2.Extract != nil {
+		return false
+	}
+
+	// All known types handled, expressions are equal if we reach here
 	return true
+}
+
+// intervalExpressionsEqual compares INTERVAL expressions
+func intervalExpressionsEqual(int1, int2 *parser.IntervalExpr) bool {
+	if eq, needsMoreChecks := compare.NilCheck(int1, int2); !needsMoreChecks {
+		return eq
+	}
+	return int1.Value == int2.Value && timeUnitsAreEqual(int1.Unit, int2.Unit)
+}
+
+// toIntervalFunctionToInterval extracts interval info from toIntervalXxx(n) function calls
+// Returns (valueStr, unit, ok) where ok is true if this is a toInterval function
+func toIntervalFunctionToInterval(funcCall *parser.FunctionCall) (string, string, bool) {
+	if funcCall == nil {
+		return "", "", false
+	}
+
+	name := strings.ToLower(normalizeIdentifier(funcCall.Name))
+	var unit string
+	switch name {
+	case "tointervalsecond":
+		unit = "SECOND"
+	case "tointervalminute":
+		unit = "MINUTE"
+	case "tointervalhour":
+		unit = "HOUR"
+	case "tointervalday":
+		unit = "DAY"
+	case "tointervalweek":
+		unit = "WEEK"
+	case "tointervalmonth":
+		unit = "MONTH"
+	case "tointervalyear":
+		unit = "YEAR"
+	default:
+		return "", "", false
+	}
+
+	// Get the argument value from FirstParentheses
+	if len(funcCall.FirstParentheses) != 1 {
+		return "", "", false
+	}
+
+	// Try to extract the number value from the argument
+	arg := funcCall.FirstParentheses[0]
+	if arg.Expression != nil &&
+		arg.Expression.Or != nil && arg.Expression.Or.And != nil && arg.Expression.Or.And.Not != nil &&
+		arg.Expression.Or.And.Not.Comparison != nil && arg.Expression.Or.And.Not.Comparison.Addition != nil &&
+		arg.Expression.Or.And.Not.Comparison.Addition.Multiplication != nil &&
+		arg.Expression.Or.And.Not.Comparison.Addition.Multiplication.Unary != nil &&
+		arg.Expression.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary != nil &&
+		arg.Expression.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Literal != nil &&
+		arg.Expression.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Literal.Number != nil {
+		val := *arg.Expression.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Literal.Number
+		return val, unit, true
+	}
+
+	return "", "", false
+}
+
+// castExpressionsEqual compares CAST expressions
+func castExpressionsEqual(cast1, cast2 *parser.CastExpression) bool {
+	if eq, needsMoreChecks := compare.NilCheck(cast1, cast2); !needsMoreChecks {
+		return eq
+	}
+	// Compare the expression being cast
+	if !expressionsAreEqual(&cast1.Expression, &cast2.Expression) {
+		return false
+	}
+	// Compare the target types using their Equal method
+	return cast1.Type.Equal(&cast2.Type)
+}
+
+// extractExpressionsEqual compares EXTRACT expressions
+func extractExpressionsEqual(ext1, ext2 *parser.ExtractExpression) bool {
+	if eq, needsMoreChecks := compare.NilCheck(ext1, ext2); !needsMoreChecks {
+		return eq
+	}
+	// Compare what is being extracted (e.g., YEAR, MONTH, DAY)
+	if !strings.EqualFold(ext1.Part, ext2.Part) {
+		return false
+	}
+	// Compare the expression being extracted from
+	return expressionsAreEqual(&ext1.Expr, &ext2.Expr)
+}
+
+// tupleExpressionsEqual compares tuple expressions
+func tupleExpressionsEqual(tuple1, tuple2 *parser.TupleExpression) bool {
+	if eq, needsMoreChecks := compare.NilCheck(tuple1, tuple2); !needsMoreChecks {
+		return eq
+	}
+	return compare.Slices(tuple1.Elements, tuple2.Elements, func(a, b parser.Expression) bool {
+		return expressionsAreEqual(&a, &b)
+	})
+}
+
+// arrayExpressionsEqual compares array expressions
+func arrayExpressionsEqual(array1, array2 *parser.ArrayExpression) bool {
+	if eq, needsMoreChecks := compare.NilCheck(array1, array2); !needsMoreChecks {
+		return eq
+	}
+	return compare.Slices(array1.Elements, array2.Elements, func(a, b parser.Expression) bool {
+		return expressionsAreEqual(&a, &b)
+	})
 }
 
 // literalsEqual compares literal values
@@ -358,18 +849,34 @@ func identifiersEqual(id1, id2 *parser.IdentifierExpr) bool {
 		return eq
 	}
 
-	// Compare database qualifier
-	if !compare.Pointers(id1.Database, id2.Database) {
+	// Compare database qualifier (normalize backticks)
+	db1 := ""
+	if id1.Database != nil {
+		db1 = normalizeIdentifier(*id1.Database)
+	}
+	db2 := ""
+	if id2.Database != nil {
+		db2 = normalizeIdentifier(*id2.Database)
+	}
+	if !strings.EqualFold(db1, db2) {
 		return false
 	}
 
-	// Compare table qualifier
-	if !compare.Pointers(id1.Table, id2.Table) {
+	// Compare table qualifier (normalize backticks)
+	table1 := ""
+	if id1.Table != nil {
+		table1 = normalizeIdentifier(*id1.Table)
+	}
+	table2 := ""
+	if id2.Table != nil {
+		table2 = normalizeIdentifier(*id2.Table)
+	}
+	if !strings.EqualFold(table1, table2) {
 		return false
 	}
 
-	// Compare column name (case-insensitive for ClickHouse)
-	return strings.EqualFold(id1.Name, id2.Name)
+	// Compare column name (case-insensitive, normalize backticks for ClickHouse)
+	return strings.EqualFold(normalizeIdentifier(id1.Name), normalizeIdentifier(id2.Name))
 }
 
 // functionCallsEqual compares function calls including arguments
@@ -378,8 +885,8 @@ func functionCallsEqual(func1, func2 *parser.FunctionCall) bool {
 		return eq
 	}
 
-	// Compare function names (case-insensitive for ClickHouse)
-	if !strings.EqualFold(func1.Name, func2.Name) {
+	// Compare function names (case-insensitive, normalize backticks for ClickHouse)
+	if !strings.EqualFold(normalizeIdentifier(func1.Name), normalizeIdentifier(func2.Name)) {
 		return false
 	}
 

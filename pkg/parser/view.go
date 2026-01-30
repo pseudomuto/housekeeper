@@ -13,11 +13,25 @@ type (
 		Table    *string `parser:"@(Ident | BacktickIdent))"`
 	}
 
+	// RefreshClause represents REFRESH clause for refreshable materialized views.
+	// ClickHouse syntax:
+	//   REFRESH EVERY|AFTER interval [OFFSET interval]
+	RefreshClause struct {
+		Refresh        string  `parser:"'REFRESH'"`
+		Every          bool    `parser:"( @'EVERY'"`
+		After          bool    `parser:"| @'AFTER' )"`
+		Interval       int     `parser:"@Number"`
+		Unit           string  `parser:"@('SECOND' | 'SECONDS' | 'MINUTE' | 'MINUTES' | 'HOUR' | 'HOURS' | 'DAY' | 'DAYS' | 'WEEK' | 'WEEKS' | 'MONTH' | 'MONTHS')"`
+		OffsetInterval *int    `parser:"('OFFSET' @Number"`
+		OffsetUnit     *string `parser:"@('SECOND' | 'SECONDS' | 'MINUTE' | 'MINUTES' | 'HOUR' | 'HOURS' | 'DAY' | 'DAYS' | 'WEEK' | 'WEEKS' | 'MONTH' | 'MONTHS'))?"`
+	}
+
 	// CreateViewStmt represents a CREATE VIEW statement.
 	// Supports both regular views and materialized views.
 	// ClickHouse syntax:
 	//   CREATE [OR REPLACE] [MATERIALIZED] VIEW [IF NOT EXISTS] [db.]view_name [ON CLUSTER cluster]
-	//   [TO [db.]table_name] [ENGINE = engine] [POPULATE]
+	//   [REFRESH EVERY|AFTER interval ...]
+	//   [APPEND] [TO [db.]table_name] [ENGINE = engine] [POPULATE]
 	//   AS SELECT ...
 	CreateViewStmt struct {
 		LeadingCommentField
@@ -29,6 +43,8 @@ type (
 		Database     *string          `parser:"(@(Ident | BacktickIdent) '.')?"`
 		Name         string           `parser:"@(Ident | BacktickIdent)"`
 		OnCluster    *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		Refresh      *RefreshClause   `parser:"@@?"`
+		Append       bool             `parser:"@'APPEND'?"`
 		To           *ViewTableTarget `parser:"('TO' @@)?"`
 		Engine       *ViewEngine      `parser:"@@?"`
 		Populate     bool             `parser:"@'POPULATE'?"`

@@ -100,12 +100,19 @@ type (
 		Parameters []TypeParameter `parser:"('(' @@ (',' @@)* ')')?"`
 	}
 
-	// TypeParameter represents a parameter in a parametric type (can be number, identifier, string, or nested function call)
+	// TypeParameter represents a parameter in a parametric type (can be number, identifier, string, enum value, or nested function call)
 	TypeParameter struct {
-		Function *ParametricFunction `parser:"@@"`
-		Number   *string             `parser:"| @Number"`
-		String   *string             `parser:"| @String"`
-		Ident    *string             `parser:"| @(Ident | BacktickIdent)"`
+		Function  *ParametricFunction `parser:"@@"`
+		EnumValue *EnumValue          `parser:"| @@"`
+		Number    *string             `parser:"| @Number"`
+		String    *string             `parser:"| @String"`
+		Ident     *string             `parser:"| @(Ident | BacktickIdent)"`
+	}
+
+	// EnumValue represents an enum value definition in Enum8/Enum16: 'name' = number
+	EnumValue struct {
+		Name  string `parser:"@String '='"`
+		Value string `parser:"@Number"`
 	}
 
 	// ParametricFunction represents a function call within type parameters (e.g., quantiles(0.5, 0.75))
@@ -124,14 +131,22 @@ func (s *SimpleType) Equal(other DataTypeComparable) bool {
 		return false
 	}
 
-	if s.Name != otherSimple.Name {
-		return false
+	// Special handling for DateTime/DateTime64 normalization
+	// ClickHouse normalizes DateTime(precision, timezone) to DateTime64(precision) in system.tables
+	// So DateTime(3, UTC) and DateTime64(3) should be considered equal
+	if s.isDateTimeType() && otherSimple.isDateTimeType() {
+		return s.isDateTimeCompatibleWith(otherSimple)
 	}
 
-	// Special handling for DateTime64 timezone normalization
-	// ClickHouse may normalize DateTime64(precision, timezone) to DateTime64(precision) in system.tables
-	if s.Name == "DateTime64" && otherSimple.Name == "DateTime64" {
-		return s.isDateTime64CompatibleWith(otherSimple)
+	// Special handling for Decimal type normalization
+	// ClickHouse normalizes Decimal64(N) to Decimal(18, N) in system.tables
+	// Similarly Decimal32(N) -> Decimal(9, N) and Decimal128(N) -> Decimal(38, N)
+	if s.isDecimalType() && otherSimple.isDecimalType() {
+		return s.isDecimalCompatibleWith(otherSimple)
+	}
+
+	if s.Name != otherSimple.Name {
+		return false
 	}
 
 	// Standard parameter comparison for all other types
@@ -146,26 +161,29 @@ func (s *SimpleType) Equal(other DataTypeComparable) bool {
 	return true
 }
 
-// TypeName returns the type name for SimpleType
-func (s *SimpleType) TypeName() string {
-	return "SimpleType"
+// isDateTimeType returns true if this is a DateTime or DateTime64 type
+func (s *SimpleType) isDateTimeType() bool {
+	return s.Name == "DateTime" || s.Name == "DateTime64"
 }
 
-// isDateTime64CompatibleWith checks if two DateTime64 types are semantically compatible
-// despite potential timezone normalization differences from ClickHouse system.tables
-func (s *SimpleType) isDateTime64CompatibleWith(other *SimpleType) bool {
-	// Both must have at least precision parameter
-	if len(s.Parameters) == 0 || len(other.Parameters) == 0 {
-		return false
-	}
+// isDateTimeCompatibleWith checks if two DateTime/DateTime64 types are semantically compatible
+// despite ClickHouse's normalization patterns:
+// - DateTime(precision, timezone) is normalized to DateTime64(precision) in system.tables
+// - DateTime64(precision, timezone) may be normalized to DateTime64(precision)
+func (s *SimpleType) isDateTimeCompatibleWith(other *SimpleType) bool {
+	// Get precision from both types
+	sPrecision := s.getDateTimePrecision()
+	otherPrecision := other.getDateTimePrecision()
 
-	// First parameter (precision) must match
-	if !s.Parameters[0].Equal(&other.Parameters[0]) {
-		return false
-	}
-
-	// Case 1: Both have same number of parameters - use normal comparison
-	if len(s.Parameters) == len(other.Parameters) {
+	// If either has no precision (plain DateTime), they must be the same type with same params
+	if sPrecision == "" || otherPrecision == "" {
+		// Plain DateTime without precision - use strict comparison
+		if s.Name != other.Name {
+			return false
+		}
+		if len(s.Parameters) != len(other.Parameters) {
+			return false
+		}
 		for i := range s.Parameters {
 			if !s.Parameters[i].Equal(&other.Parameters[i]) {
 				return false
@@ -174,16 +192,89 @@ func (s *SimpleType) isDateTime64CompatibleWith(other *SimpleType) bool {
 		return true
 	}
 
-	// Case 2: Different parameter counts - check for timezone normalization
-	// One should have 1 param (precision), other should have 2 params (precision + timezone)
-	if (len(s.Parameters) == 1 && len(other.Parameters) == 2) ||
-		(len(s.Parameters) == 2 && len(other.Parameters) == 1) {
-		// Precision already matches (checked above), so this is compatible
-		return true
+	// Both have precision - compare precision values
+	if sPrecision != otherPrecision {
+		return false
 	}
 
-	// Case 3: Both have more than 2 params or some other mismatch - not compatible
-	return false
+	// Precision matches, so DateTime(3, UTC) == DateTime64(3) == DateTime64(3, 'UTC')
+	return true
+}
+
+// getDateTimePrecision returns the precision parameter for DateTime/DateTime64 types
+// Returns "" if no precision is specified (plain DateTime)
+func (s *SimpleType) getDateTimePrecision() string {
+	if len(s.Parameters) == 0 {
+		return ""
+	}
+	// First parameter should be precision (a number)
+	if s.Parameters[0].Number != nil {
+		return *s.Parameters[0].Number
+	}
+	return ""
+}
+
+// isDecimalType returns true if this is a Decimal, Decimal32, Decimal64, or Decimal128 type
+func (s *SimpleType) isDecimalType() bool {
+	return s.Name == "Decimal" || s.Name == "Decimal32" || s.Name == "Decimal64" || s.Name == "Decimal128"
+}
+
+// isDecimalCompatibleWith checks if two Decimal types are semantically compatible
+// despite ClickHouse's normalization patterns:
+// - Decimal32(N) is normalized to Decimal(9, N)
+// - Decimal64(N) is normalized to Decimal(18, N)
+// - Decimal128(N) is normalized to Decimal(38, N)
+func (s *SimpleType) isDecimalCompatibleWith(other *SimpleType) bool {
+	sPrecision, sScale := s.getDecimalPrecisionScale()
+	otherPrecision, otherScale := other.getDecimalPrecisionScale()
+
+	// Compare normalized precision and scale
+	return sPrecision == otherPrecision && sScale == otherScale
+}
+
+// getDecimalPrecisionScale returns the normalized (precision, scale) for a Decimal type
+// For DecimalN(S), it returns the equivalent Decimal(P, S) values
+func (s *SimpleType) getDecimalPrecisionScale() (string, string) {
+	switch s.Name {
+	case "Decimal32":
+		// Decimal32(S) -> Decimal(9, S)
+		if len(s.Parameters) >= 1 && s.Parameters[0].Number != nil {
+			return "9", *s.Parameters[0].Number
+		}
+		return "9", ""
+	case "Decimal64":
+		// Decimal64(S) -> Decimal(18, S)
+		if len(s.Parameters) >= 1 && s.Parameters[0].Number != nil {
+			return "18", *s.Parameters[0].Number
+		}
+		return "18", ""
+	case "Decimal128":
+		// Decimal128(S) -> Decimal(38, S)
+		if len(s.Parameters) >= 1 && s.Parameters[0].Number != nil {
+			return "38", *s.Parameters[0].Number
+		}
+		return "38", ""
+	case "Decimal":
+		// Decimal(P, S) - already normalized form
+		if len(s.Parameters) >= 2 {
+			var precision, scale string
+			if s.Parameters[0].Number != nil {
+				precision = *s.Parameters[0].Number
+			}
+			if s.Parameters[1].Number != nil {
+				scale = *s.Parameters[1].Number
+			}
+			return precision, scale
+		}
+		return "", ""
+	default:
+		return "", ""
+	}
+}
+
+// TypeName returns the type name for SimpleType
+func (s *SimpleType) TypeName() string {
+	return "SimpleType"
 }
 
 // Equal compares two NullableType instances
@@ -355,23 +446,196 @@ func normalizeDecimalType(dt *DataType, precision string) {
 	}
 }
 
-// Equal compares two TypeParameter instances for equality
+// Equal compares two TypeParameter instances for equality.
+// It includes special handling for the common case where ClickHouse system tables output
+// quoted strings (e.g., 'UTC') while user DDL may use unquoted identifiers (e.g., UTC).
+// These are semantically equivalent and should compare as equal.
 func (t *TypeParameter) Equal(other *TypeParameter) bool {
-	return compare.PointersWithEqual(t.Function, other.Function, (*ParametricFunction).Equal) &&
-		compare.Pointers(t.Number, other.Number) &&
-		compare.Pointers(t.String, other.String) &&
-		compare.Pointers(t.Ident, other.Ident)
+	// If both have functions, compare functions
+	if t.Function != nil || other.Function != nil {
+		return compare.PointersWithEqual(t.Function, other.Function, (*ParametricFunction).Equal)
+	}
+
+	// If both have enum values, compare enum values
+	if t.EnumValue != nil || other.EnumValue != nil {
+		return compare.PointersWithEqual(t.EnumValue, other.EnumValue, (*EnumValue).Equal)
+	}
+
+	// If both have numbers, compare numbers
+	if t.Number != nil && other.Number != nil {
+		return *t.Number == *other.Number
+	}
+
+	// If both have strings, compare strings
+	if t.String != nil && other.String != nil {
+		return *t.String == *other.String
+	}
+
+	// If both have idents, compare idents
+	if t.Ident != nil && other.Ident != nil {
+		return *t.Ident == *other.Ident
+	}
+
+	// Handle cross-type comparison: String vs Ident
+	// ClickHouse may output 'UTC' (quoted string) while user DDL has UTC (unquoted ident)
+	// Strip quotes from string and compare with ident
+	if t.String != nil && other.Ident != nil {
+		return stripQuotes(*t.String) == *other.Ident
+	}
+	if t.Ident != nil && other.String != nil {
+		return *t.Ident == stripQuotes(*other.String)
+	}
+
+	// All other combinations (e.g., Number vs String) are not equal
+	// Check if both are nil/empty
+	return t.Function == nil && other.Function == nil &&
+		t.EnumValue == nil && other.EnumValue == nil &&
+		t.Number == nil && other.Number == nil &&
+		t.String == nil && other.String == nil &&
+		t.Ident == nil && other.Ident == nil
+}
+
+// Equal compares two EnumValue instances for equality
+func (e *EnumValue) Equal(other *EnumValue) bool {
+	if e == nil && other == nil {
+		return true
+	}
+	if e == nil || other == nil {
+		return false
+	}
+	return e.Name == other.Name && e.Value == other.Value
+}
+
+// String returns the SQL representation of an enum value: 'name' = value
+func (e *EnumValue) String() string {
+	if e == nil {
+		return ""
+	}
+	return e.Name + " = " + e.Value
+}
+
+// stripQuotes removes surrounding single quotes from a string.
+// For example, "'UTC'" becomes "UTC".
+func stripQuotes(s string) string {
+	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 // Equal compares two ParametricFunction instances for equality
+// Includes special handling for ClickHouse normalization patterns when function names
+// represent type names (like DateTime, DateTime64, Decimal, Decimal64, etc.)
 func (p *ParametricFunction) Equal(other *ParametricFunction) bool {
 	if eq, done := compare.NilCheck(p, other); !done {
 		return eq
 	}
+
+	// Check if this is a DateTime/DateTime64 type comparison
+	if isDateTimeFunctionName(p.Name) && isDateTimeFunctionName(other.Name) {
+		return parametricFunctionsDateTimeEqual(p, other)
+	}
+
+	// Check if this is a Decimal type comparison
+	if isDecimalFunctionName(p.Name) && isDecimalFunctionName(other.Name) {
+		return parametricFunctionsDecimalEqual(p, other)
+	}
+
 	return p.Name == other.Name &&
 		compare.Slices(p.Parameters, other.Parameters, func(a, b TypeParameter) bool {
 			return a.Equal(&b)
 		})
+}
+
+// isDateTimeFunctionName returns true if the name is DateTime or DateTime64
+func isDateTimeFunctionName(name string) bool {
+	return name == "DateTime" || name == "DateTime64"
+}
+
+// isDecimalFunctionName returns true if the name is a Decimal type
+func isDecimalFunctionName(name string) bool {
+	return name == "Decimal" || name == "Decimal32" || name == "Decimal64" || name == "Decimal128"
+}
+
+// parametricFunctionsDateTimeEqual compares DateTime/DateTime64 parametric functions
+// with special handling for ClickHouse normalization
+func parametricFunctionsDateTimeEqual(p, other *ParametricFunction) bool {
+	// Get precision from both
+	pPrecision := getParametricFunctionPrecision(p)
+	otherPrecision := getParametricFunctionPrecision(other)
+
+	// If either has no precision (plain DateTime), use strict comparison
+	if pPrecision == "" || otherPrecision == "" {
+		if p.Name != other.Name {
+			return false
+		}
+		return compare.Slices(p.Parameters, other.Parameters, func(a, b TypeParameter) bool {
+			return a.Equal(&b)
+		})
+	}
+
+	// Both have precision - compare precision values
+	// DateTime(3, UTC) == DateTime64(3) when precisions match
+	return pPrecision == otherPrecision
+}
+
+// parametricFunctionsDecimalEqual compares Decimal type parametric functions
+// with special handling for ClickHouse normalization
+func parametricFunctionsDecimalEqual(p, other *ParametricFunction) bool {
+	pPrecision, pScale := getDecimalFunctionPrecisionScale(p)
+	otherPrecision, otherScale := getDecimalFunctionPrecisionScale(other)
+
+	return pPrecision == otherPrecision && pScale == otherScale
+}
+
+// getParametricFunctionPrecision extracts precision from DateTime/DateTime64 type parameters
+func getParametricFunctionPrecision(p *ParametricFunction) string {
+	if len(p.Parameters) == 0 {
+		return ""
+	}
+	if p.Parameters[0].Number != nil {
+		return *p.Parameters[0].Number
+	}
+	return ""
+}
+
+// getDecimalFunctionPrecisionScale returns normalized (precision, scale) for Decimal type functions
+func getDecimalFunctionPrecisionScale(p *ParametricFunction) (string, string) {
+	switch p.Name {
+	case "Decimal32":
+		// Decimal32(S) -> Decimal(9, S)
+		if len(p.Parameters) >= 1 && p.Parameters[0].Number != nil {
+			return "9", *p.Parameters[0].Number
+		}
+		return "9", ""
+	case "Decimal64":
+		// Decimal64(S) -> Decimal(18, S)
+		if len(p.Parameters) >= 1 && p.Parameters[0].Number != nil {
+			return "18", *p.Parameters[0].Number
+		}
+		return "18", ""
+	case "Decimal128":
+		// Decimal128(S) -> Decimal(38, S)
+		if len(p.Parameters) >= 1 && p.Parameters[0].Number != nil {
+			return "38", *p.Parameters[0].Number
+		}
+		return "38", ""
+	case "Decimal":
+		// Decimal(P, S) - already normalized form
+		if len(p.Parameters) >= 2 {
+			var precision, scale string
+			if p.Parameters[0].Number != nil {
+				precision = *p.Parameters[0].Number
+			}
+			if p.Parameters[1].Number != nil {
+				scale = *p.Parameters[1].Number
+			}
+			return precision, scale
+		}
+		return "", ""
+	default:
+		return "", ""
+	}
 }
 
 // getConcreteType extracts the concrete DataTypeComparable implementation from the DataType union
@@ -586,6 +850,9 @@ func (s *SimpleType) String() string {
 func formatTypeParameter(t *TypeParameter) string {
 	if t.Function != nil {
 		return t.Function.String()
+	}
+	if t.EnumValue != nil {
+		return t.EnumValue.String()
 	}
 	if t.String != nil {
 		return *t.String

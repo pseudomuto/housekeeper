@@ -2,11 +2,14 @@ package schema
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
+	"github.com/pseudomuto/housekeeper/pkg/format"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 	"github.com/pseudomuto/housekeeper/pkg/utils"
 )
@@ -40,22 +43,22 @@ type (
 	// This structure contains all the properties needed for table comparison and
 	// migration generation, including columns, engine, and other table options.
 	TableInfo struct {
-		Name          string              // Table name (without database prefix)
-		Database      string              // Database name (empty if not specified)
-		Engine        *parser.TableEngine // Engine AST
-		Cluster       string              // Cluster name for distributed tables
-		Comment       string              // Table comment
-		OrderBy       *parser.Expression  // ORDER BY expression AST
-		PartitionBy   *parser.Expression  // PARTITION BY expression AST
-		PrimaryKey    *parser.Expression  // PRIMARY KEY expression AST
-		SampleBy      *parser.Expression  // SAMPLE BY expression AST
-		TTL           *parser.Expression  // Table-level TTL expression AST
-		Settings      map[string]string   // Table settings
-		Columns       []ColumnInfo        // Column definitions
-		OrReplace     bool                // Whether CREATE OR REPLACE was used
-		IfNotExists   bool                // Whether IF NOT EXISTS was used
-		AsSourceTable *string             // If this table uses AS, the source table name (qualified)
-		AsDependents  map[string]bool     // Tables that use AS to reference this table
+		Name          string                 // Table name (without database prefix)
+		Database      string                 // Database name (empty if not specified)
+		Engine        *parser.TableEngine    // Engine AST
+		Cluster       string                 // Cluster name for distributed tables
+		Comment       string                 // Table comment
+		OrderBy       *parser.Expression     // ORDER BY expression AST
+		PartitionBy   *parser.Expression     // PARTITION BY expression AST
+		PrimaryKey    *parser.Expression     // PRIMARY KEY expression AST
+		SampleBy      *parser.Expression     // SAMPLE BY expression AST
+		TTL           *parser.TableTTLClause // Table-level TTL clause AST (includes DELETE keyword)
+		Settings      map[string]string      // Table settings
+		Columns       []ColumnInfo           // Column definitions
+		OrReplace     bool                   // Whether CREATE OR REPLACE was used
+		IfNotExists   bool                   // Whether IF NOT EXISTS was used
+		AsSourceTable *string                // If this table uses AS, the source table name (qualified)
+		AsDependents  map[string]bool        // Tables that use AS to reference this table
 	}
 
 	// ColumnInfo represents a single column definition
@@ -89,6 +92,8 @@ const (
 	ColumnDiffDrop ColumnDiffType = "DROP"
 	// ColumnDiffModify indicates a column needs to be modified
 	ColumnDiffModify ColumnDiffType = "MODIFY"
+	// ColumnDiffRename indicates a column needs to be renamed
+	ColumnDiffRename ColumnDiffType = "RENAME"
 )
 
 // GetName implements SchemaObject interface.
@@ -133,7 +138,7 @@ func (t *TableInfo) Equal(other *TableInfo) bool {
 		!equalAST(t.PartitionBy, other.PartitionBy) ||
 		!equalAST(t.PrimaryKey, other.PrimaryKey) ||
 		!equalAST(t.SampleBy, other.SampleBy) ||
-		!equalAST(t.TTL, other.TTL) {
+		!ttlClausesEqual(t.TTL, other.TTL) {
 		return false
 	}
 
@@ -142,6 +147,92 @@ func (t *TableInfo) Equal(other *TableInfo) bool {
 		compare.Slices(t.Columns, other.Columns, func(a, b ColumnInfo) bool {
 			return a.Equal(b)
 		})
+}
+
+// ttlClausesEqual compares two TTL clauses for semantic equality.
+// This handles:
+// 1. The equivalence between INTERVAL X UNIT and toIntervalUnit(X) syntax
+// 2. The DELETE keyword being the default action (TTL expr DELETE == TTL expr)
+func ttlClausesEqual(a, b *parser.TableTTLClause) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	// Compare expressions with interval normalization
+	if !expressionsEqualWithIntervalNormalization(&a.Expression, &b.Expression) {
+		return false
+	}
+	// Compare Delete clauses with special handling for default DELETE action
+	// DELETE without WHERE is the default action, so:
+	// - nil Delete == Delete{Where: nil}
+	// - Both are considered equal
+	return ttlDeleteClausesEqual(a.Delete, b.Delete)
+}
+
+// ttlDeleteClausesEqual compares TTL Delete clauses, treating DELETE without WHERE as the default
+func ttlDeleteClausesEqual(a, b *parser.TTLDelete) bool {
+	// DELETE without WHERE is the default action
+	// So nil and &TTLDelete{Where: nil} are equivalent
+	aIsDefault := a == nil || a.Where == nil
+	bIsDefault := b == nil || b.Where == nil
+
+	if aIsDefault && bIsDefault {
+		return true
+	}
+	if aIsDefault != bIsDefault {
+		return false
+	}
+	// Both have WHERE clauses - compare them
+	return a.Where.Equal(b.Where)
+}
+
+// expressionsEqualWithIntervalNormalization compares two expressions for equality,
+// treating INTERVAL X UNIT and toIntervalUnit(X) as equivalent.
+func expressionsEqualWithIntervalNormalization(a, b *parser.Expression) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	// First try standard equality
+	if a.Equal(b) {
+		return true
+	}
+	// If not equal, try normalizing interval expressions
+	// Normalize both to string representation and compare
+	aNorm := normalizeIntervalExpr(a.String())
+	bNorm := normalizeIntervalExpr(b.String())
+	return aNorm == bNorm
+}
+
+// normalizeIntervalExpr converts INTERVAL X UNIT to toIntervalUnit(X) format
+// for consistent comparison. It handles the common interval units.
+func normalizeIntervalExpr(expr string) string {
+	// Replace INTERVAL X UNIT patterns with toIntervalUnit(X)
+	// Handle: INTERVAL 7 DAY -> toIntervalDay(7)
+	intervalUnits := map[string]string{
+		"SECOND":  "Second",
+		"MINUTE":  "Minute",
+		"HOUR":    "Hour",
+		"DAY":     "Day",
+		"WEEK":    "Week",
+		"MONTH":   "Month",
+		"QUARTER": "Quarter",
+		"YEAR":    "Year",
+	}
+
+	result := expr
+	for unit, funcSuffix := range intervalUnits {
+		// Match "INTERVAL <number> <UNIT>" pattern (case insensitive)
+		// Replace with toInterval<Unit>(<number>)
+		pattern := fmt.Sprintf("(?i)INTERVAL\\s+(\\d+)\\s+%s", unit)
+		re := regexp.MustCompile(pattern)
+		result = re.ReplaceAllString(result, fmt.Sprintf("toInterval%s($1)", funcSuffix))
+	}
+	return result
 }
 
 // Equal compares two ColumnInfo instances for equality using AST comparison
@@ -157,23 +248,37 @@ func (c ColumnInfo) Equal(other ColumnInfo) bool {
 		equalAST(c.TTL, other.TTL)
 }
 
-// enginesEqual compares two table engines with special handling for ReplicatedMergeTree.
-// When the target engine is ReplicatedMergeTree with no parameters, parameters are ignored
-// in the comparison. This handles the case where ClickHouse auto-expands ReplicatedMergeTree()
-// to ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}') internally.
+// enginesEqual compares two table engines with special handling for parameter normalization.
+// This handles cases where:
+// 1. ReplicatedMergeTree() is auto-expanded by ClickHouse to include paths
+// 2. Kafka vs Kafka() are semantically equivalent (empty params vs no params)
 func enginesEqual(target, current *parser.TableEngine) bool {
 	// Use standard equalAST for nil checks
 	if target == nil || current == nil {
 		return equalAST(target, current)
 	}
 
-	// Special handling for ReplicatedMergeTree when target has no parameters
-	if target.Name == "ReplicatedMergeTree" && len(target.Parameters) == 0 {
-		// If target has no parameters, only compare engine names (ignore current parameters)
-		return current.Name == "ReplicatedMergeTree"
+	// Engine names must match
+	if target.Name != current.Name {
+		return false
 	}
 
-	// For all other cases (including ReplicatedMergeTree with explicit parameters), use standard AST comparison
+	// Special handling for ReplicatedMergeTree when target has no parameters
+	// ClickHouse auto-expands ReplicatedMergeTree() to include paths like
+	// ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')
+	if target.Name == "ReplicatedMergeTree" && len(target.Parameters) == 0 {
+		return true // Names match and target has no params, consider equal
+	}
+
+	// For engines where empty params are equivalent to no params (Kafka, etc.)
+	// Treat nil and empty slice as equivalent
+	targetEmpty := len(target.Parameters) == 0
+	currentEmpty := len(current.Parameters) == 0
+	if targetEmpty && currentEmpty {
+		return true
+	}
+
+	// For all other cases, use standard AST comparison
 	return equalAST(target, current)
 }
 
@@ -199,10 +304,24 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	// Pre-allocate diffs slice with estimated capacity
 	diffs := make([]*TableDiff, 0, len(currentTables)+len(targetTables))
 
+	// Pre-identify tables that will be handled via propagation to avoid duplicate diffs.
+	// When a source table has column changes, its AS dependents should be handled via propagation
+	// (which uses DROP+CREATE for view-like engines like Distributed). We skip these tables in
+	// the main loop to prevent generating both an ALTER and a DROP+CREATE for the same table.
+	// This must be done before the main loop because dependent tables may be processed
+	// before their source tables in alphabetical order.
+	propagatedTables := identifyPropagatedTables(currentTables, targetTables)
+
 	// Find tables to create or modify (exist in target but not in current) - sorted for deterministic order
 	for _, tableName := range SortedKeys(targetTables) {
 		targetTable := targetTables[tableName]
 		currentTable, exists := currentTables[tableName]
+
+		// Skip tables that will be handled via propagation from a source table
+		if propagatedTables[tableName] {
+			continue
+		}
+
 		diff, err := createTableDiff(tableName, currentTable, targetTable, currentTables, targetTables, exists)
 		if err != nil {
 			return nil, err
@@ -246,6 +365,51 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	return diffs, nil
 }
 
+// identifyPropagatedTables pre-identifies tables that should be handled via propagation
+// rather than the main comparison loop. This is necessary because dependent tables may be
+// processed before their source tables in alphabetical order.
+//
+// A table should be handled via propagation if:
+// 1. It uses AS to reference another table (is an AS dependent)
+// 2. The source table has column changes (will generate an ALTER with column changes)
+// 3. Both the source and dependent exist in current and target
+func identifyPropagatedTables(currentTables, targetTables map[string]*TableInfo) map[string]bool {
+	propagatedTables := make(map[string]bool)
+
+	for tableName, targetTable := range targetTables {
+		// Skip tables without AS dependents
+		if targetTable.AsDependents == nil || len(targetTable.AsDependents) == 0 {
+			continue
+		}
+
+		// Check if this table exists in current (required for column comparison)
+		currentTable, existsInCurrent := currentTables[tableName]
+		if !existsInCurrent {
+			continue
+		}
+
+		// Check if this table has column changes
+		// Conditionally flatten based on whether current has Nested columns
+		comparisonTargetTable := MaybeFlattenNestedColumns(currentTable, targetTable)
+		columnChanges := compareColumns(currentTable.Columns, comparisonTargetTable.Columns)
+		if len(columnChanges) == 0 {
+			continue
+		}
+
+		// This table has column changes - mark all its AS dependents for propagation
+		for dependentName := range targetTable.AsDependents {
+			// Only mark if the dependent exists in both current and target
+			if _, existsInTarget := targetTables[dependentName]; existsInTarget {
+				if _, existsInCurrent := currentTables[dependentName]; existsInCurrent {
+					propagatedTables[dependentName] = true
+				}
+			}
+		}
+	}
+
+	return propagatedTables
+}
+
 // propagateColumnChangesToDependents creates ALTER or DROP+CREATE diffs for tables
 // that use AS to reference a source table when that source table has column changes
 func propagateColumnChangesToDependents(
@@ -284,16 +448,18 @@ func propagateColumnChangesToDependents(
 		// Generate SQL based on engine type
 		if isViewLikeEngine(targetDep.Engine) {
 			// For Distributed, Memory, etc.: DROP + CREATE is safe and necessary
+			// Note: generateDropTableSQL already includes semicolon from SQLBuilder
 			propDiff.UpSQL = fmt.Sprintf("-- Recreate to match schema changes from %s\n", sourceDiff.Name) +
-				generateDropTableSQL(currentDep) + ";\n" +
+				generateDropTableSQL(currentDep) + "\n" +
 				generateCreateTableSQL(targetDep)
-			propDiff.DownSQL = generateDropTableSQL(targetDep) + ";\n" +
+			propDiff.DownSQL = generateDropTableSQL(targetDep) + "\n" +
 				generateCreateTableSQL(currentDep)
 		} else {
 			// For MergeTree, etc.: Use ALTER to preserve data
+			// Note: For propagated changes from AS dependencies, we only propagate column changes (no TTL changes)
 			propDiff.UpSQL = fmt.Sprintf("-- Propagated from %s (AS dependency)\n", sourceDiff.Name) +
-				generateAlterTableSQL(targetDep, sourceDiff.ColumnChanges)
-			propDiff.DownSQL = generateAlterTableSQL(currentDep, reverseColumnChanges(sourceDiff.ColumnChanges))
+				generateAlterTableSQL(currentDep, targetDep, sourceDiff.ColumnChanges)
+			propDiff.DownSQL = generateAlterTableSQL(targetDep, currentDep, reverseColumnChanges(sourceDiff.ColumnChanges))
 		}
 
 		propagatedDiffs = append(propagatedDiffs, propDiff)
@@ -483,7 +649,7 @@ func extractTablesFromSQL(sql *parser.SQL) (map[string]*TableInfo, error) {
 				tableInfo.SampleBy = &sampleBy.Expression
 			}
 			if ttl := table.GetTTL(); ttl != nil {
-				tableInfo.TTL = &ttl.Expression
+				tableInfo.TTL = ttl
 			}
 			if settings := table.GetSettings(); settings != nil {
 				settingMap := make(map[string]string)
@@ -547,9 +713,9 @@ func findRenamedTable(targetTable *TableInfo, currentTables, targetTables map[st
 		}
 
 		// Compare table properties (excluding name and database)
-		// Use flattened target table for comparison
-		flattenedTargetTable := FlattenNestedColumns(targetTable)
-		if tablesEqualIgnoringName(currentTable, flattenedTargetTable) {
+		// Conditionally flatten target table based on whether current has Nested columns
+		comparisonTargetTable := MaybeFlattenNestedColumns(currentTable, targetTable)
+		if tablesEqualIgnoringName(currentTable, comparisonTargetTable) {
 			return currentName
 		}
 	}
@@ -580,12 +746,17 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 	// Create maps for easier lookup
 	currentCols := make(map[string]ColumnInfo)
 	targetCols := make(map[string]ColumnInfo)
+	// Also create position maps for rename detection
+	currentPositions := make(map[string]int)
+	targetPositions := make(map[string]int)
 
-	for _, col := range current {
+	for i, col := range current {
 		currentCols[col.Name] = col
+		currentPositions[col.Name] = i
 	}
-	for _, col := range target {
+	for i, col := range target {
 		targetCols[col.Name] = col
+		targetPositions[col.Name] = i
 	}
 
 	// Find columns to add or modify
@@ -593,16 +764,37 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 		if currentCol, exists := currentCols[targetCol.Name]; exists {
 			// Column exists - check for changes using Equal() method
 			if !currentCol.Equal(targetCol) {
-				// Fix: Create copies to avoid loop variable pointer issues
-				currentColCopy := currentCol
-				targetColCopy := targetCol
-				diffs = append(diffs, ColumnDiff{
-					Type:        ColumnDiffModify,
-					ColumnName:  targetCol.Name,
-					Current:     &currentColCopy,
-					Target:      &targetColCopy,
-					Description: "Modify column " + targetCol.Name,
-				})
+				// Check if this is an incompatible AggregateFunction type change
+				// ClickHouse doesn't support MODIFY for AggregateFunction type changes
+				// We need to use DROP + ADD instead
+				if isIncompatibleAggregateFunctionChange(currentCol.DataType, targetCol.DataType) {
+					// Convert to DROP + ADD instead of MODIFY
+					currentColCopy := currentCol
+					targetColCopy := targetCol
+					diffs = append(diffs, ColumnDiff{
+						Type:        ColumnDiffDrop,
+						ColumnName:  currentCol.Name,
+						Current:     &currentColCopy,
+						Description: "Drop column " + currentCol.Name + " (incompatible AggregateFunction change)",
+					})
+					diffs = append(diffs, ColumnDiff{
+						Type:        ColumnDiffAdd,
+						ColumnName:  targetCol.Name,
+						Target:      &targetColCopy,
+						Description: "Add column " + targetCol.Name + " (replacing incompatible AggregateFunction)",
+					})
+				} else {
+					// Fix: Create copies to avoid loop variable pointer issues
+					currentColCopy := currentCol
+					targetColCopy := targetCol
+					diffs = append(diffs, ColumnDiff{
+						Type:        ColumnDiffModify,
+						ColumnName:  targetCol.Name,
+						Current:     &currentColCopy,
+						Target:      &targetColCopy,
+						Description: "Modify column " + targetCol.Name,
+					})
+				}
 			}
 		} else {
 			// Column needs to be added
@@ -631,7 +823,310 @@ func compareColumns(current, target []ColumnInfo) []ColumnDiff {
 		}
 	}
 
+	// Detect renames: match DROP and ADD columns with matching types
+	// Use position as primary match, but use name similarity as tiebreaker
+	type posDiff struct {
+		diff *ColumnDiff
+		idx  int
+		pos  int
+	}
+	dropDiffs := make([]posDiff, 0)
+	addDiffs := make([]posDiff, 0)
+
+	// Collect DROP and ADD diffs with their positions
+	for i := range diffs {
+		diff := &diffs[i]
+		if diff.Type == ColumnDiffDrop {
+			if pos, exists := currentPositions[diff.ColumnName]; exists {
+				dropDiffs = append(dropDiffs, posDiff{diff: diff, idx: i, pos: pos})
+			}
+		} else if diff.Type == ColumnDiffAdd {
+			if pos, exists := targetPositions[diff.ColumnName]; exists {
+				addDiffs = append(addDiffs, posDiff{diff: diff, idx: i, pos: pos})
+			}
+		}
+	}
+
+	// Match DROP and ADD columns
+	// Strategy: For each DROP, find the best matching ADD using:
+	// 1. Same position + same type → always treat as rename (no name similarity required)
+	// 2. Otherwise: matching type + name similarity >= 0.53
+	//
+	// Position+type match takes precedence so that e.g. min_event_received_at -> session_start_time
+	// at the same ordinal is detected as a rename even when names are lexically unrelated.
+	type matchCandidate struct {
+		dropIdx    int
+		addIdx     int
+		score      float64
+		similarity float64
+		posMatch   bool
+	}
+
+	var candidates []matchCandidate
+	for i, dropPosDiff := range dropDiffs {
+		dropCol := dropPosDiff.diff.Current
+
+		for j, addPosDiff := range addDiffs {
+			addCol := addPosDiff.diff.Target
+
+			// Check if types match (ignoring name)
+			typeMatch := columnsEqualIgnoringName(*dropCol, *addCol)
+			if !typeMatch {
+				continue
+			}
+
+			posMatch := dropPosDiff.pos == addPosDiff.pos
+			similarity := nameSimilarity(dropPosDiff.diff.ColumnName, addPosDiff.diff.ColumnName)
+
+			// Same position + same type → treat as rename regardless of name similarity
+			if posMatch {
+				// No name similarity required
+			} else if similarity < 0.53 {
+				continue
+			}
+
+			// Score: position+type match first (highest), then by name similarity
+			score := similarity * 100.0
+			if posMatch {
+				score = 1000.0 + similarity
+			}
+
+			candidates = append(candidates, matchCandidate{
+				dropIdx:    i,
+				addIdx:     j,
+				score:      score,
+				similarity: similarity,
+				posMatch:   posMatch,
+			})
+		}
+	}
+
+	// Sort candidates by score (best first) to match unambiguous pairs first
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		// Tiebreaker: prefer position matches
+		if candidates[i].posMatch != candidates[j].posMatch {
+			return candidates[i].posMatch
+		}
+		return candidates[i].similarity > candidates[j].similarity
+	})
+
+	var renameDiffs []ColumnDiff
+	indicesToRemove := make(map[int]bool)
+	matchedAdds := make(map[int]bool)  // Track which ADD diffs have been matched
+	matchedDrops := make(map[int]bool) // Track which DROP diffs have been matched
+
+	// Process candidates in order (best matches first)
+	for _, candidate := range candidates {
+		if matchedDrops[candidate.dropIdx] || matchedAdds[candidate.addIdx] {
+			continue // Already matched
+		}
+
+		dropPosDiff := dropDiffs[candidate.dropIdx]
+		addPosDiff := addDiffs[candidate.addIdx]
+
+		// Position+type match: accept as rename without name similarity. Otherwise require similarity >= 0.53.
+		accept := candidate.posMatch
+		if !accept {
+			finalSimilarity := nameSimilarity(dropPosDiff.diff.ColumnName, addPosDiff.diff.ColumnName)
+			accept = finalSimilarity >= 0.53
+		}
+
+		if accept {
+			currentCopy := *dropPosDiff.diff.Current
+			targetCopy := *addPosDiff.diff.Target
+			renameDiffs = append(renameDiffs, ColumnDiff{
+				Type:        ColumnDiffRename,
+				ColumnName:  dropPosDiff.diff.ColumnName, // old name
+				Current:     &currentCopy,
+				Target:      &targetCopy,
+				Description: fmt.Sprintf("Rename column %s to %s", dropPosDiff.diff.ColumnName, addPosDiff.diff.ColumnName),
+			})
+
+			// Mark original diffs for removal
+			indicesToRemove[dropPosDiff.idx] = true
+			indicesToRemove[addPosDiff.idx] = true
+			matchedAdds[candidate.addIdx] = true
+			matchedDrops[candidate.dropIdx] = true
+		}
+	}
+
+	// Remove matched ADD/DROP diffs and add RENAME diffs
+	if len(indicesToRemove) > 0 {
+		// Build sorted list of indices to remove (descending order)
+		sortedIndices := make([]int, 0, len(indicesToRemove))
+		for idx := range indicesToRemove {
+			sortedIndices = append(sortedIndices, idx)
+		}
+		sort.Sort(sort.Reverse(sort.IntSlice(sortedIndices)))
+
+		// Remove indices from highest to lowest to avoid index shifting issues
+		for _, idx := range sortedIndices {
+			diffs = append(diffs[:idx], diffs[idx+1:]...)
+		}
+
+		// Add RENAME diffs
+		diffs = append(diffs, renameDiffs...)
+	}
+
 	return diffs
+}
+
+// columnsEqualIgnoringName compares two columns for equality, ignoring the name
+// For rename detection, we only care about the DataType matching - other attributes
+// like Default, Codec, TTL, Comment, DefaultType might differ but shouldn't prevent renames
+func columnsEqualIgnoringName(a, b ColumnInfo) bool {
+	// Only compare DataType - ignore name, Default, Codec, TTL, Comment, DefaultType
+	// This ensures that columns with the same type but different metadata can still be renamed
+	return equalAST(a.DataType, b.DataType)
+}
+
+// nameSimilarity calculates a simple similarity score between two column names
+// Returns a value between 0.0 and 1.0, where 1.0 is identical
+// Uses word-based matching and longest common subsequence
+func nameSimilarity(name1, name2 string) float64 {
+	if name1 == name2 {
+		return 1.0
+	}
+	if len(name1) == 0 || len(name2) == 0 {
+		return 0.0
+	}
+
+	// Split names by underscores to get words
+	words1 := strings.Split(name1, "_")
+	words2 := strings.Split(name2, "_")
+
+	// Calculate word overlap (more important for column names)
+	wordOverlap := 0.0
+	matchedWords := 0
+	totalWords := len(words1)
+	if len(words2) > totalWords {
+		totalWords = len(words2)
+	}
+
+	// Count matching words (order-independent)
+	words2Map := make(map[string]int)
+	for _, w := range words2 {
+		words2Map[w]++
+	}
+
+	for _, w1 := range words1 {
+		if count, exists := words2Map[w1]; exists && count > 0 {
+			matchedWords++
+			words2Map[w1]--
+		}
+	}
+
+	if totalWords > 0 {
+		wordOverlap = float64(matchedWords) / float64(totalWords)
+	}
+
+	// Also calculate LCS for partial matches
+	lcsLen := longestCommonSubsequence(name1, name2)
+	maxLen := len(name1)
+	if len(name2) > maxLen {
+		maxLen = len(name2)
+	}
+	lcsRatio := float64(lcsLen) / float64(maxLen)
+
+	// Weight word overlap much more heavily (80%) since column names are word-based
+	// LCS helps with partial word matches (20%)
+	return 0.8*wordOverlap + 0.2*lcsRatio
+}
+
+// longestCommonSubsequence calculates the length of the longest common subsequence
+func longestCommonSubsequence(s1, s2 string) int {
+	m, n := len(s1), len(s2)
+	dp := make([][]int, m+1)
+	for i := range dp {
+		dp[i] = make([]int, n+1)
+	}
+
+	for i := 1; i <= m; i++ {
+		for j := 1; j <= n; j++ {
+			if s1[i-1] == s2[j-1] {
+				dp[i][j] = dp[i-1][j-1] + 1
+			} else {
+				if dp[i-1][j] > dp[i][j-1] {
+					dp[i][j] = dp[i-1][j]
+				} else {
+					dp[i][j] = dp[i][j-1]
+				}
+			}
+		}
+	}
+	return dp[m][n]
+}
+
+// isIncompatibleAggregateFunctionChange checks if changing from currentType to targetType
+// involves an incompatible AggregateFunction type change that ClickHouse doesn't support via MODIFY.
+// ClickHouse cannot MODIFY AggregateFunction columns when the aggregate function itself changes
+// (e.g., from groupUniqArrayArray to argMaxIf). Such changes require DROP + ADD instead.
+func isIncompatibleAggregateFunctionChange(currentType, targetType *parser.DataType) bool {
+	if currentType == nil || targetType == nil {
+		return false
+	}
+
+	currentStr := currentType.String()
+	targetStr := targetType.String()
+
+	// Check if both are AggregateFunction or SimpleAggregateFunction types
+	isCurrentAggregate := strings.Contains(currentStr, "AggregateFunction") || strings.Contains(currentStr, "SimpleAggregateFunction")
+	isTargetAggregate := strings.Contains(targetStr, "AggregateFunction") || strings.Contains(targetStr, "SimpleAggregateFunction")
+
+	if !isCurrentAggregate || !isTargetAggregate {
+		return false // Not both aggregate functions, MODIFY should work
+	}
+
+	// Extract the aggregate function name (first parameter)
+	// AggregateFunction(funcName, ...) or SimpleAggregateFunction(funcName, ...)
+	currentFunc := extractAggregateFunctionName(currentStr)
+	targetFunc := extractAggregateFunctionName(targetStr)
+
+	// If the function names are different, it's an incompatible change
+	if currentFunc != "" && targetFunc != "" && currentFunc != targetFunc {
+		return true
+	}
+
+	// Also check if switching between AggregateFunction and SimpleAggregateFunction
+	if strings.HasPrefix(currentStr, "AggregateFunction") && strings.HasPrefix(targetStr, "SimpleAggregateFunction") {
+		return true
+	}
+	if strings.HasPrefix(currentStr, "SimpleAggregateFunction") && strings.HasPrefix(targetStr, "AggregateFunction") {
+		return true
+	}
+
+	return false
+}
+
+// extractAggregateFunctionName extracts the aggregate function name from a type string
+// e.g., "AggregateFunction(groupUniqArrayArray, Array(String))" -> "groupUniqArrayArray"
+// e.g., "SimpleAggregateFunction(max, Nullable(Decimal(18, 2)))" -> "max"
+func extractAggregateFunctionName(typeStr string) string {
+	// Find the opening parenthesis after AggregateFunction or SimpleAggregateFunction
+	openParen := strings.Index(typeStr, "(")
+	if openParen == -1 {
+		return ""
+	}
+
+	// Extract the function name (first parameter before the first comma or closing paren)
+	funcPart := typeStr[openParen+1:]
+	// Find the first comma or closing paren
+	commaIdx := strings.Index(funcPart, ",")
+	closeParenIdx := strings.Index(funcPart, ")")
+
+	endIdx := len(funcPart)
+	if commaIdx != -1 && commaIdx < endIdx {
+		endIdx = commaIdx
+	}
+	if closeParenIdx != -1 && closeParenIdx < endIdx {
+		endIdx = closeParenIdx
+	}
+
+	funcName := strings.TrimSpace(funcPart[:endIdx])
+	return funcName
 }
 
 // reverseColumnChanges reverses column changes for down migration
@@ -667,6 +1162,17 @@ func reverseColumnChanges(changes []ColumnDiff) []ColumnDiff {
 				Current:     &currentCopy,
 				Target:      &targetCopy,
 				Description: "Modify column " + change.ColumnName,
+			})
+		case ColumnDiffRename:
+			// Reverse rename: new -> old becomes old -> new
+			currentCopy := *change.Target
+			targetCopy := *change.Current
+			reversed = append(reversed, ColumnDiff{
+				Type:        ColumnDiffRename,
+				ColumnName:  change.Target.Name, // new name becomes old
+				Current:     &currentCopy,
+				Target:      &targetCopy,
+				Description: fmt.Sprintf("Rename column %s to %s", change.Target.Name, change.ColumnName),
 			})
 		}
 	}
@@ -785,7 +1291,14 @@ func writeTableOptions(sql *strings.Builder, table *TableInfo) {
 	}
 	if table.TTL != nil {
 		sql.WriteString("\nTTL ")
-		sql.WriteString(table.TTL.String())
+		sql.WriteString(table.TTL.Expression.String())
+		if table.TTL.Delete != nil {
+			sql.WriteString(" DELETE")
+			if table.TTL.Delete.Where != nil {
+				sql.WriteString(" WHERE ")
+				sql.WriteString(table.TTL.Delete.Where.String())
+			}
+		}
 	}
 
 	// Settings
@@ -840,8 +1353,11 @@ func generateRenameTableSQL(from, to *TableInfo, fromName, toName string) string
 		String()
 }
 
-func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string {
-	if len(columnChanges) == 0 {
+func generateAlterTableSQL(current, target *TableInfo, columnChanges []ColumnDiff) string {
+	// Check if there are TTL changes (using ttlClausesEqual for interval normalization)
+	ttlChanged := !ttlClausesEqual(current.TTL, target.TTL)
+
+	if len(columnChanges) == 0 && !ttlChanged {
 		return ""
 	}
 
@@ -850,12 +1366,15 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 	sql.WriteString(formatQualifiedTableName(target.Database, target.Name))
 	writeOnClusterClause(&sql, target.Cluster)
 
+	needsComma := false
+
 	// Generate column modifications
-	for i, change := range columnChanges {
-		if i > 0 {
+	for _, change := range columnChanges {
+		if needsComma {
 			sql.WriteString(",")
 		}
 		sql.WriteString("\n    ")
+		needsComma = true
 
 		switch change.Type {
 		case ColumnDiffAdd:
@@ -870,6 +1389,26 @@ func generateAlterTableSQL(target *TableInfo, columnChanges []ColumnDiff) string
 		case ColumnDiffModify:
 			sql.WriteString("MODIFY COLUMN ")
 			sql.WriteString(formatColumnDefinition(*change.Target))
+		case ColumnDiffRename:
+			sql.WriteString("RENAME COLUMN `")
+			sql.WriteString(change.ColumnName) // old name
+			sql.WriteString("` TO `")
+			sql.WriteString(change.Target.Name) // new name
+			sql.WriteString("`")
+		}
+	}
+
+	// Generate TTL modification if changed
+	if ttlChanged {
+		if needsComma {
+			sql.WriteString(",")
+		}
+		sql.WriteString("\n    ")
+		if target.TTL == nil {
+			sql.WriteString("REMOVE TTL")
+		} else {
+			sql.WriteString("MODIFY TTL ")
+			sql.WriteString(format.FormatTTLClause(target.TTL))
 		}
 	}
 
@@ -910,10 +1449,10 @@ func handleTableNotExists(tableName string, targetTable *TableInfo, currentTable
 // Otherwise, column-level differences are computed and an ALTER operation is generated.
 func handleTableExists(tableName string, currentTable, targetTable *TableInfo) (*TableDiff, error) {
 	// Table exists in both - check for changes
-	// For comparison purposes, flatten the target table to match ClickHouse's internal representation
-	// Current table is already flattened by ClickHouse, but target table may have Nested syntax
-	flattenedTargetTable := FlattenNestedColumns(targetTable)
-	if tablesEqual(currentTable, flattenedTargetTable) {
+	// Conditionally flatten target table based on whether ClickHouse has flatten_nested=0
+	// If current table has Nested columns, keep target as-is; otherwise flatten to match
+	comparisonTargetTable := MaybeFlattenNestedColumns(currentTable, targetTable)
+	if tablesEqual(currentTable, comparisonTargetTable) {
 		return nil, nil
 	}
 
@@ -923,8 +1462,8 @@ func handleTableExists(tableName string, currentTable, targetTable *TableInfo) (
 	}
 
 	// Generate column diffs for regular tables
-	// Use flattened target table for comparison but preserve original for SQL generation
-	columnChanges := compareColumns(currentTable.Columns, flattenedTargetTable.Columns)
+	// Use comparison target table (may be flattened or not depending on ClickHouse setting)
+	columnChanges := compareColumns(currentTable.Columns, comparisonTargetTable.Columns)
 
 	return createAlterDiff(tableName, currentTable, targetTable, columnChanges), nil
 }
@@ -1004,8 +1543,8 @@ func createAlterDiff(tableName string, currentTable, targetTable *TableInfo, col
 			Type:        string(TableDiffAlter),
 			Name:        tableName,
 			Description: "Alter table " + tableName,
-			UpSQL:       generateAlterTableSQL(targetTable, columnChanges),
-			DownSQL:     generateAlterTableSQL(currentTable, reverseColumnChanges(columnChanges)),
+			UpSQL:       generateAlterTableSQL(currentTable, targetTable, columnChanges),
+			DownSQL:     generateAlterTableSQL(targetTable, currentTable, reverseColumnChanges(columnChanges)),
 		},
 		Current:       currentTable,
 		Target:        targetTable,

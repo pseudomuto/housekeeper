@@ -3,6 +3,8 @@ clickhouse:
   version: "25.7"
   # Where to find clickhouse.xml (and other configs).
   config_dir: "db/config.d"
+  # Where to find user profile configs (e.g., flatten_nested=0).
+  users_dir: "db/users.d"
   # The name of the cluster for DDL objects. If blank, no cluster is applied.
   cluster: "cluster"
   # Databases to exclude from schema operations (e.g., testing databases).

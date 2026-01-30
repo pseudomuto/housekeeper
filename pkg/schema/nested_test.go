@@ -339,6 +339,324 @@ func TestDetectNestedGroups(t *testing.T) {
 	}
 }
 
+func TestHasNestedColumns(t *testing.T) {
+	tests := []struct {
+		name     string
+		table    *schema.TableInfo
+		expected bool
+	}{
+		{
+			name:     "nil table",
+			table:    nil,
+			expected: false,
+		},
+		{
+			name: "table with no columns",
+			table: &schema.TableInfo{
+				Name:    "empty",
+				Columns: []schema.ColumnInfo{},
+			},
+			expected: false,
+		},
+		{
+			name: "table with only simple columns",
+			table: &schema.TableInfo{
+				Name: "users",
+				Columns: []schema.ColumnInfo{
+					{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+					{Name: "name", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "table with flattened columns (dotted arrays)",
+			table: &schema.TableInfo{
+				Name: "users",
+				Columns: []schema.ColumnInfo{
+					{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+					{Name: "profile.name", DataType: &parser.DataType{Array: &parser.ArrayType{Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}}}},
+					{Name: "profile.age", DataType: &parser.DataType{Array: &parser.ArrayType{Type: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt8"}}}}},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "table with nested column",
+			table: &schema.TableInfo{
+				Name: "users",
+				Columns: []schema.ColumnInfo{
+					{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+					{
+						Name: "profile",
+						DataType: &parser.DataType{
+							Nested: &parser.NestedType{
+								Nested: "Nested",
+								Columns: []parser.NestedColumn{
+									{Name: "name", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+									{Name: "age", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt8"}}},
+								},
+								Close: ")",
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "table with mixed columns including nested",
+			table: &schema.TableInfo{
+				Name: "events",
+				Columns: []schema.ColumnInfo{
+					{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+					{Name: "name", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+					{Name: "tags", DataType: &parser.DataType{Array: &parser.ArrayType{Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}}}},
+					{
+						Name: "metadata",
+						DataType: &parser.DataType{
+							Nested: &parser.NestedType{
+								Nested: "Nested",
+								Columns: []parser.NestedColumn{
+									{Name: "key", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+									{Name: "value", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+								},
+								Close: ")",
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := schema.HasNestedColumns(tt.table)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMaybeFlattenNestedColumns(t *testing.T) {
+	// Helper to create a simple table
+	simpleTable := func(name string) *schema.TableInfo {
+		return &schema.TableInfo{
+			Name: name,
+			Columns: []schema.ColumnInfo{
+				{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+			},
+		}
+	}
+
+	// Helper to create a table with Nested column
+	nestedTable := func(name string) *schema.TableInfo {
+		return &schema.TableInfo{
+			Name: name,
+			Columns: []schema.ColumnInfo{
+				{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+				{
+					Name: "profile",
+					DataType: &parser.DataType{
+						Nested: &parser.NestedType{
+							Nested: "Nested",
+							Columns: []parser.NestedColumn{
+								{Name: "name", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+								{Name: "age", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt8"}}},
+							},
+							Close: ")",
+						},
+					},
+				},
+			},
+		}
+	}
+
+	// Helper to create a table with flattened columns (what ClickHouse returns with flatten_nested=1)
+	flattenedTable := func(name string) *schema.TableInfo {
+		return &schema.TableInfo{
+			Name: name,
+			Columns: []schema.ColumnInfo{
+				{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+				{Name: "profile.name", DataType: &parser.DataType{Array: &parser.ArrayType{Array: "Array", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}, Close: ")"}}},
+				{Name: "profile.age", DataType: &parser.DataType{Array: &parser.ArrayType{Array: "Array", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt8"}}, Close: ")"}}},
+			},
+		}
+	}
+
+	tests := []struct {
+		name            string
+		currentTable    *schema.TableInfo
+		targetTable     *schema.TableInfo
+		expectFlattened bool // true if result should have flattened columns
+	}{
+		{
+			name:            "current has Nested - don't flatten target",
+			currentTable:    nestedTable("current"),
+			targetTable:     nestedTable("target"),
+			expectFlattened: false,
+		},
+		{
+			name:            "current has flattened - flatten target",
+			currentTable:    flattenedTable("current"),
+			targetTable:     nestedTable("target"),
+			expectFlattened: true,
+		},
+		{
+			name:            "current is simple - flatten target with nested",
+			currentTable:    simpleTable("current"),
+			targetTable:     nestedTable("target"),
+			expectFlattened: true,
+		},
+		{
+			name:            "both simple tables - no change needed",
+			currentTable:    simpleTable("current"),
+			targetTable:     simpleTable("target"),
+			expectFlattened: false, // No nested columns to flatten
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := schema.MaybeFlattenNestedColumns(tt.currentTable, tt.targetTable)
+
+			require.NotNil(t, result)
+
+			// Check if result has flattened columns (dotted names with Array type)
+			hasFlattened := false
+			hasNested := false
+			for _, col := range result.Columns {
+				if col.DataType != nil && col.DataType.Nested != nil {
+					hasNested = true
+				}
+				// Check for dotted column names which indicate flattening
+				for _, c := range col.Name {
+					if c == '.' {
+						hasFlattened = true
+						break
+					}
+				}
+			}
+
+			if tt.expectFlattened {
+				// Should have flattened columns (dotted names) and no Nested
+				require.True(t, hasFlattened || !schema.HasNestedColumns(tt.targetTable),
+					"expected flattened columns")
+				require.False(t, hasNested, "should not have Nested columns after flattening")
+			} else {
+				// Should preserve original structure
+				if schema.HasNestedColumns(tt.targetTable) {
+					require.True(t, hasNested, "should preserve Nested columns")
+				}
+			}
+		})
+	}
+}
+
+func TestMaybeFlattenNestedColumns_PreservesIdentityWhenCurrentHasNested(t *testing.T) {
+	// When current table has Nested columns (flatten_nested=0),
+	// the target should be returned as-is without flattening
+
+	targetTable := &schema.TableInfo{
+		Name: "target",
+		Columns: []schema.ColumnInfo{
+			{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+			{
+				Name: "visual_matches",
+				DataType: &parser.DataType{
+					Nested: &parser.NestedType{
+						Nested: "Nested",
+						Columns: []parser.NestedColumn{
+							{Name: "start", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}},
+							{Name: "end", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}},
+							{Name: "word", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+							{Name: "snippet", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+						},
+						Close: ")",
+					},
+				},
+			},
+		},
+	}
+
+	currentTable := &schema.TableInfo{
+		Name: "current",
+		Columns: []schema.ColumnInfo{
+			{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+			{
+				Name: "visual_matches",
+				DataType: &parser.DataType{
+					Nested: &parser.NestedType{
+						Nested: "Nested",
+						Columns: []parser.NestedColumn{
+							{Name: "start", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}},
+							{Name: "end", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}},
+							{Name: "word", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+							{Name: "snippet", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "String"}}},
+						},
+						Close: ")",
+					},
+				},
+			},
+		},
+	}
+
+	result := schema.MaybeFlattenNestedColumns(currentTable, targetTable)
+
+	// Result should be the same as targetTable (not flattened)
+	require.Equal(t, targetTable, result, "should return target as-is when current has Nested columns")
+	require.Len(t, result.Columns, 2, "should have 2 columns (not flattened to 5)")
+	require.Equal(t, "visual_matches", result.Columns[1].Name, "should keep Nested column name")
+	require.NotNil(t, result.Columns[1].DataType.Nested, "should keep Nested type")
+}
+
+func TestMaybeFlattenNestedColumns_FlattensWhenCurrentHasFlattened(t *testing.T) {
+	// When current table has flattened columns (flatten_nested=1 default),
+	// the target should be flattened to match
+
+	targetTable := &schema.TableInfo{
+		Name: "target",
+		Columns: []schema.ColumnInfo{
+			{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+			{
+				Name: "visual_matches",
+				DataType: &parser.DataType{
+					Nested: &parser.NestedType{
+						Nested: "Nested",
+						Columns: []parser.NestedColumn{
+							{Name: "start", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}},
+							{Name: "end", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}},
+						},
+						Close: ")",
+					},
+				},
+			},
+		},
+	}
+
+	// Current table as returned by ClickHouse with flatten_nested=1
+	currentTable := &schema.TableInfo{
+		Name: "current",
+		Columns: []schema.ColumnInfo{
+			{Name: "id", DataType: &parser.DataType{Simple: &parser.SimpleType{Name: "UInt64"}}},
+			{Name: "visual_matches.start", DataType: &parser.DataType{Array: &parser.ArrayType{Array: "Array", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}, Close: ")"}}},
+			{Name: "visual_matches.end", DataType: &parser.DataType{Array: &parser.ArrayType{Array: "Array", Type: &parser.DataType{Simple: &parser.SimpleType{Name: "Int32"}}, Close: ")"}}},
+		},
+	}
+
+	result := schema.MaybeFlattenNestedColumns(currentTable, targetTable)
+
+	// Result should be flattened
+	require.NotEqual(t, targetTable, result, "should return flattened copy")
+	require.Len(t, result.Columns, 3, "should have 3 columns (flattened from 2)")
+	require.Equal(t, "id", result.Columns[0].Name)
+	require.Equal(t, "visual_matches.start", result.Columns[1].Name)
+	require.Equal(t, "visual_matches.end", result.Columns[2].Name)
+	require.NotNil(t, result.Columns[1].DataType.Array, "should be Array type")
+	require.NotNil(t, result.Columns[2].DataType.Array, "should be Array type")
+}
+
 // Helper function to format data types for comparison
 func formatDataType(dt *parser.DataType) string {
 	if dt == nil {

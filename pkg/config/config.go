@@ -24,6 +24,10 @@ type (
 		// This directory is used for managing ClickHouse server configuration fragments
 		ConfigDir string `yaml:"config_dir,omitempty"`
 
+		// UsersDir specifies the directory where ClickHouse user profile files are stored
+		// This directory is mounted to /etc/clickhouse-server/users.d for user settings like flatten_nested
+		UsersDir string `yaml:"users_dir,omitempty"`
+
 		// Cluster specifies the default cluster name for distributed ClickHouse deployments
 		// This is used for ON CLUSTER operations and distributed DDL statements
 		Cluster string `yaml:"cluster,omitempty"`
@@ -133,6 +137,9 @@ func LoadConfig(r io.Reader) (*Config, error) {
 	}
 	if cfg.ClickHouse.ConfigDir == "" {
 		cfg.ClickHouse.ConfigDir = consts.DefaultClickHouseConfigDir
+	}
+	if cfg.ClickHouse.UsersDir == "" {
+		cfg.ClickHouse.UsersDir = consts.DefaultClickHouseUsersDir
 	}
 	if cfg.ClickHouse.Cluster == "" {
 		cfg.ClickHouse.Cluster = consts.DefaultClickHouseCluster

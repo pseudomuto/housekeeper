@@ -29,6 +29,7 @@ func diff(cfg *config.Config, client docker.DockerClient) *cli.Command {
 			container, client, err := runContainer(ctx, cmd.Writer, docker.DockerOptions{
 				Version:   cfg.ClickHouse.Version,
 				ConfigDir: cfg.ClickHouse.ConfigDir,
+				UsersDir:  cfg.ClickHouse.UsersDir,
 				Name:      "housekeeper-diff",
 			}, cfg, client)
 			if err != nil {

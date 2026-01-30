@@ -194,3 +194,31 @@ func copyBoolMap(m map[string]bool) map[string]bool {
 	maps.Copy(copy, m)
 	return copy
 }
+
+// HasNestedColumns returns true if the table has any columns with the Nested data type.
+// This is used to detect if ClickHouse has flatten_nested=0 (Nested columns are kept as-is).
+func HasNestedColumns(table *TableInfo) bool {
+	if table == nil {
+		return false
+	}
+	for _, col := range table.Columns {
+		if col.DataType != nil && col.DataType.Nested != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// MaybeFlattendNestedColumns conditionally flattens Nested columns based on whether
+// the current schema from ClickHouse has Nested columns (flatten_nested=0) or not.
+// If current table has Nested columns, target is returned as-is (no flattening).
+// If current table has flattened columns, target is flattened to match.
+func MaybeFlattenNestedColumns(currentTable, targetTable *TableInfo) *TableInfo {
+	// If current table has Nested columns, ClickHouse has flatten_nested=0
+	// Don't flatten the target - compare Nested to Nested
+	if HasNestedColumns(currentTable) {
+		return targetTable
+	}
+	// Current table has flattened columns, flatten target to match
+	return FlattenNestedColumns(targetTable)
+}

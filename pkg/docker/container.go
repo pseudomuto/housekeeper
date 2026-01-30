@@ -27,6 +27,9 @@ type (
 		// ConfigDir is the optional ClickHouse config directory path to mount (relative paths will be converted to absolute)
 		ConfigDir string
 
+		// UsersDir is the optional ClickHouse users directory path to mount for user profiles (relative paths will be converted to absolute)
+		UsersDir string
+
 		// Name is the container name (default: housekeeper-dev)
 		Name string
 	}
@@ -148,6 +151,22 @@ func (c *ClickHouseContainer) Start(ctx context.Context) error {
 				ReadOnly:      true,
 			},
 		}
+	}
+
+	// Add users directory mount if specified (for user profiles like flatten_nested)
+	// Note: users.d must be read-write because ClickHouse entrypoint writes default-user.xml
+	if c.options.UsersDir != "" {
+		// Convert to absolute path to ensure proper mounting
+		absUsersDir, err := filepath.Abs(c.options.UsersDir)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get absolute path for UsersDir: %s", c.options.UsersDir)
+		}
+
+		containerOpts.Volumes = append(containerOpts.Volumes, ContainerVolume{
+			HostPath:      absUsersDir,
+			ContainerPath: "/etc/clickhouse-server/users.d",
+			ReadOnly:      false,
+		})
 	}
 
 	// Pull the image first

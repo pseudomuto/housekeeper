@@ -87,10 +87,17 @@ func runContainer(ctx context.Context, w io.Writer, opts docker.DockerOptions, c
 					return nil, nil, errors.Wrap(err, "failed to format SQL statement")
 				}
 
-				if err := client.ExecuteMigration(ctx, buf.String()); err != nil {
+				stmtSQL := buf.String()
+				if err := client.ExecuteMigration(ctx, stmtSQL); err != nil {
+					// Log ClickHouse error response immediately
+					fmt.Fprintf(os.Stderr, "\n[CLICKHOUSE_ERROR] Migration: %s\n", migration.Version)
+					fmt.Fprintf(os.Stderr, "[CLICKHOUSE_ERROR] Error: %v\n", err)
+					fmt.Fprintf(os.Stderr, "[CLICKHOUSE_ERROR] SQL (first 500 chars): %.500s\n", stmtSQL)
+					os.Stderr.Sync()
+					
 					_ = container.Stop(ctx)
 					_ = client.Close()
-					return nil, nil, errors.Wrapf(err, "failed to execute statement: %s", buf.String())
+					return nil, nil, errors.Wrapf(err, "failed to execute statement: %s", stmtSQL)
 				}
 			}
 		}
