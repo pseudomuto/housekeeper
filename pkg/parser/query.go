@@ -8,8 +8,8 @@ type (
 		With     *WithClause          `parser:"@@?"`
 		Select   string               `parser:"'SELECT'"`
 		Distinct bool                 `parser:"@'DISTINCT'?"`
-		Columns  []SelectColumn       `parser:"@@ (',' @@)*"`
-		From     *FromClause          `parser:"@@?"`
+		Columns  []SelectColumn       `parser:"(Comment | MultilineComment)* @@ (',' (Comment | MultilineComment)* @@)*"`
+		From     *FromClause          `parser:"(Comment | MultilineComment)* @@?"`
 		Where    *WhereClause         `parser:"@@?"`
 		GroupBy  *GroupByClause       `parser:"@@?"`
 		Having   *HavingClause        `parser:"@@?"`

@@ -85,6 +85,12 @@ func TestSelectParsing(t *testing.T) {
 		{"with settings", "SELECT * FROM users SETTINGS max_threads = 4", true},
 		{"with multiple settings", "SELECT * FROM users SETTINGS max_threads = 4, use_index = 1", true},
 
+		// Inline comments between SELECT columns
+		{"comment between columns", "SELECT a, -- comment\n b, c FROM t", true},
+		{"multiline comment between columns", "SELECT a, /* comment */ b FROM t", true},
+		{"comment before first column", "SELECT -- comment\n a, b FROM t", true},
+		{"comment before FROM", "SELECT a, b\n-- comment\nFROM t", true},
+
 		// Complex combinations - now working!
 		{"complex query", "SELECT u.name, COUNT(o.id) AS order_count FROM users AS u LEFT JOIN orders AS o ON u.id = o.user_id WHERE u.active = 1 GROUP BY u.name HAVING COUNT(o.id) > 5 ORDER BY order_count DESC LIMIT 10", true},
 	}
