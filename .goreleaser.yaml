@@ -35,7 +35,7 @@ archives:
 # Docker image configuration
 dockers_v2:
   - images:
-      - "ghcr.io/pseudomuto/{{ .ProjectName }}"
+      - "ghcr.io/noibu/{{ .ProjectName }}"
 
     tags:
       - "v{{.Version }}"
@@ -45,8 +45,8 @@ dockers_v2:
     labels:
       "org.opencontainers.image.title": "{{ .ProjectName }}"
       "org.opencontainers.image.description": "ClickHouse schema migration tool"
-      "org.opencontainers.image.url": "https://github.com/pseudomuto/{{ .ProjectName }}"
-      "org.opencontainers.image.source": "https://github.com/pseudomuto/{{ .ProjectName }}"
+      "org.opencontainers.image.url": "https://github.com/noibu/{{ .ProjectName }}"
+      "org.opencontainers.image.source": "https://github.com/noibu/{{ .ProjectName }}"
       "org.opencontainers.image.version": "{{ .Version }}"
       "org.opencontainers.image.created": "{{ .Date }}"
       "org.opencontainers.image.revision": "{{ .FullCommit }}"
@@ -84,7 +84,7 @@ changelog:
 # Release configuration
 release:
   github:
-    owner: pseudomuto
+    owner: noibu
     name: housekeeper
   draft: false
   prerelease: auto
@@ -99,7 +99,7 @@ release:
     Container image is available on GitHub Container Registry:
 
     ```bash
-    docker pull ghcr.io/pseudomuto/housekeeper:{{ .Version }}
+    docker pull ghcr.io/noibu/housekeeper:{{ .Version }}
     ```
 
     ### Installation
@@ -107,4 +107,4 @@ release:
     Download the appropriate binary for your platform from the assets below, or use the container image.
 
   footer: |
-    **Full Changelog**: https://github.com/pseudomuto/housekeeper/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/noibu/housekeeper/compare/{{ .PreviousTag }}...{{ .Tag }}
