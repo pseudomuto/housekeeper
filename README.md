@@ -1,8 +1,8 @@
 # Housekeeper
 
-[![CI](https://github.com/pseudomuto/housekeeper/workflows/CI/badge.svg)](https://github.com/pseudomuto/housekeeper/actions?query=workflow%3ACI)
-[![GoDoc](https://godoc.org/github.com/pseudomuto/housekeeper?status.svg)](https://godoc.org/github.com/pseudomuto/housekeeper)
-[![Go Report Card](https://goreportcard.com/badge/github.com/pseudomuto/housekeeper)](https://goreportcard.com/report/github.com/pseudomuto/housekeeper)
+[![CI](https://github.com/noibu/housekeeper/workflows/CI/badge.svg)](https://github.com/noibu/housekeeper/actions?query=workflow%3ACI)
+[![GoDoc](https://godoc.org/github.com/noibu/housekeeper?status.svg)](https://godoc.org/github.com/noibu/housekeeper)
+[![Go Report Card](https://goreportcard.com/badge/github.com/noibu/housekeeper)](https://goreportcard.com/report/github.com/noibu/housekeeper)
 
 A ClickHouse schema management tool heavily inspired by [Atlas](https://atlasgo.io/), built specifically to address the gaps in ClickHouse support that Atlas couldn't fill.
 
@@ -64,12 +64,12 @@ Rather than wait for Atlas to catch up with ClickHouse's unique requirements, Ho
 
 ## Documentation
 
-📚 **[Complete Documentation](https://pseudomuto.github.io/housekeeper/)**
+📚 **[Complete Documentation](https://noibu.github.io/housekeeper/)**
 
-- [Getting Started](https://pseudomuto.github.io/housekeeper/getting-started/installation/) - Installation and setup
-- [User Guide](https://pseudomuto.github.io/housekeeper/user-guide/schema-management/) - Schema management and migrations
-- [How It Works](https://pseudomuto.github.io/housekeeper/how-it-works/overview/) - Architecture and technical details
-- [Examples](https://pseudomuto.github.io/housekeeper/examples/basic-schema/) - Real-world usage patterns
+- [Getting Started](https://noibu.github.io/housekeeper/getting-started/installation/) - Installation and setup
+- [User Guide](https://noibu.github.io/housekeeper/user-guide/schema-management/) - Schema management and migrations
+- [How It Works](https://noibu.github.io/housekeeper/how-it-works/overview/) - Architecture and technical details
+- [Examples](https://noibu.github.io/housekeeper/examples/basic-schema/) - Real-world usage patterns
 
 ## Quick Start
 

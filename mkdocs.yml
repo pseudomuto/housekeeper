@@ -1,10 +1,10 @@
 site_name: Housekeeper Documentation
 site_description: Modern ClickHouse schema management and migration tool
 site_author: Housekeeper Team
-site_url: https://pseudomuto.github.io/housekeeper/
+site_url: https://noibu.github.io/housekeeper/
 
-repo_name: pseudomuto/housekeeper
-repo_url: https://github.com/pseudomuto/housekeeper
+repo_name: noibu/housekeeper
+repo_url: https://github.com/noibu/housekeeper
 edit_uri: edit/main/docs/
 
 theme:
@@ -33,27 +33,27 @@ theme:
 nav:
   - Home: index.md
   - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quick-start.md
-    - Project Setup: getting-started/project-setup.md
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quick-start.md
+      - Project Setup: getting-started/project-setup.md
   - User Guide:
-    - Schema Management: user-guide/schema-management.md
-    - Writing Schemas: user-guide/writing-schemas.md
-    - Migration Process: user-guide/migration-process.md
-    - Configuration: user-guide/configuration.md
+      - Schema Management: user-guide/schema-management.md
+      - Writing Schemas: user-guide/writing-schemas.md
+      - Migration Process: user-guide/migration-process.md
+      - Configuration: user-guide/configuration.md
   - How It Works:
-    - Overview: how-it-works/overview.md
-    - Parser Architecture: how-it-works/parser.md
-    - Migration Generation: how-it-works/migration-generation.md
-    - Docker Integration: how-it-works/docker.md
+      - Overview: how-it-works/overview.md
+      - Parser Architecture: how-it-works/parser.md
+      - Migration Generation: how-it-works/migration-generation.md
+      - Docker Integration: how-it-works/docker.md
   - Advanced Topics:
-    - Cluster Management: advanced/cluster-management.md
-    - Best Practices: advanced/best-practices.md
-    - Troubleshooting: advanced/troubleshooting.md
+      - Cluster Management: advanced/cluster-management.md
+      - Best Practices: advanced/best-practices.md
+      - Troubleshooting: advanced/troubleshooting.md
   - Examples:
-    - Basic Schema: examples/basic-schema.md
-    - E-commerce Demo: examples/ecommerce-demo.md
-    - Complex Migrations: examples/complex-migrations.md
+      - Basic Schema: examples/basic-schema.md
+      - E-commerce Demo: examples/ecommerce-demo.md
+      - Complex Migrations: examples/complex-migrations.md
 
 markdown_extensions:
   - admonition
@@ -79,3 +79,4 @@ extra_css:
 
 plugins:
   - search
+

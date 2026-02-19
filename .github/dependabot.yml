@@ -7,9 +7,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "pseudomuto"
+      - "highstead"
     assignees:
-      - "pseudomuto"
+      - "highstead"
     commit-message:
       prefix: "deps"
       include: "scope"
@@ -21,9 +21,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     reviewers:
-      - "pseudomuto"
+      - "highstead"
     assignees:
-      - "pseudomuto"
+      - "highstead"
     commit-message:
       prefix: "ci"
       include: "scope"
+
