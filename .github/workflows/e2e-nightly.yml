@@ -52,7 +52,7 @@ jobs:
           ./bin/housekeeper --help
 
       - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Run E2E tests
         env:
