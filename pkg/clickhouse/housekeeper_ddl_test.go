@@ -134,8 +134,8 @@ CREATE TABLE housekeeper.revisions (version String) ENGINE = MergeTree() ORDER B
 			require.NoError(t, err)
 			require.Len(t, parsed.Statements, len(tt.expectedResult))
 
-			// Apply injectOnCluster (this is the function we're testing)
-			result := injectOnCluster(parsed.Statements, tt.cluster)
+			// Apply InjectOnCluster (this is the function we're testing)
+			result := parser.InjectOnCluster(parsed.Statements, tt.cluster)
 
 			// Verify the results
 			require.Len(t, result, len(tt.expectedResult))
@@ -145,47 +145,6 @@ CREATE TABLE housekeeper.revisions (version String) ENGINE = MergeTree() ORDER B
 
 				require.Equal(t, expected, actual, "Statement %d mismatch", i)
 			}
-		})
-	}
-}
-
-func TestIsHousekeeperDatabaseUnit(t *testing.T) {
-	tests := []struct {
-		name     string
-		database string
-		expected bool
-	}{
-		{name: "housekeeper database", database: "housekeeper", expected: true},
-		{name: "regular database", database: "analytics", expected: false},
-		{name: "default database", database: "default", expected: false},
-		{name: "system database", database: "system", expected: false},
-		{name: "empty database", database: "", expected: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isHousekeeperDatabase(tt.database)
-			require.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestGetDatabaseNameUnit(t *testing.T) {
-	tests := []struct {
-		name     string
-		database *string
-		expected string
-	}{
-		{name: "nil database", database: nil, expected: "default"},
-		{name: "empty database", database: stringPtr(""), expected: "default"},
-		{name: "explicit database", database: stringPtr("analytics"), expected: "analytics"},
-		{name: "housekeeper database", database: stringPtr("housekeeper"), expected: "housekeeper"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := getDatabaseName(tt.database)
-			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -258,7 +217,10 @@ func extractClusterInfo(stmt *parser.Statement) ClusterExpectation {
 	}
 }
 
-// Helper function to create string pointers
-func stringPtr(s string) *string {
-	return &s
+// extracts the database name from a pointer, defaulting to "default" if nil.
+func getDatabaseName(database *string) string {
+	if database != nil && *database != "" {
+		return *database
+	}
+	return "default"
 }
