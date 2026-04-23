@@ -269,11 +269,29 @@ func (f *Formatter) formatIdentifierExpr(id *parser.IdentifierExpr) string {
 		// If there's no database or table qualification, but the name contains dots,
 		// treat it as a single column identifier (e.g., flattened nested column)
 		parts = append(parts, utils.BacktickColumnName(id.Name))
+	} else if isNumeric(id.Name) {
+		// Numeric name is a tuple element index (e.g., col.1) — don't backtick
+		parts = append(parts, id.Name)
 	} else {
 		parts = append(parts, f.identifier(id.Name))
 	}
 
+	// Append tuple index without backticks (e.g., col.1)
+	if id.TupleIndex != nil {
+		parts = append(parts, *id.TupleIndex)
+	}
+
 	return strings.Join(parts, ".")
+}
+
+// isNumeric checks if a string is a numeric value (tuple element index)
+func isNumeric(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 // isBooleanLiteral checks if a name represents a boolean literal

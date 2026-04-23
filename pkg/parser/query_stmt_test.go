@@ -60,6 +60,10 @@ func TestSelectJoin(t *testing.T) {
 		{name: "full", sql: `SELECT * FROM users AS u FULL JOIN orders AS o ON u.id = o.user_id;`},
 		{name: "cross", sql: `SELECT * FROM users AS u CROSS JOIN categories AS c;`},
 		{name: "using", sql: `SELECT * FROM users AS u JOIN orders AS o USING (user_id);`},
+		{name: "array_join", sql: `SELECT attr_name, attr_value FROM analytics.events ARRAY JOIN mapKeys(attributes) AS attr_name, mapValues(attributes) AS attr_value;`},
+		{name: "left_array_join", sql: `SELECT arr_elem FROM my_table LEFT ARRAY JOIN arr AS arr_elem;`},
+		{name: "array_join_single", sql: `SELECT x FROM t ARRAY JOIN arr AS x;`},
+		{name: "array_join_multiple", sql: `SELECT item.name AS question, detail.label AS detail_label, detail.content AS detail_content FROM analytics.raw_events ARRAY JOIN payload.items AS item ARRAY JOIN item.details AS detail;`},
 	}
 
 	runStatementTests(t, "query/join", tests)

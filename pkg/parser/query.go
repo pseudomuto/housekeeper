@@ -44,11 +44,27 @@ type (
 		Alias      *string     `parser:"('AS' @(Ident | BacktickIdent))?"`
 	}
 
+	// ArrayJoinExpr represents a single expression in ARRAY JOIN clause
+	// Syntax: expr [AS alias]
+	ArrayJoinExpr struct {
+		Expression Expression `parser:"@@"`
+		Alias      *string    `parser:"('AS' @(Ident | BacktickIdent))?"`
+	}
+
+	// ArrayJoinClause represents ARRAY JOIN clause in ClickHouse
+	// Syntax: [LEFT] ARRAY JOIN expr [AS alias] [, expr [AS alias] ...]
+	ArrayJoinClause struct {
+		Left        bool            `parser:"@'LEFT'?"`
+		ArrayJoin   string          `parser:"'ARRAY' 'JOIN'"`
+		Expressions []ArrayJoinExpr `parser:"@@ (',' @@)*"`
+	}
+
 	// FromClause represents FROM clause with joins
 	FromClause struct {
-		From  string       `parser:"'FROM'"`
-		Table TableRef     `parser:"@@"`
-		Joins []JoinClause `parser:"@@*"`
+		From       string            `parser:"'FROM'"`
+		Table      TableRef          `parser:"@@"`
+		ArrayJoins []ArrayJoinClause `parser:"@@*"`
+		Joins      []JoinClause      `parser:"@@*"`
 	}
 
 	// TableRef represents a table reference (table, subquery, or function)
@@ -95,7 +111,7 @@ type (
 	// JoinClause represents JOIN operations
 	JoinClause struct {
 		Type      string         `parser:"@('INNER' | 'LEFT' | 'RIGHT' | 'FULL' | 'CROSS')?"`
-		Join      string         `parser:"@('JOIN' | 'ARRAY' 'JOIN' | 'GLOBAL' 'JOIN' | 'ASOF' 'JOIN')"`
+		Join      string         `parser:"@('JOIN' | 'GLOBAL' 'JOIN' | 'ASOF' 'JOIN')"`
 		Table     TableRef       `parser:"@@"`
 		Condition *JoinCondition `parser:"@@?"`
 	}

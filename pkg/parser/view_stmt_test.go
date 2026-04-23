@@ -12,6 +12,7 @@ func TestCreateView(t *testing.T) {
 		{name: "or_replace", sql: `CREATE OR REPLACE VIEW analytics.updated_view AS SELECT id, name, updated_at FROM users ORDER BY updated_at DESC;`},
 		{name: "with_backticks", sql: "CREATE VIEW `analytics-db`.`daily-summary` AS SELECT `order-date` AS `date`, count(*) AS `total-orders` FROM `orders-table` GROUP BY `order-date`;"},
 		{name: "with_window_functions", sql: `CREATE VIEW analytics.user_rankings AS SELECT user_id, name, score, row_number() OVER (ORDER BY score DESC) AS rank, rank() OVER (PARTITION BY category ORDER BY score DESC) AS category_rank FROM user_scores ORDER BY score DESC;`},
+		{name: "with_functional_cast", sql: `CREATE VIEW analytics.filtered_events AS SELECT region_id, org_id, user_id, product, timestamp, CAST(metadata.category, 'String') AS category, CAST(metadata.end_date, 'Date') AS end_date, CAST(metadata.detail.sequence_num, 'Nullable(UInt32)') AS sequence_num, CAST(metadata.participant_ids, 'Array(String)') AS participant_ids FROM analytics.events WHERE CAST(metadata.region, 'String') = 'us_west';`},
 	}
 
 	runStatementTests(t, "view/create", tests)
@@ -28,6 +29,8 @@ func TestCreateMaterializedView(t *testing.T) {
 		{name: "full_options", sql: `CREATE OR REPLACE MATERIALIZED VIEW IF NOT EXISTS analytics.mv_complex ON CLUSTER production TO analytics.destination_table ENGINE = ReplacingMergeTree(version) POPULATE AS SELECT id, name, max(version) AS version, argMax(data, version) AS data FROM source GROUP BY id, name;`},
 		{name: "with_joins", sql: `CREATE MATERIALIZED VIEW analytics.mv_joins ENGINE = MergeTree() ORDER BY (date, category) AS SELECT toDate(e.timestamp) AS date, e.user_id, u.name AS user_name, e.category, count() AS event_count, sum(e.value) AS total_value FROM events AS e LEFT JOIN users AS u ON e.user_id = u.id WHERE e.status = 'completed' GROUP BY date, e.user_id, u.name, e.category;`},
 		{name: "with_states", sql: `CREATE MATERIALIZED VIEW metrics.mv_user_stats_state TO metrics.user_stats_aggregated AS SELECT toDate(timestamp) AS date, user_id, sumState(amount) AS total_amount_state, avgState(duration) AS avg_duration_state, uniqState(session_id) AS unique_sessions_state FROM raw_events GROUP BY date, user_id;`},
+		{name: "with_array_join", sql: `CREATE MATERIALIZED VIEW analytics.attr_totals ENGINE = MergeTree() ORDER BY (event_id, attr_name) AS SELECT event_id, attr_name, attr_value FROM analytics.events ARRAY JOIN mapKeys(attributes) AS attr_name, mapValues(attributes) AS attr_value;`},
+		{name: "with_multiple_array_joins", sql: `CREATE MATERIALIZED VIEW analytics.nested_items_mv TO analytics.nested_items AS SELECT id, region_id, org_id, user_id, item.name AS question, detail.label AS detail_label, detail.content AS detail_content, detail.position AS detail_position, parseDateTime64BestEffortOrZero(inserted_at, 3, 'UTC') AS inserted_at FROM analytics.raw_events ARRAY JOIN payload.items AS item ARRAY JOIN item.details AS detail;`},
 	}
 
 	runStatementTests(t, "view/create_materialized", tests)
