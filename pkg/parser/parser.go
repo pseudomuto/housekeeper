@@ -62,6 +62,14 @@ func normalizeImplicitAliases(sql string) string {
 
 	// Process patterns carefully, checking each match individually
 
+	// Reserved words that should never be treated as implicit aliases
+	reservedWords := map[string]bool{
+		"ARRAY": true, "GLOBAL": true, "ASOF": true,
+		"LEFT": true, "RIGHT": true, "INNER": true, "FULL": true, "CROSS": true,
+		"JOIN": true, "WHERE": true, "GROUP": true, "ORDER": true,
+		"LIMIT": true, "HAVING": true, "SETTINGS": true, "ON": true, "USING": true,
+	}
+
 	// Pattern 1: FROM tablename alias WHERE/GROUP/ORDER/etc
 	keywords := []string{"WHERE", "LEFT", "RIGHT", "INNER", "JOIN", "GROUP", "ORDER", "LIMIT", "HAVING", "SETTINGS"}
 
@@ -70,7 +78,7 @@ func normalizeImplicitAliases(sql string) string {
 		pattern := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s+` + keyword + `\b`)
 		matches := pattern.FindAllStringSubmatch(result, -1)
 		for _, match := range matches {
-			if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+			if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) && !reservedWords[strings.ToUpper(match[2])] {
 				result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+" "+keyword)
 			}
 		}
@@ -80,7 +88,7 @@ func normalizeImplicitAliases(sql string) string {
 	pattern2 := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s*\)`)
 	matches2 := pattern2.FindAllStringSubmatch(result, -1)
 	for _, match := range matches2 {
-		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) && !reservedWords[strings.ToUpper(match[2])] {
 			result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+" )")
 		}
 	}
@@ -89,7 +97,7 @@ func normalizeImplicitAliases(sql string) string {
 	semicolonPattern := regexp.MustCompile(`\bFROM\s+(\w+(?:\.\w+)?)\s+(\w+)\s*;`)
 	matches3 := semicolonPattern.FindAllStringSubmatch(result, -1)
 	for _, match := range matches3 {
-		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) && !reservedWords[strings.ToUpper(match[2])] {
 			result = strings.ReplaceAll(result, match[0], "FROM "+match[1]+" AS "+match[2]+";")
 		}
 	}
@@ -98,7 +106,7 @@ func normalizeImplicitAliases(sql string) string {
 	joinPattern := regexp.MustCompile(`\bJOIN\s+(\w+(?:\.\w+)?)\s+(\w+)\s+ON\b`)
 	matches4 := joinPattern.FindAllStringSubmatch(result, -1)
 	for _, match := range matches4 {
-		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+		if len(match) == 3 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) && !reservedWords[strings.ToUpper(match[2])] {
 			result = strings.ReplaceAll(result, match[0], "JOIN "+match[1]+" AS "+match[2]+" ON")
 		}
 	}
@@ -107,7 +115,7 @@ func normalizeImplicitAliases(sql string) string {
 	onPattern := regexp.MustCompile(`\)\s+(\w+)\s+ON\b`)
 	matches5 := onPattern.FindAllStringSubmatch(result, -1)
 	for _, match := range matches5 {
-		if len(match) == 2 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) {
+		if len(match) == 2 && !regexp.MustCompile(`\bAS\s+`).MatchString(match[0]) && !reservedWords[strings.ToUpper(match[1])] {
 			result = strings.ReplaceAll(result, match[0], ") AS "+match[1]+" ON")
 		}
 	}

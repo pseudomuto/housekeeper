@@ -46,6 +46,10 @@ func TestSelectParsing(t *testing.T) {
 		{"full join", "SELECT * FROM users AS u FULL JOIN orders AS o ON u.id = o.user_id", true},
 		{"cross join", "SELECT * FROM users AS u CROSS JOIN categories AS c", true},
 		{"join using", "SELECT * FROM users AS u JOIN orders AS o USING (user_id)", true},
+		{"array join", "SELECT attr_name, attr_value FROM analytics.events ARRAY JOIN mapKeys(attributes) AS attr_name, mapValues(attributes) AS attr_value", true},
+		{"left array join", "SELECT arr_elem FROM my_table LEFT ARRAY JOIN arr AS arr_elem", true},
+		{"array join single", "SELECT x FROM t ARRAY JOIN arr AS x", true},
+		{"multiple array joins", "SELECT item.name AS question, detail.label AS detail_label FROM t ARRAY JOIN payload.items AS item ARRAY JOIN item.answers AS detail", true},
 
 		// GROUP BY clause - now working!
 		{"group by single", "SELECT category, count(*) FROM products GROUP BY category", true},
@@ -156,7 +160,7 @@ func TestSelectStatementFixture(t *testing.T) {
 		},
 		{
 			"Complex comprehensive query",
-			`SELECT 
+			`SELECT
 				u.id,
 				u.name,
 				u.email,
@@ -166,7 +170,7 @@ func TestSelectStatementFixture(t *testing.T) {
 				max(o.created_at) AS last_order_date
 			FROM users AS u
 			LEFT JOIN orders AS o ON u.id = o.user_id AND o.status = 'completed'
-			WHERE u.active = 1 
+			WHERE u.active = 1
 				AND u.created_at >= '2023-01-01'
 				AND u.email IS NOT NULL
 			GROUP BY u.id, u.name, u.email

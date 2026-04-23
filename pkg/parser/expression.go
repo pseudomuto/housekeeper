@@ -145,10 +145,14 @@ type (
 	}
 
 	// IdentifierExpr represents column names or qualified names
+	// Also supports tuple element access: tuple_col.1, tuple_col.2
+	// When tuple access like col.1 is used, the column name ends up in Database
+	// and the index in Name, but String() produces the correct output.
 	IdentifierExpr struct {
-		Database *string `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Table    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
-		Name     string  `parser:"@(Ident | BacktickIdent)"`
+		Database   *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Table      *string `parser:"(@(Ident | BacktickIdent) '.')?"`
+		Name       string  `parser:"@(Ident | BacktickIdent | Number)"`
+		TupleIndex *string `parser:"('.' @Number)?"`
 	}
 
 	// FunctionCall represents function invocations, including parameterized functions like quantilesState(0.5, 0.75)(value)
@@ -177,7 +181,7 @@ type (
 	// OrderByExpr for ORDER BY in OVER clause
 	OrderByExpr struct {
 		Expression Expression `parser:"@@"`
-		Desc       bool       `parser:"@'DESC'?"`
+		Direction  *string    `parser:"@('ASC' | 'DESC')?"`
 		Nulls      *string    `parser:"('NULLS' @('FIRST' | 'LAST'))?"`
 	}
 
@@ -234,12 +238,26 @@ type (
 	}
 
 	// CastExpression represents type casting
+	// Supports both standard form: CAST(expr AS Type)
+	// and functional form: CAST(expr, 'Type')
 	CastExpression struct {
-		Cast       string     `parser:"'CAST' '('"`
-		Expression Expression `parser:"@@"`
-		As         string     `parser:"'AS'"`
-		Type       DataType   `parser:"@@"`
-		Close      string     `parser:"')'"`
+		Cast       string          `parser:"'CAST' '('"`
+		Expression Expression      `parser:"@@"`
+		Standard   *CastStandard   `parser:"(@@"`
+		Functional *CastFunctional `parser:"| @@)"`
+		Close      string          `parser:"')'"`
+	}
+
+	// CastStandard represents the standard CAST form: CAST(expr AS Type)
+	CastStandard struct {
+		As   string   `parser:"'AS'"`
+		Type DataType `parser:"@@"`
+	}
+
+	// CastFunctional represents the functional CAST form: CAST(expr, 'Type')
+	CastFunctional struct {
+		Comma      string `parser:"','"`
+		TypeString string `parser:"@String"`
 	}
 
 	// IntervalExpr represents INTERVAL expressions
@@ -492,6 +510,9 @@ func (i *IdentifierExpr) String() string {
 		result += *i.Table + "."
 	}
 	result += i.Name
+	if i.TupleIndex != nil {
+		result += "." + *i.TupleIndex
+	}
 	return result
 }
 
@@ -583,8 +604,8 @@ func (o *OverClause) String() string {
 // String returns the string representation of an OrderByExpr for ORDER BY in OVER clauses
 func (o *OrderByExpr) String() string {
 	result := o.Expression.String()
-	if o.Desc {
-		result += " DESC"
+	if o.Direction != nil {
+		result += " " + *o.Direction
 	}
 	if o.Nulls != nil {
 		result += " NULLS " + *o.Nulls
@@ -666,7 +687,13 @@ func (c *CaseExpression) String() string {
 }
 
 func (c *CastExpression) String() string {
-	return "CAST(" + c.Expression.String() + " AS " + formatDataTypeForExpression(c.Type) + ")"
+	if c.Functional != nil {
+		return "CAST(" + c.Expression.String() + ", " + c.Functional.TypeString + ")"
+	}
+	if c.Standard != nil {
+		return "CAST(" + c.Expression.String() + " AS " + formatDataTypeForExpression(c.Standard.Type) + ")"
+	}
+	return "CAST(" + c.Expression.String() + ")"
 }
 
 func (e *ExtractExpression) String() string {
@@ -996,7 +1023,19 @@ func (i *IdentifierExpr) Equal(other *IdentifierExpr) bool {
 	}
 
 	// Compare Name
-	return i.Name == other.Name
+	if i.Name != other.Name {
+		return false
+	}
+
+	// Compare TupleIndex
+	if (i.TupleIndex != nil) != (other.TupleIndex != nil) {
+		return false
+	}
+	if i.TupleIndex != nil && *i.TupleIndex != *other.TupleIndex {
+		return false
+	}
+
+	return true
 }
 
 // Equal compares two FunctionCall

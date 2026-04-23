@@ -105,9 +105,19 @@ func TestExpressionParsing(t *testing.T) {
 		// {"CASE with value", "CASE status WHEN 'active' THEN 1 WHEN 'inactive' THEN 0 END", true},
 		// {"nested CASE", "CASE WHEN age < 18 THEN 'minor' WHEN age < 65 THEN 'adult' ELSE 'senior' END", true},
 
-		// CAST
+		// Tuple element access
+		{"tuple element access", "duration_at_location.1", true},
+		{"qualified tuple access", "table.column.1", true},
+		{"fully qualified tuple access", "db.table.column.1", true},
+
+		// CAST - standard form
 		{"CAST", "CAST(age AS String)", true},
 		{"CAST complex", "CAST(price * 1.1 AS Decimal(10, 2))", true},
+		// CAST - functional form
+		{"CAST functional", "CAST(age, 'String')", true},
+		{"CAST functional date", "CAST(created_at, 'Date')", true},
+		{"CAST functional nullable", "CAST(grade_lesson_number, 'Nullable(UInt32)')", true},
+		{"CAST functional array", "CAST(studentIds, 'Array(String)')", true},
 
 		// INTERVAL - now working!
 		{"INTERVAL", "INTERVAL 1 DAY", true},
@@ -127,6 +137,8 @@ func TestExpressionParsing(t *testing.T) {
 		{"simple window function", "row_number() OVER ()", true},
 		{"window with partition", "rank() OVER (PARTITION BY category)", true},
 		{"window with order", "dense_rank() OVER (ORDER BY price DESC)", true},
+		{"window with order asc", "sum(is_new_group) OVER (PARTITION BY user_id, category ORDER BY timestamp ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)", true},
+		{"window with order asc rows unbounded", "lagInFrame(addSeconds(timestamp, length)) OVER (PARTITION BY user_id, category ORDER BY timestamp ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)", true},
 		{"window with partition and order", "row_number() OVER (PARTITION BY category ORDER BY price DESC)", true},
 		{"window with multiple partitions", "sum(amount) OVER (PARTITION BY user_id, category ORDER BY date)", true},
 		{"window with nulls handling", "rank() OVER (ORDER BY score DESC NULLS LAST)", true},

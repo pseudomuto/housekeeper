@@ -146,11 +146,39 @@ func (f *Formatter) formatFromClause(from *parser.FromClause) string {
 	var results strings.Builder
 	results.WriteString(f.keyword("FROM") + " ")
 	results.WriteString(f.formatTableRef(&from.Table))
+	for i := range from.ArrayJoins {
+		results.WriteString("\n" + f.formatArrayJoinClause(&from.ArrayJoins[i]))
+	}
 	for _, join := range from.Joins {
 		results.WriteString("\n" + f.formatJoinClause(&join))
 	}
 
 	return results.String()
+}
+
+// formatArrayJoinClause formats ARRAY JOIN clause
+func (f *Formatter) formatArrayJoinClause(arrayJoin *parser.ArrayJoinClause) string {
+	if arrayJoin == nil {
+		return ""
+	}
+
+	result := ""
+	if arrayJoin.Left {
+		result = f.keyword("LEFT") + " "
+	}
+	result += f.keyword("ARRAY") + " " + f.keyword("JOIN")
+
+	exprs := make([]string, 0, len(arrayJoin.Expressions))
+	for _, expr := range arrayJoin.Expressions {
+		exprStr := f.formatExpression(&expr.Expression)
+		if expr.Alias != nil {
+			exprStr += " " + f.keyword("AS") + " " + f.identifier(*expr.Alias)
+		}
+		exprs = append(exprs, exprStr)
+	}
+
+	result += " " + strings.Join(exprs, ", ")
+	return result
 }
 
 // formatTableRef formats a table reference
