@@ -8,7 +8,7 @@ CREATE OR REPLACE TABLE IF NOT EXISTS `analytics`.`events` ON CLUSTER `productio
     `tags`       Array(String) DEFAULT array(),
     `location`   Tuple(`lat` Float64, `lon` Float64),
     `settings`   Nested(`key` String, `value` String),
-    `temp_data`  String TTL `timestamp` + days(30) COMMENT 'Temporary data'
+    `temp_data`  String COMMENT 'Temporary data' TTL `timestamp` + days(30)
 )
 ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/events', '{replica}')
 ORDER BY (`user_id`, `timestamp`)

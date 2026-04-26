@@ -60,7 +60,7 @@ func (f *Formatter) buildCreateTableHeader(stmt *parser.CreateTableStmt) []strin
 	headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
 
 	if stmt.OnCluster != nil {
-		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 	}
 
 	// Handle AS clause
@@ -291,7 +291,7 @@ func (f *Formatter) alterTable(w io.Writer, stmt *parser.AlterTableStmt) error {
 		headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
 
 		if stmt.OnCluster != nil {
-			headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		lines = append(lines, strings.Join(headerParts, " "))
@@ -399,6 +399,11 @@ func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 		parts = append(parts, f.formatExpression(&defaultClause.Expression))
 	}
 
+	// Comment — must precede CODEC per ClickHouse grammar
+	if comment := col.GetComment(); comment != nil {
+		parts = append(parts, f.keyword("COMMENT"), *comment)
+	}
+
 	// Codec
 	if codecClause := col.GetCodec(); codecClause != nil {
 		parts = append(parts, f.formatCodec(codecClause))
@@ -407,11 +412,6 @@ func (f *Formatter) formatColumn(col *parser.Column, alignWidth int) string {
 	// TTL
 	if ttlClause := col.GetTTL(); ttlClause != nil {
 		parts = append(parts, f.keyword("TTL"), f.formatExpression(&ttlClause.Expression))
-	}
-
-	// Comment
-	if comment := col.GetComment(); comment != nil {
-		parts = append(parts, f.keyword("COMMENT"), *comment)
 	}
 
 	// Trailing comments (inline with column)
@@ -443,6 +443,11 @@ func (f *Formatter) formatColumnWithoutComments(col *parser.Column, alignWidth i
 		parts = append(parts, f.formatExpression(&defaultClause.Expression))
 	}
 
+	// Comment — must precede CODEC per ClickHouse grammar
+	if comment := col.GetComment(); comment != nil {
+		parts = append(parts, f.keyword("COMMENT"), *comment)
+	}
+
 	// Codec
 	if codecClause := col.GetCodec(); codecClause != nil {
 		parts = append(parts, f.formatCodec(codecClause))
@@ -451,11 +456,6 @@ func (f *Formatter) formatColumnWithoutComments(col *parser.Column, alignWidth i
 	// TTL
 	if ttlClause := col.GetTTL(); ttlClause != nil {
 		parts = append(parts, f.keyword("TTL"), f.formatExpression(&ttlClause.Expression))
-	}
-
-	// Comment
-	if comment := col.GetComment(); comment != nil {
-		parts = append(parts, f.keyword("COMMENT"), *comment)
 	}
 
 	return strings.Join(parts, " ")
@@ -687,16 +687,16 @@ func (f *Formatter) formatModifyColumn(op *parser.ModifyColumnOperation) string 
 		parts = append(parts, f.keyword(op.Default.Type))
 		parts = append(parts, f.formatExpression(&op.Default.Expression))
 	}
+	if op.Comment != nil {
+		parts = append(parts, f.keyword("COMMENT"))
+		parts = append(parts, "'"+*op.Comment+"'")
+	}
 	if op.Codec != nil {
 		parts = append(parts, f.formatCodec(op.Codec))
 	}
 	if op.TTL != nil {
 		parts = append(parts, f.keyword("TTL"))
 		parts = append(parts, f.formatExpression(op.TTL))
-	}
-	if op.Comment != nil {
-		parts = append(parts, f.keyword("COMMENT"))
-		parts = append(parts, "'"+*op.Comment+"'")
 	}
 	return strings.Join(parts, " ")
 }
