@@ -1,0 +1,2 @@
+CREATE VIEW `v` ON CLUSTER '{cluster}'
+AS SELECT 1;

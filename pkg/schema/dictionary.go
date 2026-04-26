@@ -760,9 +760,9 @@ func buildDictionaryHeader(parts []string, stmt *parser.CreateDictionaryStmt, us
 		parts = append(parts, stmt.Name)
 	}
 
-	// ON CLUSTER
+	// ON CLUSTER — use FormatClusterName so macro refs like '{cluster}' are emitted verbatim
 	if stmt.OnCluster != nil {
-		parts = append(parts, "ON CLUSTER", *stmt.OnCluster)
+		parts = append(parts, "ON CLUSTER", utils.FormatClusterName(*stmt.OnCluster))
 	}
 
 	return parts

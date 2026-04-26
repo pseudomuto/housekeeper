@@ -27,7 +27,7 @@ type (
 		IfNotExists *string             `parser:"(@'IF' 'NOT' 'EXISTS')?"`
 		Database    *string             `parser:"((@(Ident | BacktickIdent) '.')?"`
 		Name        string              `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Columns     []*DictionaryColumn `parser:"'(' @@* ')'"`
 		Clauses     []DictionaryClause  `parser:"@@*"`
 		Comment     *string             `parser:"('COMMENT' @String)?"`
@@ -159,7 +159,7 @@ type (
 		IfNotExists *string `parser:"'ATTACH' 'DICTIONARY' (@'IF' 'NOT' 'EXISTS')?"`
 		Database    *string `parser:"((@(Ident | BacktickIdent) '.')?"`
 		Name        string  `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}
@@ -172,7 +172,7 @@ type (
 		IfExists    *string `parser:"'DETACH' 'DICTIONARY' (@'IF' 'EXISTS')?"`
 		Database    *string `parser:"((@(Ident | BacktickIdent) '.')?"`
 		Name        string  `parser:"@(Ident | BacktickIdent))"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Permanently *string `parser:"(@'PERMANENTLY')?"`
 		Sync        *string `parser:"(@'SYNC')?"`
 		TrailingCommentField
@@ -187,7 +187,7 @@ type (
 		IfExists  *string `parser:"'DROP' 'DICTIONARY' (@'IF' 'EXISTS')?"`
 		Database  *string `parser:"((@(Ident | BacktickIdent) '.')?"`
 		Name      string  `parser:"@(Ident | BacktickIdent))"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Sync      *string `parser:"(@'SYNC')?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
@@ -198,7 +198,7 @@ type (
 	RenameDictionaryStmt struct {
 		LeadingCommentField
 		Renames   []*DictionaryRename `parser:"'RENAME' 'DICTIONARY' @@ (',' @@)*"`
-		OnCluster *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string             `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}

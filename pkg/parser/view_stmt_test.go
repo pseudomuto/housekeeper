@@ -9,6 +9,7 @@ func TestCreateView(t *testing.T) {
 		{name: "basic", sql: `CREATE VIEW analytics.daily_summary AS SELECT date, count(*) AS total FROM events GROUP BY date;`},
 		{name: "if_not_exists", sql: `CREATE VIEW IF NOT EXISTS users_view AS SELECT id, name FROM users WHERE active = 1;`},
 		{name: "on_cluster", sql: `CREATE VIEW stats_view ON CLUSTER production AS SELECT * FROM statistics;`},
+		{name: "on_cluster_macro", sql: `CREATE VIEW v ON CLUSTER '{cluster}' AS SELECT 1;`},
 		{name: "or_replace", sql: `CREATE OR REPLACE VIEW analytics.updated_view AS SELECT id, name, updated_at FROM users ORDER BY updated_at DESC;`},
 		{name: "with_backticks", sql: "CREATE VIEW `analytics-db`.`daily-summary` AS SELECT `order-date` AS `date`, count(*) AS `total-orders` FROM `orders-table` GROUP BY `order-date`;"},
 		{name: "with_window_functions", sql: `CREATE VIEW analytics.user_rankings AS SELECT user_id, name, score, row_number() OVER (ORDER BY score DESC) AS rank, rank() OVER (PARTITION BY category ORDER BY score DESC) AS category_rank FROM user_scores ORDER BY score DESC;`},

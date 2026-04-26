@@ -445,6 +445,13 @@ func (f *Formatter) identifier(name string) string {
 	return utils.BacktickIdentifier(name)
 }
 
+// clusterName formats a cluster name for ON CLUSTER clauses.
+// Plain identifiers are backtick-quoted; ClickHouse macro references (e.g. '{cluster}')
+// are returned verbatim so that generated DDL is portable across clusters.
+func (f *Formatter) clusterName(name string) string {
+	return utils.FormatClusterName(name)
+}
+
 // commentable represents any statement that can have leading and trailing comments
 type commentable interface {
 	GetLeadingComments() []string

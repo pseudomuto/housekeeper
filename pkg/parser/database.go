@@ -11,7 +11,7 @@ type (
 		Database    string          `parser:"'DATABASE'"`
 		IfNotExists bool            `parser:"@('IF' 'NOT' 'EXISTS')?"`
 		Name        string          `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Engine      *DatabaseEngine `parser:"@@?"`
 		Comment     *string         `parser:"('COMMENT' @String)?"`
 		TrailingCommentField
@@ -36,7 +36,7 @@ type (
 		Alter     string               `parser:"'ALTER'"`
 		Database  string               `parser:"'DATABASE'"`
 		Name      string               `parser:"@(Ident | BacktickIdent)"`
-		OnCluster *string              `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string              `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Action    *AlterDatabaseAction `parser:"@@"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
@@ -56,7 +56,7 @@ type (
 		IfNotExists bool            `parser:"@('IF' 'NOT' 'EXISTS')?"`
 		Name        string          `parser:"@(Ident | BacktickIdent)"`
 		Engine      *DatabaseEngine `parser:"@@?"`
-		OnCluster   *string         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}
@@ -69,7 +69,7 @@ type (
 		Database    string  `parser:"'DATABASE'"`
 		IfExists    bool    `parser:"@('IF' 'EXISTS')?"`
 		Name        string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Permanently bool    `parser:"@'PERMANENTLY'?"`
 		Sync        bool    `parser:"@'SYNC'?"`
 		TrailingCommentField
@@ -84,7 +84,7 @@ type (
 		Database  string  `parser:"'DATABASE'"`
 		IfExists  bool    `parser:"@('IF' 'EXISTS')?"`
 		Name      string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Sync      bool    `parser:"@'SYNC'?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
@@ -97,7 +97,7 @@ type (
 		Rename    string            `parser:"'RENAME'"`
 		Database  string            `parser:"'DATABASE'"`
 		Renames   []*DatabaseRename `parser:"@@ (',' @@)*"`
-		OnCluster *string           `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string           `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}

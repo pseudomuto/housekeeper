@@ -8,7 +8,7 @@ type (
 		OrReplace   bool          `parser:"'CREATE' (@'OR' 'REPLACE')? 'ROLE'"`
 		IfNotExists bool          `parser:"@('IF' 'NOT' 'EXISTS')?"`
 		Name        string        `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Settings    *RoleSettings `parser:"@@?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
@@ -20,7 +20,7 @@ type (
 		LeadingCommentField
 		IfExists  bool          `parser:"'ALTER' 'ROLE' @('IF' 'EXISTS')?"`
 		Name      string        `parser:"@(Ident | BacktickIdent)"`
-		OnCluster *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string       `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		RenameTo  *string       `parser:"('RENAME' 'TO' @(Ident | BacktickIdent))?"`
 		Settings  *RoleSettings `parser:"@@?"`
 		TrailingCommentField
@@ -33,7 +33,7 @@ type (
 		LeadingCommentField
 		IfExists  bool     `parser:"'DROP' 'ROLE' @('IF' 'EXISTS')?"`
 		Names     []string `parser:"@(Ident | BacktickIdent) (',' @(Ident | BacktickIdent))*"`
-		OnCluster *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string  `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}
@@ -65,7 +65,7 @@ type (
 	GrantStmt struct {
 		LeadingCommentField
 		Privileges  *PrivilegeList `parser:"'GRANT' @@"`
-		OnCluster   *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		On          *GrantTarget   `parser:"('ON' @@)?"`
 		To          *GranteeList   `parser:"'TO' @@"`
 		WithGrant   bool           `parser:"@('WITH' 'GRANT' 'OPTION')?"`
@@ -82,7 +82,7 @@ type (
 		GrantOption bool           `parser:"'REVOKE' (@'GRANT' 'OPTION' 'FOR'"`
 		AdminOption bool           `parser:"| @'ADMIN' 'OPTION' 'FOR')?"`
 		Privileges  *PrivilegeList `parser:"@@"`
-		OnCluster   *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string        `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		On          *GrantTarget   `parser:"('ON' @@)?"`
 		From        *GranteeList   `parser:"'FROM' @@"`
 		TrailingCommentField

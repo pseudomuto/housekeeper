@@ -33,7 +33,7 @@ func (f *Formatter) createView(w io.Writer, stmt *parser.CreateViewStmt) error {
 		headerParts = append(headerParts, f.qualifiedName(stmt.Database, stmt.Name))
 
 		if stmt.OnCluster != nil {
-			headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		lines = append(lines, strings.Join(headerParts, " "))
