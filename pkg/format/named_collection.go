@@ -30,7 +30,7 @@ func (f *Formatter) createNamedCollection(w io.Writer, stmt *parser.CreateNamedC
 	headerParts = append(headerParts, f.identifier(stmt.Name))
 
 	if stmt.OnCluster != nil {
-		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 	}
 
 	headerParts = append(headerParts, f.keyword("AS"))
@@ -76,7 +76,7 @@ func (f *Formatter) alterNamedCollection(w io.Writer, stmt *parser.AlterNamedCol
 	headerParts = append(headerParts, f.identifier(stmt.Name))
 
 	if stmt.OnCluster != nil {
-		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 	}
 
 	lines = append(lines, strings.Join(headerParts, " "))
@@ -105,7 +105,7 @@ func (f *Formatter) dropNamedCollection(w io.Writer, stmt *parser.DropNamedColle
 	headerParts = append(headerParts, f.identifier(stmt.Name))
 
 	if stmt.OnCluster != nil {
-		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+		headerParts = append(headerParts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 	}
 
 	line := strings.Join(headerParts, " ") + ";"

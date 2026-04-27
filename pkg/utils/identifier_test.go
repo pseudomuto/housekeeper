@@ -274,3 +274,87 @@ func TestStripBackticks(t *testing.T) {
 func stringPtr(s string) *string {
 	return &s
 }
+
+func TestIsClusterMacro(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected bool
+	}{
+		// ClickHouse server macro references — single-quoted braces
+		{"'{cluster}'", true},
+		{"'{shard}'", true},
+		{"'{replica}'", true},
+		// Any single-quoted value is treated as a macro by the parser convention
+		{"'any-quoted-string'", true},
+		// Plain identifiers must NOT be treated as macros
+		{"default", false},
+		{"my-cluster", false},
+		{"`default`", false},
+		// Edge cases
+		{"", false},
+		{"'", false},  // not a valid single-quoted string (no closing quote)
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			require.Equal(t, tc.expected, utils.IsClusterMacro(tc.input))
+		})
+	}
+}
+
+func TestIsClickHouseMacro(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected bool
+	}{
+		// Proper ClickHouse server macro syntax: '{identifier}'
+		{"'{cluster}'", true},
+		{"'{shard}'", true},
+		{"'{replica}'", true},
+		{"'{my_macro}'", true},
+		// Single-quoted strings without braces are NOT server macros
+		{"'any-quoted-string'", false},
+		{"'default'", false},
+		// Plain identifiers are not macros
+		{"default", false},
+		{"my-cluster", false},
+		{"`default`", false},
+		// Malformed macro patterns
+		{"'{}'", false},           // empty identifier
+		{"'{123bad}'", false},     // identifier starts with digit
+		{"'{cluster'", false},     // missing closing brace
+		{"'{cluster}x'", false},   // trailing content after brace
+		// Edge cases
+		{"", false},
+		{"'", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			require.Equal(t, tc.expected, utils.IsClickHouseMacro(tc.input))
+		})
+	}
+}
+
+func TestFormatClusterName(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		// Macro references must be returned verbatim (no extra quoting)
+		{"'{cluster}'", "'{cluster}'"},
+		{"'{shard}'", "'{shard}'"},
+		// Plain identifiers must be backtick-quoted
+		{"default", "`default`"},
+		{"my-cluster", "`my-cluster`"},
+		{"prod", "`prod`"},
+		// Empty string — nothing to format
+		{"", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			require.Equal(t, tc.expected, utils.FormatClusterName(tc.input))
+		})
+	}
+}

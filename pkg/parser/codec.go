@@ -45,12 +45,23 @@ func (c *CodecClause) String() string {
 	return "CODEC(" + strings.Join(specs, ", ") + ")"
 }
 
-// Equal compares two CodecSpec instances for equality
+// Equal compares two CodecSpec instances for equality.
+//
+// When the target (other) specifies no explicit parameters, ClickHouse's
+// default-expanded parameters stored in the current schema (c) are accepted
+// as equal. ClickHouse normalizes e.g. CODEC(ZSTD) → CODEC(ZSTD(1)) and
+// CODEC(Delta) → CODEC(Delta(8)) in create_table_query, so a user-written
+// schema without explicit parameters should match what ClickHouse stores.
 func (c *CodecSpec) Equal(other *CodecSpec) bool {
-	return c.Name == other.Name &&
-		compare.Slices(c.Parameters, other.Parameters, func(a, b TypeParameter) bool {
-			return a.Equal(&b)
-		})
+	if c.Name != other.Name {
+		return false
+	}
+	if len(other.Parameters) == 0 {
+		return true
+	}
+	return compare.Slices(c.Parameters, other.Parameters, func(a, b TypeParameter) bool {
+		return a.Equal(&b)
+	})
 }
 
 // String returns the SQL representation of a codec spec.

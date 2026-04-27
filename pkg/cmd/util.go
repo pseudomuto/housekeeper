@@ -13,6 +13,7 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/docker"
 	"github.com/pseudomuto/housekeeper/pkg/migrator"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
+	"github.com/pseudomuto/housekeeper/pkg/podman"
 	schemapkg "github.com/pseudomuto/housekeeper/pkg/schema"
 )
 
@@ -39,7 +40,14 @@ func runContainer(ctx context.Context, w io.Writer, opts docker.DockerOptions, c
 		}
 	}
 
-	// 2. Create and start container
+	// 2. Create and start container.
+	// Inject auto-detect resolver if the caller didn't supply one: under Podman
+	// (detected via HOUSEKEEPER_RUNTIME, CONTAINER_HOST, DOCKER_HOST, or socket
+	// path) the Podman resolver connects via bridge IP + container port, which
+	// works correctly in rootless mode. Under Docker the Docker resolver is used.
+	if opts.AddressResolver == nil {
+		opts.AddressResolver = podman.NewAutoDetectResolver()
+	}
 	container, err := docker.NewWithOptions(dockerClient, opts)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create ClickHouse container")

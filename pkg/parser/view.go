@@ -28,7 +28,7 @@ type (
 		IfNotExists  bool             `parser:"@('IF' 'NOT' 'EXISTS')?"`
 		Database     *string          `parser:"(@(Ident | BacktickIdent) '.')?"`
 		Name         string           `parser:"@(Ident | BacktickIdent)"`
-		OnCluster    *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster    *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		To           *ViewTableTarget `parser:"('TO' @@)?"`
 		Engine       *ViewEngine      `parser:"@@?"`
 		Populate     bool             `parser:"@'POPULATE'?"`
@@ -47,7 +47,7 @@ type (
 		IfNotExists bool    `parser:"@('IF' 'NOT' 'EXISTS')?"`
 		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
 		Name        string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}
@@ -62,7 +62,7 @@ type (
 		IfExists    bool    `parser:"@('IF' 'EXISTS')?"`
 		Database    *string `parser:"(@(Ident | BacktickIdent) '.')?"`
 		Name        string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster   *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Permanently bool    `parser:"@'PERMANENTLY'?"`
 		Sync        bool    `parser:"@'SYNC'?"`
 		TrailingCommentField
@@ -79,7 +79,7 @@ type (
 		IfExists  bool    `parser:"@('IF' 'EXISTS')?"`
 		Database  *string `parser:"(@(Ident | BacktickIdent) '.')?"`
 		Name      string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Sync      bool    `parser:"@'SYNC'?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`

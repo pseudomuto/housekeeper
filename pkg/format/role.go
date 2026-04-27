@@ -28,7 +28,7 @@ func (f *Formatter) createRole(w io.Writer, stmt *parser.CreateRoleStmt) error {
 
 		// ON CLUSTER
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		// SETTINGS
@@ -59,7 +59,7 @@ func (f *Formatter) alterRole(w io.Writer, stmt *parser.AlterRoleStmt) error {
 
 		// ON CLUSTER
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		// RENAME TO
@@ -164,7 +164,7 @@ func (f *Formatter) grant(w io.Writer, stmt *parser.GrantStmt) error {
 
 		// ON CLUSTER
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		// ON target
@@ -213,7 +213,7 @@ func (f *Formatter) revoke(w io.Writer, stmt *parser.RevokeStmt) error {
 
 		// ON CLUSTER
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		// ON target

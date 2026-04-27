@@ -8,27 +8,29 @@ import (
 	"github.com/pseudomuto/housekeeper/pkg/parser"
 )
 
-// systemDatabases contains the list of ClickHouse system databases that should be excluded
-// from schema extraction operations. These databases are managed by ClickHouse internally
-// and should not be included in user schema operations.
-var systemDatabases = []string{
-	"default",
+// systemObjectDatabases lists ClickHouse-internal databases that should be excluded from
+// object extraction (tables, views, dictionaries). "default" is intentionally absent
+// because users can and do place tables there.
+var systemObjectDatabases = []string{
 	"system",
 	"information_schema",
 	"INFORMATION_SCHEMA",
 	"housekeeper",
 }
 
-// buildSystemDatabaseExclusion creates a SQL "NOT IN" clause for excluding system databases
-// using parameterized queries to prevent SQL injection. Returns the SQL condition and the
-// parameters to use with the query.
-// The columnName parameter specifies which column to check (e.g., "database", "name").
-func buildSystemDatabaseExclusion(columnName string) (string, []any) {
-	// Create placeholders for each system database
-	placeholders := make([]string, len(systemDatabases))
-	params := make([]any, len(systemDatabases))
+// systemDatabaseNames extends systemObjectDatabases with "default" for use when generating
+// CREATE DATABASE statements. "default" always exists in ClickHouse and must not appear as
+// a migration target, but the tables/views/dicts it contains are valid user objects.
+var systemDatabaseNames = append(append([]string{}, systemObjectDatabases...), "default")
 
-	for i, db := range systemDatabases {
+// buildSystemDatabaseExclusion creates a SQL "NOT IN" clause for excluding system databases
+// (for object extraction) using parameterized queries. The columnName parameter specifies
+// which column to check (e.g., "database", "name").
+func buildSystemDatabaseExclusion(columnName string) (string, []any) {
+	placeholders := make([]string, len(systemObjectDatabases))
+	params := make([]any, len(systemObjectDatabases))
+
+	for i, db := range systemObjectDatabases {
 		placeholders[i] = "?"
 		params[i] = db
 	}
@@ -37,20 +39,40 @@ func buildSystemDatabaseExclusion(columnName string) (string, []any) {
 	return condition, params
 }
 
-// buildDatabaseExclusion creates a SQL "NOT IN" clause for excluding both system databases
-// and user-specified ignored databases. Returns the SQL condition and the parameters to use
-// with the query. The columnName parameter specifies which column to check (e.g., "database", "name").
+// buildDatabaseExclusion creates a SQL "NOT IN" clause for excluding system object databases
+// and user-specified ignored databases from object extraction (tables, views, dictionaries).
+// Use buildDatabaseNameExclusion when generating CREATE DATABASE statements instead.
 func buildDatabaseExclusion(columnName string, ignoreDatabases []string) (string, []any) {
-	// Combine system databases with user-specified ignored databases
-	allExcluded := append([]string{}, systemDatabases...)
+	allExcluded := append([]string{}, systemObjectDatabases...)
 	allExcluded = append(allExcluded, ignoreDatabases...)
 
-	// If no databases to exclude, return a trivial condition
 	if len(allExcluded) == 0 {
 		return "1=1", []any{}
 	}
 
-	// Create placeholders for all excluded databases
+	placeholders := make([]string, len(allExcluded))
+	params := make([]any, len(allExcluded))
+
+	for i, db := range allExcluded {
+		placeholders[i] = "?"
+		params[i] = db
+	}
+
+	condition := columnName + " NOT IN (" + strings.Join(placeholders, ", ") + ")"
+	return condition, params
+}
+
+// buildDatabaseNameExclusion creates a SQL "NOT IN" clause for use in CREATE DATABASE
+// extraction. It excludes systemDatabaseNames (which includes "default") plus any
+// user-specified ignored databases.
+func buildDatabaseNameExclusion(columnName string, ignoreDatabases []string) (string, []any) {
+	allExcluded := append([]string{}, systemDatabaseNames...)
+	allExcluded = append(allExcluded, ignoreDatabases...)
+
+	if len(allExcluded) == 0 {
+		return "1=1", []any{}
+	}
+
 	placeholders := make([]string, len(allExcluded))
 	params := make([]any, len(allExcluded))
 

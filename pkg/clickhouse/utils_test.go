@@ -15,16 +15,16 @@ func TestBuildSystemDatabaseExclusion(t *testing.T) {
 		expectedParams []any
 	}{
 		{
-			name:           "database column",
+			name:           "database column excludes internal DBs but not default",
 			columnName:     "database",
-			expectedQuery:  "database NOT IN (?, ?, ?, ?, ?)",
-			expectedParams: []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
+			expectedQuery:  "database NOT IN (?, ?, ?, ?)",
+			expectedParams: []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
 		},
 		{
-			name:           "name column",
+			name:           "name column excludes internal DBs but not default",
 			columnName:     "name",
-			expectedQuery:  "name NOT IN (?, ?, ?, ?, ?)",
-			expectedParams: []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
+			expectedQuery:  "name NOT IN (?, ?, ?, ?)",
+			expectedParams: []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
 		},
 	}
 
@@ -123,31 +123,64 @@ func TestBuildDatabaseExclusion(t *testing.T) {
 		expectedParams  []any
 	}{
 		{
-			name:            "only system databases",
+			name:            "excludes internal DBs but not default",
 			columnName:      "database",
 			ignoreDatabases: []string{},
-			expectedQuery:   "database NOT IN (?, ?, ?, ?, ?)",
-			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
+			expectedQuery:   "database NOT IN (?, ?, ?, ?)",
+			expectedParams:  []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper"},
 		},
 		{
-			name:            "system and user databases",
+			name:            "internal DBs plus user-specified ignored databases",
 			columnName:      "name",
 			ignoreDatabases: []string{"testing_db", "temp_db"},
-			expectedQuery:   "name NOT IN (?, ?, ?, ?, ?, ?, ?)",
-			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "testing_db", "temp_db"},
+			expectedQuery:   "name NOT IN (?, ?, ?, ?, ?, ?)",
+			expectedParams:  []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "testing_db", "temp_db"},
 		},
 		{
-			name:            "single ignored database",
+			name:            "single user-specified ignored database",
 			columnName:      "database",
 			ignoreDatabases: []string{"staging"},
-			expectedQuery:   "database NOT IN (?, ?, ?, ?, ?, ?)",
-			expectedParams:  []any{"default", "system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "staging"},
+			expectedQuery:   "database NOT IN (?, ?, ?, ?, ?)",
+			expectedParams:  []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "staging"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query, params := buildDatabaseExclusion(tt.columnName, tt.ignoreDatabases)
+			require.Equal(t, tt.expectedQuery, query)
+			require.Equal(t, tt.expectedParams, params)
+		})
+	}
+}
+
+func TestBuildDatabaseNameExclusion(t *testing.T) {
+	tests := []struct {
+		name            string
+		columnName      string
+		ignoreDatabases []string
+		expectedQuery   string
+		expectedParams  []any
+	}{
+		{
+			name:            "excludes default and internal DBs",
+			columnName:      "name",
+			ignoreDatabases: []string{},
+			expectedQuery:   "name NOT IN (?, ?, ?, ?, ?)",
+			expectedParams:  []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "default"},
+		},
+		{
+			name:            "default, internal, and user-specified databases",
+			columnName:      "name",
+			ignoreDatabases: []string{"staging"},
+			expectedQuery:   "name NOT IN (?, ?, ?, ?, ?, ?)",
+			expectedParams:  []any{"system", "information_schema", "INFORMATION_SCHEMA", "housekeeper", "default", "staging"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, params := buildDatabaseNameExclusion(tt.columnName, tt.ignoreDatabases)
 			require.Equal(t, tt.expectedQuery, query)
 			require.Equal(t, tt.expectedParams, params)
 		})

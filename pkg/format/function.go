@@ -23,7 +23,7 @@ func (f *Formatter) formatCreateFunction(w io.Writer, stmt *parser.CreateFunctio
 			if _, err := w.Write([]byte(" " + f.keyword("on") + " " + f.keyword("cluster") + " ")); err != nil {
 				return err
 			}
-			if _, err := w.Write([]byte(f.identifier(*stmt.OnCluster))); err != nil {
+			if _, err := w.Write([]byte(f.clusterName(*stmt.OnCluster))); err != nil {
 				return err
 			}
 		}
@@ -94,7 +94,7 @@ func (f *Formatter) formatDropFunction(w io.Writer, stmt *parser.DropFunctionStm
 
 		// Add ON CLUSTER if specified
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("on")+" "+f.keyword("cluster"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("on")+" "+f.keyword("cluster"), f.clusterName(*stmt.OnCluster))
 		}
 
 		if _, err := w.Write([]byte(strings.Join(parts, " "))); err != nil {

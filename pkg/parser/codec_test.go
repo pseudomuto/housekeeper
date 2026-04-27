@@ -94,6 +94,27 @@ func TestCodecSpec(t *testing.T) {
 				},
 				expected: false,
 			},
+			{
+				// ClickHouse expands ZSTD → ZSTD(1) in create_table_query.
+				// When the target (b) has no explicit params, the stored default is acceptable.
+				name: "live has ClickHouse-expanded params, target has no params",
+				a: CodecSpec{
+					Name:       "ZSTD",
+					Parameters: []TypeParameter{{Number: utils.Ptr("1")}},
+				},
+				b:        CodecSpec{Name: "ZSTD"},
+				expected: true,
+			},
+			{
+				// ClickHouse expands Delta → Delta(8) for 8-byte column types.
+				name: "live has ClickHouse-expanded Delta params, target has no params",
+				a: CodecSpec{
+					Name:       "Delta",
+					Parameters: []TypeParameter{{Number: utils.Ptr("8")}},
+				},
+				b:        CodecSpec{Name: "Delta"},
+				expected: true,
+			},
 		}
 
 		for _, tt := range tests {
