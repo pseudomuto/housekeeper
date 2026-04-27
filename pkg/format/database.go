@@ -40,7 +40,7 @@ func (f *Formatter) alterDatabase(w io.Writer, stmt *parser.AlterDatabaseStmt) e
 
 		// ON CLUSTER
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		// Action
@@ -76,7 +76,7 @@ func (f *Formatter) attachDatabase(w io.Writer, stmt *parser.AttachDatabaseStmt)
 
 		// ON CLUSTER
 		if stmt.OnCluster != nil {
-			parts = append(parts, f.keyword("ON CLUSTER"), f.identifier(*stmt.OnCluster))
+			parts = append(parts, f.keyword("ON CLUSTER"), f.clusterName(*stmt.OnCluster))
 		}
 
 		_, err := w.Write([]byte(strings.Join(parts, " ") + ";"))

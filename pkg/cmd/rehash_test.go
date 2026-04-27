@@ -20,7 +20,7 @@ func TestRehashCommand_WithMigrations(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -53,7 +53,7 @@ func TestRehashCommand_EmptyMigrationsDirectory(t *testing.T) {
 	// Ensure migrations directory exists but is empty
 	testutil.RequireDirEmpty(t, fixture.GetMigrationsDir())
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -83,7 +83,7 @@ func TestRehashCommand_NoMigrationsDirectory(t *testing.T) {
 	err := os.RemoveAll(fixture.GetMigrationsDir())
 	require.NoError(t, err)
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -111,7 +111,7 @@ func TestRehashCommand_UpdatesExistingSumFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(originalContent), "oldhash")
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -141,7 +141,7 @@ func TestRehashCommand_WithMultipleMigrations(t *testing.T) {
 		WithMigrations(testutil.SampleMigrations())
 	defer fixture.Cleanup()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -175,7 +175,7 @@ func TestRehashCommand_FilePermissions(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -200,7 +200,7 @@ func TestRehashCommand_InvalidMigrations(t *testing.T) {
 		})
 	defer fixture.Cleanup()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -226,7 +226,7 @@ func TestRehashCommand_MigrationCount(t *testing.T) {
 		WithMigrations(migrations)
 	defer fixture.Cleanup()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -247,7 +247,7 @@ func TestRehashCommand_CommandStructure(t *testing.T) {
 	fixture := testutil.TestProject(t)
 	defer fixture.Cleanup()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	require.Equal(t, "rehash", command.Name)
 	require.Equal(t, "Regenerate the sum file for all migrations", command.Usage)
@@ -273,7 +273,7 @@ func TestRehashCommand_ReadOnlyMigrationsDir(t *testing.T) {
 		_ = os.Chmod(fixture.GetMigrationsDir(), consts.ModeDir)
 	}()
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -302,7 +302,7 @@ func TestRehashCommand_WithSubdirectories(t *testing.T) {
 	err = os.WriteFile(txtFile, []byte("Not a migration"), consts.ModeFile)
 	require.NoError(t, err)
 
-	command := rehash(fixture.Project)
+	command := rehash(fixture.Project, fixture.Config)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -325,7 +325,7 @@ func TestTestableRehash(t *testing.T) {
 		WithMigrations(testutil.MinimalMigrations())
 	defer fixture.Cleanup()
 
-	command := TestableRehash(fixture.Project)
+	command := TestableRehash(fixture.Project, fixture.Config)
 
 	require.Equal(t, "rehash", command.Name)
 	require.NotNil(t, command.Action)

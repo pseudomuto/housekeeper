@@ -138,7 +138,7 @@ CREATE TABLE test_db.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		var buf bytes.Buffer
 		err := schema.Compile("non-existent-file.sql", &buf)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to read file")
+		require.Contains(t, err.Error(), "no such file or directory")
 	})
 
 	t.Run("returns error for non-existent import", func(t *testing.T) {
@@ -155,7 +155,7 @@ CREATE TABLE test_db.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		var buf bytes.Buffer
 		err = schema.Compile(schemaFile, &buf)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to read file")
+		require.Contains(t, err.Error(), "no such file or directory")
 	})
 
 	t.Run("handles absolute import paths", func(t *testing.T) {
@@ -181,6 +181,41 @@ CREATE TABLE test_db.users (id UInt64) ENGINE = MergeTree() ORDER BY id;`
 		compiled := buf.String()
 		require.Contains(t, compiled, "CREATE DATABASE test_db")
 		require.Contains(t, compiled, "CREATE TABLE test_db.imported_table")
+	})
+
+	t.Run("compiles directory entrypoint in alphabetical order", func(t *testing.T) {
+		schemaDir := t.TempDir()
+
+		err := os.WriteFile(filepath.Join(schemaDir, "02_tables.sql"), []byte(
+			"CREATE TABLE app.users (id UInt64) ENGINE = MergeTree() ORDER BY id;",
+		), consts.ModeFile)
+		require.NoError(t, err)
+
+		err = os.WriteFile(filepath.Join(schemaDir, "01_databases.sql"), []byte(
+			"CREATE DATABASE app ENGINE = Atomic;",
+		), consts.ModeFile)
+		require.NoError(t, err)
+
+		// Non-.sql files should be ignored
+		err = os.WriteFile(filepath.Join(schemaDir, "README.md"), []byte("docs"), consts.ModeFile)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		err = schema.Compile(schemaDir, &buf)
+		require.NoError(t, err)
+
+		compiled := buf.String()
+		require.Contains(t, compiled, "CREATE DATABASE app")
+		require.Contains(t, compiled, "CREATE TABLE app.users")
+		// 01_ must appear before 02_ (alphabetical order)
+		require.Less(t, strings.Index(compiled, "CREATE DATABASE"), strings.Index(compiled, "CREATE TABLE"))
+	})
+
+	t.Run("returns error for non-existent directory", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := schema.Compile("/nonexistent-dir", &buf)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no such file or directory")
 	})
 
 	t.Run("preserves line structure", func(t *testing.T) {

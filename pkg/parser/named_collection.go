@@ -22,7 +22,7 @@ type (
 		Collection     string                      `parser:"'COLLECTION'"`
 		IfNotExists    *string                     `parser:"(@'IF' 'NOT' 'EXISTS')?"`
 		Name           string                      `parser:"@(Ident | BacktickIdent)"`
-		OnCluster      *string                     `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster      *string                     `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		As             string                      `parser:"'AS'"`
 		Parameters     []*NamedCollectionParameter `parser:"@@*"`
 		GlobalOverride *NamedCollectionOverride    `parser:"@@?"`
@@ -41,7 +41,7 @@ type (
 		Collection string                          `parser:"'COLLECTION'"`
 		IfExists   *string                         `parser:"(@'IF' 'EXISTS')?"`
 		Name       string                          `parser:"@(Ident | BacktickIdent)"`
-		OnCluster  *string                         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster  *string                         `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Operations *AlterNamedCollectionOperations `parser:"@@? ';'"`
 	}
 
@@ -67,7 +67,7 @@ type (
 		Collection string  `parser:"'COLLECTION'"`
 		IfExists   *string `parser:"(@'IF' 'EXISTS')?"`
 		Name       string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster  *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster  *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Semicolon  string  `parser:"';'"`
 	}
 

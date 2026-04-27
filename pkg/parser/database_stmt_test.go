@@ -16,6 +16,7 @@ func TestCreateDatabase(t *testing.T) {
 		{name: "full_options", sql: "CREATE DATABASE IF NOT EXISTS full_db ON CLUSTER production ENGINE = Atomic COMMENT 'Full featured database';"},
 		{name: "with_backticks", sql: "CREATE DATABASE `user-database` ENGINE = Atomic;"},
 		{name: "backticks_full", sql: "CREATE DATABASE IF NOT EXISTS `order-db` ON CLUSTER `prod-cluster` COMMENT 'Database with special chars';"},
+		{name: "on_cluster_macro", sql: "CREATE DATABASE mydb ON CLUSTER '{cluster}' ENGINE = Atomic;"},
 	}
 
 	runStatementTests(t, "database/create", tests)

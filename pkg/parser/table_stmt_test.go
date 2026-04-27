@@ -53,6 +53,9 @@ func TestCreateTable(t *testing.T) {
 		SETTINGS index_granularity = 8192, merge_with_ttl_timeout = 3600
 		COMMENT 'User events table';`},
 
+		// Cluster macro references ('{cluster}', '{shard}', etc.)
+		{name: "on_cluster_macro", sql: `CREATE TABLE steam_market_data ON CLUSTER '{cluster}' (ts DateTime64(6), price Int64) ENGINE = ReplicatedReplacingMergeTree() ORDER BY ts;`},
+
 		// Backticks
 		{name: "with_backticks", sql: "CREATE TABLE `user-db`.`order-table` (`user-id` UInt64, `order-id` String, `order-date` Date, `select` String, `group` LowCardinality(String)) ENGINE = MergeTree() ORDER BY (`user-id`, `order-date`);"},
 
@@ -220,6 +223,7 @@ func TestDropTable(t *testing.T) {
 		{name: "basic", sql: `DROP TABLE users;`},
 		{name: "if_exists", sql: `DROP TABLE IF EXISTS temp_table;`},
 		{name: "on_cluster", sql: `DROP TABLE measurements ON CLUSTER production;`},
+		{name: "on_cluster_macro", sql: `DROP TABLE IF EXISTS events ON CLUSTER '{cluster}';`},
 		{name: "sync", sql: `DROP TABLE user_profiles SYNC;`},
 		{name: "full_options", sql: `DROP TABLE IF EXISTS analytics.old_events ON CLUSTER production SYNC;`},
 		{name: "with_backticks", sql: "DROP TABLE IF EXISTS `analytics-db`.`user-events` ON CLUSTER `prod-cluster`;"},

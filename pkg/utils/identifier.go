@@ -1,6 +1,17 @@
 package utils
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
+
+// chMacroRe matches ClickHouse server-side macro references as stored by the
+// participle lexer. The lexer emits String tokens with their surrounding single
+// quotes intact, so '{cluster}' is stored as the Go string "'{cluster}'".
+//
+// Pattern: opening quote, opening brace, a valid ClickHouse identifier
+// ([A-Za-z_][A-Za-z0-9_]*), closing brace, closing quote.
+var chMacroRe = regexp.MustCompile(`^'\{[A-Za-z_][A-Za-z0-9_]*\}'$`)
 
 // BacktickIdentifier adds backticks around an identifier, handling nested identifiers.
 // It properly handles database.table.column style identifiers by backticking each part.
@@ -93,6 +104,73 @@ func BacktickQualifiedName(database *string, name string) string {
 //   - "" -> false
 func IsBackticked(s string) bool {
 	return len(s) >= 2 && s[0] == '`' && s[len(s)-1] == '`' && !strings.Contains(s[1:len(s)-1], "`")
+}
+
+// IsClusterMacro reports whether a cluster name is a ClickHouse server macro reference.
+//
+// ClickHouse macros use single-quoted braces in ON CLUSTER clauses, e.g. '{cluster}',
+// '{shard}'. These are expanded at query execution time from the server's macros config
+// (<macros><cluster>…</cluster></macros>). They must be preserved verbatim in DDL so that
+// migrations are portable across clusters with different names.
+//
+// The parser stores the raw lexer token value for String tokens, which includes the
+// surrounding single quotes, so '{cluster}' is stored as the Go string "'{cluster}'".
+//
+// Examples:
+//
+//	IsClusterMacro("'{cluster}'") → true
+//	IsClusterMacro("'{shard}'")   → true
+//	IsClusterMacro("default")     → false
+//	IsClusterMacro("")            → false
+func IsClusterMacro(s string) bool {
+	return len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\''
+}
+
+// IsClickHouseMacro reports whether s is a ClickHouse server macro reference
+// of the form '{identifier}' (single-quoted curly-brace expression).
+//
+// This is stricter than IsClusterMacro: it requires the inner content to be a
+// valid identifier wrapped in curly braces, matching the ClickHouse <macros>
+// config substitution syntax. Use this when you need to distinguish a genuine
+// server macro (suitable for cross-cluster portability) from an arbitrary
+// single-quoted cluster name.
+//
+// Examples:
+//
+//	IsClickHouseMacro("'{cluster}'")      → true
+//	IsClickHouseMacro("'{shard}'")        → true
+//	IsClickHouseMacro("'{replica}'")      → true
+//	IsClickHouseMacro("'plain-string'")   → false  (no braces)
+//	IsClickHouseMacro("default")          → false  (not quoted)
+//	IsClickHouseMacro("")                 → false
+func IsClickHouseMacro(s string) bool {
+	return chMacroRe.MatchString(s)
+}
+
+// FormatClusterName formats a cluster name for use in SQL DDL output.
+//
+// This is the single, canonical place where the macro-vs-identifier distinction is
+// handled for ON CLUSTER clauses. It is used by the formatter, SQLBuilder, and the
+// schema DDL generators so that macro syntax is preserved end-to-end.
+//
+// - Macro references (e.g. "'{cluster}'") are returned as-is — the single quotes are
+//   part of the ClickHouse syntax and must not be wrapped in backticks.
+// - Plain identifiers (e.g. "default", "my-cluster") are backtick-quoted for safety.
+//
+// Examples:
+//
+//	FormatClusterName("'{cluster}'") → "'{cluster}'"
+//	FormatClusterName("default")     → "`default`"
+//	FormatClusterName("")            → ""
+func FormatClusterName(name string) string {
+	switch {
+	case name == "":
+		return ""
+	case IsClusterMacro(name):
+		return name
+	default:
+		return BacktickIdentifier(name)
+	}
 }
 
 // StripBackticks removes backticks from an identifier if present.
