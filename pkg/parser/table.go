@@ -187,10 +187,11 @@ type (
 
 	// EngineParameter represents a parameter in an ENGINE clause
 	EngineParameter struct {
-		Expression *Expression `parser:"@@"`
-		String     *string     `parser:"| @String"`
-		Number     *string     `parser:"| @Number"`
-		Ident      *string     `parser:"| @(Ident | BacktickIdent)"`
+		LeadingComments []string    `parser:"@(Comment | MultilineComment)*"`
+		Expression      *Expression `parser:"  @@"`
+		String          *string     `parser:"| @String"`
+		Number          *string     `parser:"| @Number"`
+		Ident           *string     `parser:"| @(Ident | BacktickIdent)"`
 	}
 
 	// OrderByClause represents ORDER BY expression

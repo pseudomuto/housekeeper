@@ -494,27 +494,74 @@ func (f *Formatter) formatTableEngine(engine *parser.TableEngine) string {
 	if engine == nil {
 		return ""
 	}
-
-	result := engine.Name
-	// Always add parentheses for consistency
-	result += "("
-	if len(engine.Parameters) > 0 {
-		var params []string
-		for _, param := range engine.Parameters {
-			if param.Expression != nil {
-				params = append(params, f.formatEngineParameter(param.Expression))
-			} else if param.String != nil {
-				params = append(params, *param.String)
-			} else if param.Number != nil {
-				params = append(params, *param.Number)
-			} else if param.Ident != nil {
-				params = append(params, f.identifier(*param.Ident))
-			}
-		}
-		result += strings.Join(params, ", ")
+	if len(engine.Parameters) == 0 {
+		return engine.Name + "()"
 	}
-	result += ")"
-	return result
+	if engineParametersHaveComments(engine.Parameters) {
+		return f.formatTableEngineMultiline(engine)
+	}
+
+	params := make([]string, 0, len(engine.Parameters))
+	for _, param := range engine.Parameters {
+		if v, ok := f.formatEngineParameterValue(&param); ok {
+			params = append(params, v)
+		}
+	}
+	return engine.Name + "(" + strings.Join(params, ", ") + ")"
+}
+
+// engineParametersHaveComments reports whether any parameter has leading comments
+func engineParametersHaveComments(params []parser.EngineParameter) bool {
+	for _, p := range params {
+		if len(p.LeadingComments) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// formatTableEngineMultiline renders the engine call multi-line with comments interleaved
+func (f *Formatter) formatTableEngineMultiline(engine *parser.TableEngine) string {
+	indent := f.indent(1)
+	var b strings.Builder
+	b.WriteString(engine.Name)
+	b.WriteString("(\n")
+	last := len(engine.Parameters) - 1
+	for i := range engine.Parameters {
+		param := &engine.Parameters[i]
+		for _, c := range param.LeadingComments {
+			b.WriteString(indent)
+			b.WriteString(c)
+			b.WriteString("\n")
+		}
+		v, ok := f.formatEngineParameterValue(param)
+		if !ok {
+			continue
+		}
+		b.WriteString(indent)
+		b.WriteString(v)
+		if i < last {
+			b.WriteString(",")
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString(")")
+	return b.String()
+}
+
+// formatEngineParameterValue formats the value portion of an engine parameter
+func (f *Formatter) formatEngineParameterValue(param *parser.EngineParameter) (string, bool) {
+	switch {
+	case param.Expression != nil:
+		return f.formatEngineParameter(param.Expression), true
+	case param.String != nil:
+		return *param.String, true
+	case param.Number != nil:
+		return *param.Number, true
+	case param.Ident != nil:
+		return f.identifier(*param.Ident), true
+	}
+	return "", false
 }
 
 // formatEngineParameter formats an expression in engine parameters with special handling for simple identifiers

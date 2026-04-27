@@ -106,6 +106,22 @@ func TestCreateTable(t *testing.T) {
 		{name: "as_on_cluster", sql: `CREATE TABLE events_distributed ON CLUSTER production AS events_local ENGINE = Distributed(production, currentDatabase(), events_local, rand());`},
 		{name: "as_full_options", sql: `CREATE OR REPLACE TABLE IF NOT EXISTS analytics.events_all ON CLUSTER analytics_cluster AS analytics.events_local ENGINE = Distributed(analytics_cluster, analytics, events_local, cityHash64(user_id)) SETTINGS index_granularity = 8192 COMMENT 'Distributed view of events_local';`},
 
+		// Comments inside engine argument lists
+		{name: "engine_args_leading_comment", sql: `CREATE TABLE replicated_events (id UInt64, ver UInt64) ENGINE = ReplicatedReplacingMergeTree(
+    -- shared keeper path keeps replicas in sync
+    '/clickhouse/tables/{shard}/{database}/replicated_events',
+    '{replica}',
+    ver
+) ORDER BY id;`},
+		{name: "engine_args_inter_arg_comments", sql: `CREATE TABLE replicated_events (id UInt64, ver UInt64) ENGINE = ReplicatedReplacingMergeTree(
+    '/clickhouse/tables/{shard}/replicated_events',
+    -- per-replica identity from server macros
+    '{replica}',
+    -- monotonic version column for replacement
+    ver
+) ORDER BY id;`},
+		{name: "engine_args_block_comment", sql: `CREATE TABLE replicated_events (id UInt64, ver UInt64) ENGINE = ReplicatedReplacingMergeTree(/* keeper path */ '/p', '{replica}', ver) ORDER BY id;`},
+
 		// CREATE TABLE AS with table functions
 		{name: "as_remote", sql: `CREATE TABLE remote_copy AS remote('host:9000', 'db', 'table') ENGINE = MergeTree() ORDER BY id;`},
 		{name: "as_cluster", sql: `CREATE TABLE cluster_data AS cluster('my_cluster', 'default', 'events') ENGINE = MergeTree() ORDER BY id;`},
