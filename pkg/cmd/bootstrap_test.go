@@ -30,13 +30,19 @@ func TestBootstrapCommand_RequiresConfig(t *testing.T) {
 }
 
 func TestBootstrapCommand_RequiresURL(t *testing.T) {
-	// Test that bootstrap command requires URL flag
+	// HOUSEKEEPER_DATABASE_URL must be absent so the Required: true check fires.
+	// When set (e.g. by devenv), urfave/cli satisfies the flag via its EnvVars
+	// source and the action runs instead of returning a validation error.
+	if orig, had := os.LookupEnv("HOUSEKEEPER_DATABASE_URL"); had {
+		os.Unsetenv("HOUSEKEEPER_DATABASE_URL")
+		t.Cleanup(func() { os.Setenv("HOUSEKEEPER_DATABASE_URL", orig) })
+	}
+
 	fixture := testutil.TestProject(t)
 	defer fixture.Cleanup()
 
 	command := bootstrap(fixture.Project, fixture.Config)
 
-	// Create a test CLI app to test flag validation
 	app := &cli.Command{
 		Name:   "test",
 		Flags:  command.Flags,
@@ -44,8 +50,7 @@ func TestBootstrapCommand_RequiresURL(t *testing.T) {
 		Before: command.Before,
 	}
 
-	ctx := context.Background()
-	err := app.Run(ctx, []string{"test"}) // No --url flag
+	err := app.Run(context.Background(), []string{"test"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Required flag \"url\" not set")
 }

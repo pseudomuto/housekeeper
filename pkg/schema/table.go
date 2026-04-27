@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	A "github.com/IBM/fp-go/v2/array"
+	O "github.com/IBM/fp-go/v2/option"
 	"github.com/pseudomuto/housekeeper/pkg/compare"
 	"github.com/pseudomuto/housekeeper/pkg/consts"
 	"github.com/pseudomuto/housekeeper/pkg/parser"
@@ -194,6 +196,20 @@ func compareTables(current, target *parser.SQL) ([]*TableDiff, error) {
 	targetTables, err := extractTablesFromSQL(target)
 	if err != nil {
 		return nil, err
+	}
+
+	// Normalise the cluster name in all current (live-DB) tables to match the
+	// target schema's cluster convention. ClickHouse expands macros like
+	// '{cluster}' to their concrete values (e.g. 'default') when reporting
+	// SHOW CREATE TABLE, so the current state always holds the concrete name.
+	// Without this step, ALTER/DROP/RENAME migrations would hard-code the
+	// cluster name instead of preserving the portable macro syntax.
+	if sc := inferSchemaCluster(targetTables); sc != "" {
+		for _, t := range currentTables {
+			if t.Cluster != "" {
+				t.Cluster = sc
+			}
+		}
 	}
 
 	// Pre-allocate diffs slice with estimated capacity
@@ -556,9 +572,36 @@ func findRenamedTable(targetTable *TableInfo, currentTables, targetTables map[st
 	return ""
 }
 
-// tablesEqual compares two tables for equality
-func tablesEqual(a, b *TableInfo) bool {
-	return a.Equal(b)
+// inferSchemaCluster returns the authoritative cluster name from the target schema.
+// Priority:
+//  1. Any server macro (e.g. '{cluster}') — portable across clusters.
+//  2. Unanimous plain name — all clustered tables agree on the same value.
+//  3. "" — mixed names or no clustered tables; conservative, avoids incorrect rewrites.
+//
+// The result is applied to live-DB tables before diff generation so that ALTER / DROP /
+// RENAME migrations emit the same cluster syntax as the desired schema instead of the
+// concrete name ClickHouse reports after macro expansion.
+func inferSchemaCluster(tables map[string]*TableInfo) string {
+	clusters := make([]string, 0, len(tables))
+	for _, t := range tables {
+		if t.Cluster != "" {
+			clusters = append(clusters, t.Cluster)
+		}
+	}
+	return O.MonadGetOrElse(
+		O.MonadAlt(
+			A.FindFirst(utils.IsClickHouseMacro)(clusters),
+			func() O.Option[string] {
+				return O.MonadChain(A.Head(clusters), func(first string) O.Option[string] {
+					if A.Any(func(c string) bool { return c != first })(clusters) {
+						return O.None[string]()
+					}
+					return O.Some(first)
+				})
+			},
+		),
+		func() string { return "" },
+	)
 }
 
 // tablesEqualIgnoringName compares two tables for equality ignoring name and database
@@ -683,11 +726,13 @@ func formatQualifiedTableName(database, name string) string {
 	return name
 }
 
-// writeOnClusterClause writes an ON CLUSTER clause if cluster is specified
+// writeOnClusterClause writes an ON CLUSTER clause if cluster is specified.
+// Uses FormatClusterName so that macro references (e.g. '{cluster}') are emitted verbatim
+// and plain names are backtick-quoted for safety.
 func writeOnClusterClause(sql *strings.Builder, cluster string) {
 	if cluster != "" {
 		sql.WriteString(" ON CLUSTER ")
-		sql.WriteString(cluster)
+		sql.WriteString(utils.FormatClusterName(cluster))
 	}
 }
 
@@ -913,7 +958,7 @@ func handleTableExists(tableName string, currentTable, targetTable *TableInfo) (
 	// For comparison purposes, flatten the target table to match ClickHouse's internal representation
 	// Current table is already flattened by ClickHouse, but target table may have Nested syntax
 	flattenedTargetTable := FlattenNestedColumns(targetTable)
-	if tablesEqual(currentTable, flattenedTargetTable) {
+	if currentTable.Equal(flattenedTargetTable) {
 		return nil, nil
 	}
 

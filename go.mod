@@ -4,6 +4,7 @@ go 1.25.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.41.0
+	github.com/IBM/fp-go/v2 v2.1.22
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0

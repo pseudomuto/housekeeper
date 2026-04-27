@@ -3,270 +3,197 @@ package docker
 import (
 	"context"
 	"fmt"
+	"net"
 	"path/filepath"
 	"time"
 
-	"github.com/docker/go-connections/nat"
+	F "github.com/IBM/fp-go/v2/function"
+	O "github.com/IBM/fp-go/v2/option"
+	R "github.com/IBM/fp-go/v2/result"
 	"github.com/pkg/errors"
 )
 
 const (
-	// DefaultClickHousePort is the default port for ClickHouse server
-	DefaultClickHousePort = 9000
-
-	// DefaultClickHouseHTTPPort is the default HTTP port for ClickHouse server
+	DefaultClickHousePort     = 9000
 	DefaultClickHouseHTTPPort = 8123
+
+	readinessDeadline     = 120 * time.Second
+	readinessPollInterval = 500 * time.Millisecond
+	readinessDialTimeout  = 2 * time.Second
 )
 
 type (
-	// DockerOptions represents options for running ClickHouse in Docker
+	// DockerOptions configures a ClickHouseContainer.
 	DockerOptions struct {
-		// Version is the ClickHouse version to run (default: latest)
+		// Version is the ClickHouse image tag to use (default: latest).
 		Version string
 
-		// ConfigDir is the optional ClickHouse config directory path to mount (relative paths will be converted to absolute)
+		// ConfigDir is an optional host path to mount as /etc/clickhouse-server/config.d.
+		// Relative paths are resolved to absolute before mounting.
 		ConfigDir string
 
-		// Name is the container name (default: housekeeper-dev)
+		// Name is the container name (default: housekeeper-dev).
 		Name string
+
+		// AddressResolver determines how to obtain the container's network address.
+		// When nil, DockerAddressResolver is used (localhost + mapped host ports).
+		// Use podman.NewPodmanAddressResolver() or podman.NewAutoDetectResolver() for Podman.
+		AddressResolver AddressResolver
 	}
 
-	// ClickHouseContainer manages ClickHouse Docker containers for development
+	// ClickHouseContainer manages a ClickHouse container for local development.
 	ClickHouseContainer struct {
-		options DockerOptions
-		engine  *engine
-		running bool
-		ports   map[int]int // hostPort -> containerPort mapping
+		options         DockerOptions
+		engine          *engine
+		running         bool
+		addressResolver AddressResolver
 	}
 )
 
-// New creates a new ClickHouse Docker container with default options
-//
-// Example:
-//
-//	// Create Docker client
-//	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer cli.Close()
-//
-//	container, err := docker.New(cli)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	// Start ClickHouse container
-//	if err := container.Start(ctx); err != nil {
-//		log.Fatal(err)
-//	}
-//	defer container.Stop(ctx)
+// New creates a ClickHouseContainer with default options.
 func New(dockerClient DockerClient) (*ClickHouseContainer, error) {
 	return NewWithOptions(dockerClient, DockerOptions{})
 }
 
-// NewWithOptions creates a new ClickHouse Docker container with custom options
-//
-// Example:
-//
-//	// Create Docker client
-//	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer cli.Close()
-//
-//	opts := docker.DockerOptions{
-//		Version:   "25.7",
-//		ConfigDir: "/path/to/project/db/config.d",
-//	}
-//	container, err := docker.NewWithOptions(cli, opts)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	// Start ClickHouse container
-//	if err := container.Start(ctx); err != nil {
-//		log.Fatal(err)
-//	}
-//	defer container.Stop(ctx)
+// NewWithOptions creates a ClickHouseContainer with the given options.
 func NewWithOptions(dockerClient DockerClient, opts DockerOptions) (*ClickHouseContainer, error) {
-	engine := newEngine(dockerClient)
-
+	resolver := opts.AddressResolver
+	if resolver == nil {
+		resolver = &DockerAddressResolver{}
+	}
 	return &ClickHouseContainer{
-		options: opts,
-		engine:  engine,
-		running: false,
-		ports:   make(map[int]int),
+		options:         opts,
+		engine:          newEngine(dockerClient),
+		addressResolver: resolver,
 	}, nil
 }
 
-// Start starts a ClickHouse Docker container with the configured version
+func (c *ClickHouseContainer) containerName() string {
+	return O.MonadGetOrElse(O.FromNonZero[string]()(c.options.Name), F.Constant("housekeeper-dev"))
+}
+
+// Start pulls the image, cleans up any stale container with the same name, then starts a
+// fresh container and waits for ClickHouse to accept TCP connections.
+//
+// Stale cleanup prevents "name already in use" failures when a previous run was interrupted
+// before Stop was called.
 func (c *ClickHouseContainer) Start(ctx context.Context) error {
 	if c.running {
 		return errors.New("container is already running")
 	}
 
-	// Determine ClickHouse version to use
-	version := c.options.Version
-	if version == "" {
-		version = "latest"
+	version := O.MonadGetOrElse(O.FromNonZero[string]()(c.options.Version), F.Constant("latest"))
+
+	containerName := c.containerName()
+
+	if err := c.engine.StopIfExists(ctx, containerName); err != nil {
+		return errors.Wrapf(err, "failed to clean up existing container %q", containerName)
 	}
 
-	// Determine container name to use
-	containerName := c.options.Name
-	if containerName == "" {
-		containerName = "housekeeper-dev"
-	}
-
-	// Build container options
 	containerOpts := ContainerOptions{
 		Name:  containerName,
 		Image: fmt.Sprintf("clickhouse/clickhouse-server:%s-alpine", version),
-		Env: map[string]string{
-			"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": "1",
-		},
+		Env:   map[string]string{"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": "1"},
 		Ports: map[int]int{
-			// Use negative values as placeholders for dynamic port assignment
-			-1: DefaultClickHousePort,     // Let Docker assign random host port for native port 9000
-			-2: DefaultClickHouseHTTPPort, // Let Docker assign random host port for HTTP port 8123
+			-1: DefaultClickHousePort,
+			-2: DefaultClickHouseHTTPPort,
 		},
 	}
 
-	// Add config directory mount if specified
 	if c.options.ConfigDir != "" {
-		// Convert to absolute path to ensure proper mounting
 		absConfigDir, err := filepath.Abs(c.options.ConfigDir)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get absolute path for ConfigDir: %s", c.options.ConfigDir)
 		}
+		containerOpts.Volumes = []ContainerVolume{{
+			HostPath:      absConfigDir,
+			ContainerPath: "/etc/clickhouse-server/config.d",
+			ReadOnly:      true,
+		}}
+	}
 
-		containerOpts.Volumes = []ContainerVolume{
-			{
-				HostPath:      absConfigDir,
-				ContainerPath: "/etc/clickhouse-server/config.d",
-				ReadOnly:      true,
-			},
+	return R.ToError(F.Pipe2(
+		R.TryCatchError(struct{}{}, errors.Wrap(c.engine.Pull(ctx, containerOpts.Image), "failed to pull ClickHouse image")),
+		R.Chain(func(_ struct{}) R.Result[struct{}] {
+			return R.TryCatchError(struct{}{}, errors.Wrap(c.engine.Start(ctx, containerOpts), "failed to start ClickHouse container"))
+		}),
+		R.Chain(func(_ struct{}) R.Result[struct{}] {
+			c.running = true
+			return R.TryCatchError(struct{}{}, errors.Wrap(c.waitForReady(ctx), "ClickHouse container failed to become ready"))
+		}),
+	))
+}
+
+// waitForReady polls the ClickHouse native port via TCP until it accepts connections
+// or readinessDeadline elapses. The address is resolved through the injected
+// AddressResolver so Podman bridge IPs work without special-casing.
+func (c *ClickHouseContainer) waitForReady(ctx context.Context) error {
+	addr, err := c.addressResolver.Resolve(ctx, c.engine.client, c.containerName())
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve container address for readiness check")
+	}
+
+	target := net.JoinHostPort(addr.Host, fmt.Sprintf("%d", addr.NativePort))
+	deadline := time.Now().Add(readinessDeadline)
+
+	for time.Now().Before(deadline) {
+		conn, dialErr := net.DialTimeout("tcp", target, readinessDialTimeout)
+		if dialErr == nil {
+			_ = conn.Close()
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(readinessPollInterval):
 		}
 	}
 
-	// Pull the image first
-	if err := c.engine.Pull(ctx, containerOpts.Image); err != nil {
-		return errors.Wrap(err, "failed to pull ClickHouse image")
-	}
-
-	// Start the container
-	if err := c.engine.Start(ctx, containerOpts); err != nil {
-		return errors.Wrap(err, "failed to start ClickHouse container")
-	}
-
-	c.running = true
-
-	// Wait for ClickHouse to be ready
-	if err := c.waitForReady(ctx); err != nil {
-		return errors.Wrap(err, "ClickHouse container failed to become ready")
-	}
-
-	return nil
+	return errors.Errorf("ClickHouse at %s failed to become ready within %s", target, readinessDeadline)
 }
 
-// waitForReady waits for ClickHouse to be ready to accept connections
-func (c *ClickHouseContainer) waitForReady(ctx context.Context) error {
-	// Simple wait implementation - just wait a few seconds
-	// In a more sophisticated implementation, we would check HTTP endpoint
-	select {
-	case <-time.After(10 * time.Second):
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// Stop stops and removes the ClickHouse Docker container
+// Stop stops and removes the container.
 func (c *ClickHouseContainer) Stop(ctx context.Context) error {
 	if !c.running {
-		return nil // Already stopped
+		return nil
 	}
-
-	// Determine container name
-	containerName := c.options.Name
-	if containerName == "" {
-		containerName = "housekeeper-dev"
-	}
-
-	err := c.engine.Stop(ctx, containerName)
+	err := c.engine.Stop(ctx, c.containerName())
 	c.running = false
-
 	if err != nil {
 		return errors.Wrap(err, "failed to stop ClickHouse container")
 	}
-
 	return nil
 }
 
-// GetDSN returns the DSN for connecting to the Docker ClickHouse instance
+// GetDSN returns the native-protocol DSN for the running container.
 func (c *ClickHouseContainer) GetDSN(ctx context.Context) (string, error) {
 	if !c.running {
 		return "", errors.New("container is not running")
 	}
-
-	// Determine container name
-	containerName := c.options.Name
-	if containerName == "" {
-		containerName = "housekeeper-dev"
-	}
-
-	// Inspect container to get port mapping
-	inspect, err := c.engine.client.ContainerInspect(ctx, containerName)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to inspect container")
-	}
-
-	// Find the mapped port for ClickHouse native port (9000)
-	nativePort := nat.Port(fmt.Sprintf("%d/tcp", DefaultClickHousePort))
-	bindings, exists := inspect.NetworkSettings.Ports[nativePort]
-	if !exists || len(bindings) == 0 {
-		return "", errors.New("ClickHouse native port not exposed")
-	}
-
-	host := "localhost"
-	port := bindings[0].HostPort
-
-	return fmt.Sprintf("clickhouse://default:@%s:%s/", host, port), nil
+	addr, err := c.addressResolver.Resolve(ctx, c.engine.client, c.containerName())
+	return R.UnwrapError(F.Pipe1(
+		R.TryCatchError(addr, errors.Wrap(err, "failed to resolve container address")),
+		R.Map(func(addr *ContainerAddress) string {
+			return fmt.Sprintf("clickhouse://default:@%s:%d/", addr.Host, addr.NativePort)
+		}),
+	))
 }
 
-// GetHTTPDSN returns the HTTP DSN for connecting to the Docker ClickHouse instance
+// GetHTTPDSN returns the HTTP DSN for the running container.
 func (c *ClickHouseContainer) GetHTTPDSN(ctx context.Context) (string, error) {
 	if !c.running {
 		return "", errors.New("container is not running")
 	}
-
-	// Determine container name
-	containerName := c.options.Name
-	if containerName == "" {
-		containerName = "housekeeper-dev"
-	}
-
-	// Inspect container to get port mapping
-	inspect, err := c.engine.client.ContainerInspect(ctx, containerName)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to inspect container")
-	}
-
-	// Find the mapped port for ClickHouse HTTP port (8123)
-	httpPort := nat.Port(fmt.Sprintf("%d/tcp", DefaultClickHouseHTTPPort))
-	bindings, exists := inspect.NetworkSettings.Ports[httpPort]
-	if !exists || len(bindings) == 0 {
-		return "", errors.New("ClickHouse HTTP port not exposed")
-	}
-
-	host := "localhost"
-	port := bindings[0].HostPort
-
-	return fmt.Sprintf("http://%s:%s", host, port), nil
+	addr, err := c.addressResolver.Resolve(ctx, c.engine.client, c.containerName())
+	return R.UnwrapError(F.Pipe1(
+		R.TryCatchError(addr, errors.Wrap(err, "failed to resolve container address")),
+		R.Map(func(addr *ContainerAddress) string {
+			return fmt.Sprintf("http://%s:%d", addr.Host, addr.HTTPPort)
+		}),
+	))
 }
 
-// IsRunning returns true if the container is currently running
+// IsRunning reports whether the container is currently running.
 func (c *ClickHouseContainer) IsRunning() bool {
 	return c.running
 }

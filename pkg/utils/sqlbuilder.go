@@ -138,13 +138,17 @@ func (b *SQLBuilder) QualifiedName(database *string, name string) *SQLBuilder {
 
 // OnCluster adds an ON CLUSTER clause if cluster is not empty.
 //
+// Plain cluster names are backtick-quoted; ClickHouse macro references (e.g. '{cluster}')
+// are emitted verbatim so that generated migrations are portable across clusters.
+//
 // Example:
 //
-//	builder.OnCluster("production")  // ON CLUSTER `production`
-//	builder.OnCluster("")            // (nothing added)
+//	builder.OnCluster("production")   // ON CLUSTER `production`
+//	builder.OnCluster("'{cluster}'")  // ON CLUSTER '{cluster}'
+//	builder.OnCluster("")             // (nothing added)
 func (b *SQLBuilder) OnCluster(cluster string) *SQLBuilder {
 	if cluster != "" {
-		b.parts = append(b.parts, "ON", "CLUSTER", BacktickIdentifier(cluster))
+		b.parts = append(b.parts, "ON", "CLUSTER", FormatClusterName(cluster))
 	}
 	return b
 }

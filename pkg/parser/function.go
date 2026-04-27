@@ -7,7 +7,7 @@ type (
 	CreateFunctionStmt struct {
 		LeadingCommentField
 		Name       string           `parser:"'CREATE' 'FUNCTION' @(Ident | BacktickIdent)"`
-		OnCluster  *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster  *string          `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		Parameters []*FunctionParam `parser:"'AS' ( '(' (@@ (',' @@)*)? ')' | @@ )"`
 		Expression *Expression      `parser:"'->' @@"`
 		TrailingCommentField
@@ -20,7 +20,7 @@ type (
 		LeadingCommentField
 		IfExists  bool    `parser:"'DROP' 'FUNCTION' @('IF' 'EXISTS')?"`
 		Name      string  `parser:"@(Ident | BacktickIdent)"`
-		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent))?"`
+		OnCluster *string `parser:"('ON' 'CLUSTER' @(Ident | BacktickIdent | String))?"`
 		TrailingCommentField
 		Semicolon bool `parser:"';'"`
 	}
