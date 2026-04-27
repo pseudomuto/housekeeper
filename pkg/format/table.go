@@ -249,7 +249,11 @@ func (f *Formatter) formatTableClauseType(clause *parser.TableClause) string {
 		return f.keyword("SAMPLE BY") + " " + f.formatExpression(&clause.SampleBy.Expression)
 	}
 	if clause.TTL != nil {
-		return f.keyword("TTL") + " " + f.formatExpression(&clause.TTL.Expression)
+		out := f.keyword("TTL") + " " + f.formatExpression(&clause.TTL.Expression)
+		if action := f.formatTTLAction(clause.TTL.Action); action != "" {
+			out += " " + action
+		}
+		return out
 	}
 	if clause.Settings != nil && len(clause.Settings.Settings) > 0 {
 		return f.formatTableSettings(clause.Settings)
@@ -555,6 +559,24 @@ func getSimpleIdentifierName(expr *parser.Expression) string {
 		return ""
 	}
 	return expr.Or.And.Not.Comparison.Addition.Multiplication.Unary.Primary.Identifier.Name
+}
+
+// formatTTLAction formats the optional TTL action keyword
+func (f *Formatter) formatTTLAction(action *parser.TTLAction) string {
+	if action == nil {
+		return ""
+	}
+	switch {
+	case action.Delete:
+		return f.keyword("DELETE")
+	case action.ToDisk != nil:
+		return f.keyword("TO DISK") + " " + *action.ToDisk
+	case action.ToVolume != nil:
+		return f.keyword("TO VOLUME") + " " + *action.ToVolume
+	case action.Recompress != nil:
+		return f.keyword("RECOMPRESS") + " " + f.formatCodec(&action.Recompress.Codec)
+	}
+	return ""
 }
 
 // formatTableSettings formats the SETTINGS clause

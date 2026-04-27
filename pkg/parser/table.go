@@ -218,9 +218,25 @@ type (
 	}
 
 	// TableTTLClause represents table-level TTL expression
+	//   TTL expr [DELETE | TO DISK 'name' | TO VOLUME 'name' | RECOMPRESS CODEC(...)]
 	TableTTLClause struct {
 		TTL        string     `parser:"'TTL'"`
 		Expression Expression `parser:"@@"`
+		Action     *TTLAction `parser:"@@?"`
+	}
+
+	// TTLAction represents the optional action keyword on a table-level TTL clause
+	TTLAction struct {
+		Delete     bool           `parser:"  @'DELETE'"`
+		ToDisk     *string        `parser:"| 'TO' 'DISK' @String"`
+		ToVolume   *string        `parser:"| 'TO' 'VOLUME' @String"`
+		Recompress *TTLRecompress `parser:"| @@"`
+	}
+
+	// TTLRecompress represents the RECOMPRESS CODEC(...) action of a TTL clause
+	TTLRecompress struct {
+		Recompress string      `parser:"'RECOMPRESS'"`
+		Codec      CodecClause `parser:"@@"`
 	}
 
 	// TableSettingsClause represents SETTINGS clause
